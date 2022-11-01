@@ -1,0 +1,5 @@
+class MethodParams {
+    List<MethodParam> optionalParams = [];
+    List<MethodParam> namedParams = [];
+    List<MethodParam> positionalParams = [];
+}

@@ -1,0 +1,9 @@
+class ClassDecl extends TopDecl {
+    Boolean isAbstract;
+    TypeParams generics;
+    DataType extendType;
+    List<DataType> impls = [];
+    List<ClassMember> members = [];
+    List<DataType> mixins = [];
+    ClassDecl(String name) : super(name, TopDeclType.Class);
+} 

@@ -1,0 +1,5 @@
+enum CommentType {
+    SINGLE,
+    MULTI,
+    DOC,
+}

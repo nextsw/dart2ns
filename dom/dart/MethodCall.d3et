@@ -1,0 +1,15 @@
+class MethodCall extends Statement {
+    String name;
+    List<DataType> typeArgs = [];
+    List<Argument> positionArgs = [];
+    List<NamedArgument> namedArgs = [];
+    Boolean checkNull;
+    Boolean notNull;
+    Expression on;
+    MethodCall({
+        this.name,
+        this.typeArgs,
+        this.positionArgs,
+        this.namedArgs,
+    });
+}

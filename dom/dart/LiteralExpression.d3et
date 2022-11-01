@@ -1,0 +1,6 @@
+class LiteralExpression extends Expression {
+    String value;
+    LiteralType type;
+    Boolean isRawString;
+    LiteralExpression({this.value, this.type, this.isRawString});
+}

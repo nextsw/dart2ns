@@ -1,0 +1,8 @@
+class ForLoop extends Statement {
+    Block body;
+    Declaration decl;
+    Expression test;
+    List<Statement> inits = [];
+    List<Statement> resets = [];
+    ForLoop({this.body, this.decl, this.test, this.inits, this.resets});
+}

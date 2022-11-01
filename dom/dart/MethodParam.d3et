@@ -1,0 +1,11 @@
+class MethodParam {
+    List<Comment> beforeComments = [];
+    String thisToken;
+    Expression defaultValue;
+    Boolean required;
+    Boolean deprecated;
+    DataType dataType;
+    String name;
+    List<Annotation> annotations = [];
+    MethodParam({this.thisToken, this.name, this.dataType, this.deprecated, this.required, this.annotations, this.defaultValue});
+}

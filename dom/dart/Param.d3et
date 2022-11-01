@@ -1,0 +1,4 @@
+class Param {
+    String name;
+    Param({this.name});
+}

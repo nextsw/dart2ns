@@ -1,0 +1,6 @@
+class TypeCastOrCheckExpression extends Expression {
+    Boolean check;
+    DataType dataType;
+    Expression exp;
+    TypeCastOrCheckExpression({this.check, this.dataType, this.exp});
+}

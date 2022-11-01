@@ -1,0 +1,4 @@
+class CaseExpression {
+    List<Expression> tests = [];
+    Expression result;
+}

@@ -1,0 +1,5 @@
+class Annotation {
+    String name;
+    String value;
+    Annotation({this.name, this.value});
+}

@@ -1,0 +1,6 @@
+class CollectionIf extends ArrayItem {
+    Expression test;
+    ArrayItem thenItem;
+    ArrayItem elseItem;
+    CollectionIf({this.test, this.thenItem, this.elseItem});
+}

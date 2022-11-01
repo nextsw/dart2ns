@@ -1,0 +1,5 @@
+class DoWhileLoop extends Statement {
+    Block body;
+    Expression test;
+    DoWhileLoop({this.body, this.test});
+}

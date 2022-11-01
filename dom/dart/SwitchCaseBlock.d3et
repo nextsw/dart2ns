@@ -1,0 +1,4 @@
+class SwitchCaseBlock {
+    List<Expression> tests = [];
+    List<Statement> statements = [];
+}

@@ -1,0 +1,8 @@
+abstract class TopDecl {
+    TopDeclType type;
+    String name;
+    String path;
+    List<GenError> errors;
+    List<Annotation> annotations;
+    TopDecl(this.name, this.type, {this.path});
+}

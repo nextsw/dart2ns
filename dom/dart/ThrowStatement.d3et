@@ -1,0 +1,3 @@
+class ThrowStatement extends Statement {
+    Expression exp;    
+}

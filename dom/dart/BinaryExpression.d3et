@@ -1,0 +1,6 @@
+class BinaryExpression extends Expression {
+    String op;
+    Expression left;
+    Expression right;
+    BinaryExpression({this.op, this.left, this.right});
+}

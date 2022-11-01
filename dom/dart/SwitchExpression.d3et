@@ -1,0 +1,6 @@
+class SwitchExpression extends Expression {
+    Expression on;
+    List<CaseExpression> cases = [];
+    Expression onElse;
+    SwitchExpression({this.on, this.cases});
+}

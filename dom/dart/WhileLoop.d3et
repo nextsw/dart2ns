@@ -1,0 +1,5 @@
+class WhileLoop extends Statement {
+    Block body;
+    Expression test;
+    WhileLoop({this.body, this.test});
+}

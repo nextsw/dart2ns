@@ -1,0 +1,5 @@
+class ArrayAccess extends Expression {
+    Expression on;
+    Expression index;
+    ArrayAccess({this.on, this.index});
+}

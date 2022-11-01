@@ -1,0 +1,6 @@
+class CollectionSpread extends ArrayItem {
+    Expression values;
+    List<Comment> beforeComments = [];
+    Boolean checkNull;
+    CollectionSpread({this.values, this.beforeComments, this.checkNull});
+}

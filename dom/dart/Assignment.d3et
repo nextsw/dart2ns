@@ -1,0 +1,6 @@
+class Assignment extends Statement {
+    String op;
+    Expression left;
+    Expression right;
+    Assignment({this.op, this.left, this.right});
+}

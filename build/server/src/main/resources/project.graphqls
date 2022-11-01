@@ -1,0 +1,407 @@
+scalar Date
+
+scalar LocalDate
+
+scalar LocalDateTime
+
+scalar LocalTime
+
+scalar OffsetDateTime
+
+scalar ExpressionString
+
+scalar BlockString
+
+scalar Type
+
+scalar Duration
+
+schema
+{
+	query: Query
+	mutation: Mutation
+}
+
+union BaseUserUnionX =  AnonymousUser
+
+interface DBObject
+{
+	id : Long
+	localId : Long
+}
+
+type DatabaseObject
+{
+	object : DBObject
+}
+
+type DFile
+{
+	name : String
+	id : String
+	size : Long
+}
+
+input DFileEntityInput
+{
+	name : String
+	id : String
+	size : Long
+}
+
+type LoginResult
+{
+	success : Boolean
+	token : String
+	failureMessage : String
+	userObject : UserUnionX
+}
+
+input ObjectRef
+{
+	id : Long
+	type : String
+}
+
+type Query
+{
+	getObject : DatabaseObject
+	getAnonymousUserById ( id: Long ) : AnonymousUser
+	getOneTimePasswordById ( id: Long ) : OneTimePassword
+	checkTokenUniqueInOneTimePassword ( oneTimePasswordId: Long token: String ) : Boolean
+	getVerificationDataById ( id: Long ) : VerificationData
+	loginWithOTP ( token: String code: String ) : LoginResult
+}
+
+type Mutation
+{
+}
+
+type MutateOneTimePasswordResult
+{
+	status : MutateResultStatus
+	value : OneTimePassword
+	errors : [String]
+}
+
+type Subscription
+{
+	onAnonymousUserChangeEvent : AnonymousUserChangeEvent
+	onAnonymousUserChangeEventById ( ids: [Long] ) : AnonymousUserChangeEvent
+	onBaseUserChangeEvent : BaseUserChangeEvent
+	onBaseUserChangeEventById ( ids: [Long] ) : BaseUserChangeEvent
+	onBaseUserSessionChangeEvent : BaseUserSessionChangeEvent
+	onBaseUserSessionChangeEventById ( ids: [Long] ) : BaseUserSessionChangeEvent
+	onOneTimePasswordChangeEvent : OneTimePasswordChangeEvent
+	onOneTimePasswordChangeEventById ( ids: [Long] ) : OneTimePasswordChangeEvent
+	onVerificationDataChangeEvent : VerificationDataChangeEvent
+	onVerificationDataChangeEventById ( ids: [Long] ) : VerificationDataChangeEvent
+}
+
+type AnonymousUserChangeEvent
+{
+	model : AnonymousUser
+	changeType : ChangeEventType
+}
+
+type BaseUserChangeEvent
+{
+	model : BaseUserUnionX
+	changeType : ChangeEventType
+}
+
+type BaseUserSessionChangeEvent
+{
+	model : BaseUserSession
+	changeType : ChangeEventType
+}
+
+type OneTimePasswordChangeEvent
+{
+	model : OneTimePassword
+	changeType : ChangeEventType
+}
+
+type VerificationDataChangeEvent
+{
+	model : VerificationData
+	changeType : ChangeEventType
+}
+
+type AnonymousUser
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	isActive : Boolean
+	deviceToken : String
+}
+
+input AnonymousUserEntityInput
+{
+	id : Long
+	isActive : Boolean
+	deviceToken : String
+}
+
+type Avatar
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	image : D3EImage
+	createFrom : String
+}
+
+input AvatarEntityInput
+{
+	id : Long
+	image : D3EImageEntityInput
+	createFrom : String
+}
+
+input BaseUserEntityInputUnionX
+{
+	type : String
+	valueAnonymousUser : AnonymousUserEntityInput
+}
+
+input BaseUserEntityInput
+{
+	id : Long
+	isActive : Boolean
+	deviceToken : String
+}
+
+type BaseUserSession
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	userSessionId : String
+}
+
+input BaseUserSessionEntityInputUnionX
+{
+	type : String
+}
+
+input BaseUserSessionEntityInput
+{
+	id : Long
+	userSessionId : String
+}
+
+type ChangePasswordRequest
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	newPassword : String
+}
+
+input ChangePasswordRequestEntityInput
+{
+	id : Long
+	newPassword : String
+}
+
+type D3EImage
+{
+	size : Long
+	width : Long
+	height : Long
+	file : DFile
+}
+
+input D3EImageEntityInput
+{
+	id : Long
+	size : Long
+	width : Long
+	height : Long
+	file : DFileEntityInput
+}
+
+type EmailMessage
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	from : String
+	to : [String]
+	body : String
+	createdOn : LocalDateTime
+	bcc : [String]
+	cc : [String]
+	subject : String
+	html : Boolean
+	inlineAttachments : [DFile]
+	attachments : [DFile]
+}
+
+input EmailMessageEntityInput
+{
+	id : Long
+	from : String
+	to : [String]
+	body : String
+	createdOn : LocalDateTime
+	bcc : [String]
+	cc : [String]
+	subject : String
+	html : Boolean
+	inlineAttachments : [DFileEntityInput]
+	attachments : [DFileEntityInput]
+}
+
+type OneTimePassword
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	input : String
+	inputType : String
+	userType : String
+	success : Boolean
+	errorMsg : String
+	token : String
+	expiry : LocalDateTime
+}
+
+input OneTimePasswordEntityInput
+{
+	id : Long
+	input : String
+	inputType : String
+	userType : String
+}
+
+type PushNotification
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	deviceTokens : [String]
+	title : String
+	body : String
+	path : String
+}
+
+input PushNotificationEntityInput
+{
+	id : Long
+	deviceTokens : [String]
+	title : String
+	body : String
+	path : String
+}
+
+type ReportConfig
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	identity : String
+	values : [ReportConfigOption]
+}
+
+input ReportConfigEntityInput
+{
+	id : Long
+	identity : String
+	values : [ReportConfigOptionEntityInput]
+}
+
+type ReportConfigOption
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	identity : String
+	value : String
+}
+
+input ReportConfigOptionEntityInput
+{
+	id : Long
+	identity : String
+	value : String
+}
+
+type SMSMessage
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	from : String
+	to : [String]
+	body : String
+	createdOn : LocalDateTime
+	dltTemplateId : String
+}
+
+input SMSMessageEntityInput
+{
+	id : Long
+	from : String
+	to : [String]
+	body : String
+	createdOn : LocalDateTime
+	dltTemplateId : String
+}
+
+type VerificationData
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	method : String
+	context : String
+	subject : String
+	body : String
+}
+
+input VerificationDataEntityInput
+{
+	id : Long
+	method : String
+	context : String
+	subject : String
+	body : String
+}
+
+type VerificationDataByTokenRequest
+	implements DBObject
+{
+	id : Long
+	localId : Long
+	token : String
+}
+
+input VerificationDataByTokenRequestEntityInput
+{
+	id : Long
+	token : String
+}
+
+enum MutateResultStatus {
+	ServerError
+	Success
+	AuthFail
+	ValidationFail
+	BadRequest
+}
+
+enum ChangeEventType {
+	Insert
+	Update
+	Delete
+}
+
+enum SubscriptionChangeType {
+	All
+	Insert
+	Update
+	Delete
+}

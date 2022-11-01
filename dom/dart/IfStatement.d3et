@@ -1,0 +1,6 @@
+class IfStatement extends Statement {
+    Expression test;
+    Statement thenStatement;
+    Statement elseStatement;
+    IfStatement({this.test, this.thenStatement, this.elseStatement});
+}

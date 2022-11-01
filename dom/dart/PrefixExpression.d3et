@@ -1,0 +1,5 @@
+class PrefixExpression extends Statement {
+    String prefix;
+    Expression on;
+    PrefixExpression({this.prefix, this.on});
+}

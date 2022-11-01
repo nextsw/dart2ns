@@ -1,0 +1,14 @@
+(Project Dart2Ns {
+    name 'Dart2NS'
+    domain 'ns.dart'
+    package 'ns.dart'
+    javaNativeDeps [
+
+    ]    
+    dartNativeDeps [
+
+    ]
+    resourceBundles [
+        
+    ]
+})

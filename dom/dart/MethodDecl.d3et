@@ -1,0 +1,36 @@
+class MethodDecl extends ClassMember{
+    String name;
+    List<Annotation> annotations = [];
+    MethodParams params;
+    DataType returnType;
+    Boolean final;
+    Boolean static;
+    Boolean const;
+    Boolean setter;
+    Boolean getter;
+    Boolean factory;
+    Expression init;
+    String factoryName;
+    TypeParams generics;
+    Block body;
+    ASyncType asyncType;
+    MethodDecl({
+        this.name, 
+        this.params, 
+        this.returnType,
+        this.annotations,
+        this.final, 
+        this.static,
+        this.const,
+        this.setter,
+        this.getter,
+        this.factory,
+        this.init,
+        this.factoryName,
+        this.generics,
+        this.body,
+        this.asyncType,
+    });
+    String content;
+
+}

@@ -1,0 +1,730 @@
+server class TypeScanner {
+
+    static String singleQuote = '\'';
+
+    static String doubleQuote = '\"';
+
+    static String numSep = '_';
+
+    Integer pos = 0;
+
+    Integer lineNo = 0;
+
+    Integer lastNlPos = 0;
+
+    Boolean isInsideString = false;
+
+    Boolean isInterStart = false;
+
+    Boolean isInterEnd = false;
+
+    String lineComment;
+
+    Boolean isStarted = false;
+
+    Integer tidex = 0;
+
+    String text;
+
+    String quote;
+
+    Integer noLines = 0;
+
+    Integer eofs = 0;
+
+    TypeScanner(this.text);
+
+    TypeToken scan() {
+        while (true) {
+            if (isStarted) {
+                pos++;
+            }
+            isStarted = true;
+            if (pos >= text.length) {
+                return endOfFile();
+            }
+            if (!isInsideString) {
+                skipWhiteSpace();
+            }
+            if (isInterEnd) {
+                // TODO
+                
+            }
+            skipWhiteSpace();
+            if (pos >= text.length) {
+                return endOfFile();
+            }
+            String c = text.get(pos);
+            String nextc = lookAhead(1);
+            if (ParserUtil.isNameChar(c)) {
+                String name = identName();
+                String nextChar = lookAhead(1);
+                TypeKind kind = TypeToken.keywords.get(name);
+                if (kind != TypeKind.Unknown && kind != null) {
+                    return newToken(kind, name, name.length);
+                }
+                if (isInsideString) {
+                    if (nextChar == quote) {
+                        isInterEnd = true;
+                        isInterStart = false;
+                        isInsideString = false;
+                    }
+                }
+                return newToken(TypeKind.Name, name, name.length);
+            } else if (ParserUtil.isDigit(c) || ((c == '.' && ParserUtil.isDigit(nextc)) || c == '-' && ParserUtil.isDigit(nextc))) {
+                if (!isInsideString) {
+                    Integer startPos = pos;
+                    while (startPos < text.length && text.get(startPos) == '0') {
+                        startPos++;
+                    }
+                    Integer prefixZeroNum = startPos - pos;
+                    if (startPos == text.length || (c == '0' && !ParserUtil.isDigit(text.get(startPos)))) {
+                        prefixZeroNum--;
+                    }
+                    pos += prefixZeroNum;
+                }
+                String num = identNumber();
+                this.pos++;
+                return newToken(TypeKind.Number, num, num.length);
+            }
+            this.pos++;
+            switch (c) {
+                case '+':
+                    {
+                        if (nextc == '+') {
+                            pos++;
+                            return newToken(TypeKind.Inc, '++', 2);
+                        } else if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.PlusAssign, '+=', 2);
+                        }
+                        return newToken(TypeKind.Plus, '+', 1);
+                    }
+
+                case '-':
+                    {
+                        if (nextc == '-') {
+                            pos++;
+                            return newToken(TypeKind.Dec, '--', 2);
+                        } else if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.MinusAssign, '-=', 2);
+                        } else if (nextc == '>') {
+                            pos++;
+                            return newToken(TypeKind.Map, '->', 2);
+                        }
+                        return newToken(TypeKind.Minus, '-', 1);
+                    }
+
+                case '*':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.MultAssign, '*=', 2);
+                        }
+                        return newToken(TypeKind.Mul, '*', 1);
+                    }
+
+                case '^':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.XorAssign, '^=', 2);
+                        }
+                        return newToken(TypeKind.Xor, '^', 1);
+                    }
+
+                case '%':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.ModAssign, '%=', 2);
+                        }
+                        return newToken(TypeKind.Mod, '%', 1);
+                    }
+
+                case '?':
+                    {
+                        if (nextc == '?') {
+                            pos++;
+                            return newToken(TypeKind.DoubleQuestion, '??', 2);
+                        }
+                        return newToken(TypeKind.Question, '?', 1);
+                    }
+                case '(':
+                    {
+                        return newToken(TypeKind.Lpar, '(', 1);
+                    }
+
+                case ')':
+                    {
+                        return newToken(TypeKind.Rpar, ')', 1);
+                    }
+
+                case '[':
+                    {
+                        return newToken(TypeKind.Lsbr, '[', 1);
+                    }
+
+                case ']':
+                    {
+                        return newToken(TypeKind.Rsbr, ']', 1);
+                    }
+
+                case '{':
+                    {
+                        if (isInsideString) {
+                            continue;
+                        }
+                        return newToken(TypeKind.Lcbr, '{', 1);
+                    }
+                case '$':
+                    {
+                        if (isInsideString) {
+                            return newToken(TypeKind.StrDollar, '$', 1);
+                        }
+                        return newToken(TypeKind.Dollar, '', 1);
+                    }
+                case '}':
+                    {
+                        if (isInsideString) {
+                            pos++;
+                            if (text.get(pos) == quote) {
+                                isInsideString = false;
+                                return newToken(TypeKind.String, quote == TypeScanner.singleQuote ? '\'' : '\"', 1);
+                            }
+                            String identStr = identString();
+                            return newToken(TypeKind.String, identStr, identStr.length + 2);
+                        } else {
+                            return newToken(TypeKind.Rcbr, '}', 1);
+                        }
+                    }
+                case '\'':
+                    {
+                        this.pos--;
+                        String identStr = identString();
+                        return newToken(TypeKind.String, identStr, identStr.length + 2);
+                    }
+
+                case '&':
+                    {
+                        if (nextc == '&') {
+                            pos++;
+                            return newToken(TypeKind.And, '&&', 2);
+                        }
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.AndAssign, '&=', 2);
+                        }
+                        return newToken(TypeKind.Amp, '&', 1);
+                    }
+
+                case '|':
+                    {
+                        if (nextc == '|') {
+                            pos++;
+                            return newToken(TypeKind.Or, '||', 2);
+                        }
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.OrAssign, '|=', 2);
+                        }
+                        return newToken(TypeKind.Pipe, '|', 1);
+                    }
+                case ',':
+                    {
+                        return newToken(TypeKind.Comma, ',', 1);
+                    }
+
+                case '@':
+                    {
+                        return newToken(TypeKind.At, '@', 1);
+                    }
+
+                case '.':
+                    {
+                        if (nextc == '.') {
+                            pos++;
+                            if (text.get(pos) == '.') {
+                                pos++;
+                                return newToken(TypeKind.Ellipses, '...', 3);
+                            }
+                            return newToken(TypeKind.DotDot, '..', 2);
+                        }
+                        return newToken(TypeKind.Dot, '.', 1);
+                    }
+
+                case '#':
+                    {
+                        return newToken(TypeKind.Hash, '#', 1);
+                    }
+
+                case '>':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.Ge, '>=', 2);
+                        } else if (nextc == '>') {
+                            if (pos + 2 < text.length && text.get(pos + 2) == '=') {
+                                pos += 2;
+                                return newToken(TypeKind.RightShiftAssign, '>>=', 3);
+                            }
+                            pos++;
+                            return newToken(TypeKind.RightShift, '>>', 2);
+                        } else {
+                            return newToken(TypeKind.Gt, '>', 1);
+                        }
+                    }
+
+                case '<':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.Le, '<=', 2);
+                        } else if (nextc == '<') {
+                            if (pos + 2 < text.length && text.get(pos + 2) == '=') {
+                                pos += 2;
+                                return newToken(TypeKind.LeftShiftAssign, '<<=', 3);
+                            }
+                            pos++;
+                            return newToken(TypeKind.LeftShift, '<<', 2);
+                        } else {
+                            return newToken(TypeKind.Lt, '<', 1);
+                        }
+                    }
+
+                case '=':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.Eq, '==', 2);
+                        } else if (nextc == '>') {
+                            pos++;
+                            return newToken(TypeKind.Arrow, '=>', 2);
+                        } else {
+                            return newToken(TypeKind.Assign, '=', 1);
+                        }
+                    }
+
+
+                case ':':
+                    {
+                        return newToken(TypeKind.Colon, ':', 1);
+                    }
+
+                case ';':
+                    {
+                        return newToken(TypeKind.Semicolon, ';', 1);
+                    }
+                case '!':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.Ne, '!=', 2);
+                        }
+                        return newToken(TypeKind.Not, '!', 1);
+                    }
+
+                case '~':
+                    {
+                        return newToken(TypeKind.BitNot, '~', 1);
+                    }
+                case '/':
+                    {
+                        if (nextc == '=') {
+                            pos++;
+                            return newToken(TypeKind.DivAssign, '/=', 2);
+                        }
+                        if (nextc == '/') {
+                            Integer start = pos + 1;
+                            ignoreLine();
+                            Integer commentLineEnd = pos;
+                            lineNo--;
+                            String comment = text.substring(start, commentLineEnd);
+                            return newToken(TypeKind.CommentSingle, comment, comment.length + 2);
+                        }
+                        if (nextc == '*') {
+                            Integer start = pos + 1;
+                            while (true) {
+                                pos++;
+                                if (pos >= text.length) {
+                                    lineNo--;
+                                    error('Comment not terminated');
+                                }
+                                if (text.get(pos) == '\n') {
+                                    incLineNumber();
+                                    continue;
+                                }
+                                if (expect('*/', pos)) {
+                                    break;
+                                }
+                            }
+                            String comment = text.substring(start, pos);
+                            this.pos += 2;
+                            return newToken(TypeKind.CommentMulti, comment, comment.length + 4);
+                        }
+                        return newToken(TypeKind.Div, '/', 1);
+                    }
+
+            }
+            break;
+        }
+        return newToken(TypeKind.Eof, '', 1);
+    }
+
+    void ignoreLine() {
+        eatToEndOfLine();
+        incLineNumber();
+    }
+
+    void eatToEndOfLine() {
+        while (pos < text.length && text.get(pos) != '\n') {
+            pos++;
+        }
+    }
+
+    void error(String msg) {
+    }
+
+    void incLineNumber() {
+        lastNlPos = pos;
+        lineNo++;
+        if (lineNo > noLines) {
+            noLines = lineNo;
+        }
+    }
+
+    Boolean expect(String want, Integer startPos) {
+        Integer endPos = startPos + want.length;
+        if (startPos < 0 || startPos >= text.length) {
+            return false;
+        }
+        if (endPos < 0 || endPos > text.length) {
+            return false;
+        }
+        for (Integer x = startPos; x < endPos; x++) {
+            if (text.get(x) != want.get(x - startPos)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    String identString() {
+        String q = text.get(pos);
+        Boolean isQuote = q == singleQuote || q == doubleQuote;
+        Boolean isRaw = isQuote && (pos > 0) && (text.get(pos - 1) == 'r');
+        if (isQuote && !isInsideString) {
+            quote = q;
+        }
+        Integer nCrChars = 0;
+        Integer start = pos;
+        isInsideString = false;
+        String slash = '\\';
+        Boolean escape = false;
+        while (true) {
+            pos++;
+            if (pos >= text.length) {
+                break;
+            }
+            String c = text.get(pos);
+            String prevc = text.get(pos - 1);
+            if (!escape && c == quote) {
+                break;
+            }
+            if (c == slash) {
+                escape = !escape;
+            } else {
+                escape = false;
+            }
+            if (c == '\r') {
+                nCrChars++;
+            }
+            if (c == '\n') {
+                break;
+            }
+        }
+        String lit = '';
+        if (text.get(start) == quote) {
+            start++;
+        }
+        Integer end = pos;
+        if (isInsideString) {
+            end++;
+        }
+        if (start <= pos) {
+            String stringSoFar = text.substring(start, end);
+            if (nCrChars > 0) {
+                stringSoFar = stringSoFar.replaceAll('\r', '');
+            }
+            if (stringSoFar.contains('\\\n')) {
+                lit = trimSlashLineBreak(stringSoFar);
+            } else {
+                lit = stringSoFar;
+            }
+        }
+        return lit;
+    }
+
+    String identDecNumber() {
+        Boolean hasWrongDigit = false;
+        Integer firstWrongDigitPos = 0;
+        String firstWrongDigit = '';
+        Integer startPos = pos;
+        while (pos < text.length) {
+            String c = text.get(pos);
+            if (!ParserUtil.isDigit(c) && c != numSep && c != '-') {
+                if (!ParserUtil.isLetter(c) || (c == 'e' || c == 'E' || c == '-')) {
+                    break;
+                } else if (!hasWrongDigit) {
+                    hasWrongDigit = true;
+                    firstWrongDigitPos = pos;
+                    firstWrongDigit = c;
+                }
+            }
+            pos++;
+        }
+        Boolean callMethod = false;
+        Boolean isRange = false;
+        Boolean isFloatWithoutFraction = false;
+        if (pos < text.length && text.get(pos) == '.') {
+            pos++;
+            if (pos < text.length) {
+                if (ParserUtil.isDigit(text.get(pos))) {
+                    while (pos < text.length) {
+                        String c = text.get(pos);
+                        if (!ParserUtil.isDigit(c)) {
+                            if (!ParserUtil.isLetter(c) || (c == 'e' || c == 'E')) {
+                                if ((c == '.') && (pos + 1 < text.length) && ParserUtil.isLetter(text.get(pos + 1))) {
+                                    callMethod = true;
+                                }
+                                break;
+                            } else if (!hasWrongDigit) {
+                                hasWrongDigit = true;
+                                firstWrongDigitPos = pos;
+                                firstWrongDigit = c;
+                            }
+                        }
+                        pos++;
+                    }
+                } else if (text.get(pos) == '.') {
+                    isRange = true;
+                    pos--;
+                } else if ([
+                    'e',
+                    'E',
+                ].contains(text.get(pos))) {
+                    //s.e5
+                    
+                } else if (ParserUtil.isLetter(text.get(pos))) {
+                    //5.str()
+                    callMethod = true;
+                    pos--;
+                } else if (text.get(pos) != ')') {
+                    //5.
+                    isFloatWithoutFraction = true;
+                    pos--;
+                }
+            }
+        }
+        Boolean hasExp = false;
+        if (pos < text.length && (text.get(pos) == 'e' || text.get(pos) == 'E')) {
+            hasExp = true;
+            pos++;
+            if (pos < text.length && (text.get(pos) == '-' || text.get(pos) == '+')) {
+                pos++;
+            }
+            while (pos < text.length) {
+                String c = text.get(pos);
+                if (!ParserUtil.isDigit(c)) {
+                    if (!ParserUtil.isLetter(c)) {
+                        //5e5.str()
+                        if ((c == '.') && (pos + 1 < text.length) && ParserUtil.isLetter(text.get(pos + 1))) {
+                            callMethod = true;
+                        }
+                        break;
+                    } else if (!hasWrongDigit) {
+                        hasWrongDigit = true;
+                        firstWrongDigitPos = pos;
+                        firstWrongDigit = c;
+                    }
+                }
+                pos++;
+            }
+        }
+        if (hasWrongDigit) {
+            pos = firstWrongDigitPos;
+            error('this number has unsuitable digit');
+        } else if ((text.get(pos - 1) == 'e' || text.get(pos - 1) == 'E')) {
+            pos--;
+            error('exponent has no digits');
+        } else if ((pos < text.length) && (text.get(pos) == '.') && !isRange && !isFloatWithoutFraction && !callMethod) {
+            if (hasExp) {
+                error('exponential part should be integer');
+            } else {
+                error('too many decimal points in number');
+            }
+        }
+        String number = text.substring(startPos, pos).replaceAll(numSep, '');
+        pos--;
+        return number;
+    }
+
+    String identBinNumber() {
+        // TODO: Why does a binary number contain letters?
+        return _identNonDecNumber((c) => !ParserUtil.isBinDigit(c), (c) => (!ParserUtil.isDigit(c) && !ParserUtil.isLetter(c)));
+    }
+
+    String identHexNumber() {
+        return _identNonDecNumber((c) => !ParserUtil.isHexDigit(c), (c) => !ParserUtil.isLetter(c));
+    }
+
+    String identOctNumber() {
+        return _identNonDecNumber((c) => !ParserUtil.isOctDigit(c), (c) => (!ParserUtil.isDigit(c) && !ParserUtil.isLetter(c)));
+    }
+
+    String _identNonDecNumber(OneFunction<String, Boolean> digitCheck, OneFunction<String, Boolean> breakCheck) {
+        Boolean hasWrongDigit = false;
+        Integer firstWrongDigitPos = 0;
+        String firstWrongDigit = '\\0';
+        Integer startPos = this.pos;
+        this.pos += 2;
+        // skip '0x'
+        String c = this.text.get(this.pos);
+        if (c == TypeScanner.numSep) {
+            this.error('separator `_` is only valid between digits in a numeric literal');
+        }
+        while (this.pos < this.text.length) {
+            c = this.text.get(this.pos);
+            if (digitCheck(c) && (c != numSep)) {
+                if (breakCheck(c)) {
+                    break;
+                } else if (!hasWrongDigit) {
+                    hasWrongDigit = true;
+                    firstWrongDigitPos = this.pos;
+                    firstWrongDigit = c;
+                }
+            }
+            this.pos++;
+        }
+        if (startPos + 2 == this.pos) {
+            this.pos--;
+            // adjust error position
+            this.error('number part of this number is not provided');
+        } else if (hasWrongDigit) {
+            this.pos = firstWrongDigitPos;
+            // adjust error position
+            this.error('this number has unsuitable digit `' + firstWrongDigit + '`');
+        }
+        String number = this.text.substring(startPos, this.pos).replaceAll(TypeScanner.numSep, '');
+        this.pos--;
+        return number;
+    }
+
+    String trimSlashLineBreak(String s) {
+        // Integer start = 0;
+        // String retString = s;
+        // while(true) {
+        //     Integer idx = retString.indexOf('\\\n', start);
+        //     if(idx != -1) {
+        //         retString =retString.substring(0, idx) + retString.substring(idx + 2).trim();
+        //         start = idx;
+        //     } else {
+        //         break;
+        //     }
+        // }
+        // return retString;
+        return s.split('\n').map((one) {
+            if (one.endsWith('\\')) {
+                return one.substring(0, one.length - 1);
+            }
+            return one;
+        }).join('');
+    }
+
+    Integer countSymbolBefore(Integer p, String c) {
+        Integer count = 0;
+        for (Integer i = p; i >= 0; i--) {
+            if (text.get(i) != c) {
+                break;
+            }
+            count++;
+        }
+        return count;
+    }
+
+    String identNumber() {
+        if (expect('0x', this.pos)) {
+            return identHexNumber();
+        }
+        if (expect('0b', this.pos)) {
+            return identBinNumber();
+        }
+        if (expect('0o', this.pos)) {
+            return identOctNumber();
+        }
+        return identDecNumber();
+    }
+
+    TypeToken newToken(TypeKind kind, String name, Integer len) {
+        TypeToken token = TypeToken();
+        token.kind = kind;
+        token.lit = name;
+        token.len = len;
+        token.lineNo = this.lineNo;
+        Integer newLineStart = this.lastNlPos > 0 ? this.lastNlPos + 1 : 0;
+        token.index = this.pos - newLineStart - len + 1;
+        if (token.index < 0) {
+            token.index = 0;
+        }
+        token.pos = lastNlPos + token.index;
+        return token;
+    }
+
+    TypeToken newToken2(TypeKind kind, String name, Integer index, Integer len) {
+        TypeToken token = TypeToken();
+        token.kind = kind;
+        token.lit = name;
+        token.len = len;
+        token.lineNo = this.lineNo;
+        token.index = index;
+        return token;
+    }
+
+    static Boolean isNl(String c) {
+        return c == '\r' || c == '\n';
+    }
+
+    TypeToken endOfFile() {
+        eofs++;
+        return newToken(TypeKind.Eof, '', 1);
+    }
+
+    void skipWhiteSpace() {
+        while (pos < text.length && ParserUtil.isSpace(text.get(pos))) {
+            if (expect('\n', pos)) {
+                incLineNumber();
+            }
+            pos++;
+        }
+    }
+
+    String lookAhead(Integer n) {
+        if (pos + n < text.length) {
+            return text.get(pos + n);
+        } else {
+            return '';
+        }
+    }
+
+    String identName() {
+        Integer start = pos;
+        pos++;
+        while ((pos < text.length) && (ParserUtil.isNameChar(text.get(pos)) || ParserUtil.isDigit(text.get(pos)))) {
+            pos++;
+        }
+        String name = text.substring(start, pos);
+        pos--;
+        return name;
+    }
+}

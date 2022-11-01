@@ -1,0 +1,6 @@
+class TerinaryExpression extends Expression {
+    Expression condition;
+    Expression ifTrue;
+    Expression ifFalse;
+    TerinaryExpression({this.condition, this.ifTrue, this.ifFalse});
+}

@@ -1,0 +1,5 @@
+class PostfixExpression extends Statement {
+    String postfix;
+    Expression on;
+    PostfixExpression({this.postfix, this.on});
+}

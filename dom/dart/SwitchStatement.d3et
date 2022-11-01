@@ -1,0 +1,6 @@
+class SwitchStatement extends Statement {
+    Expression test;
+    List<SwitchCaseBlock> cases = [];
+    SwitchStatement({this.test});
+    List<Statement> defaults = [];
+}

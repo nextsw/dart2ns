@@ -1,0 +1,25 @@
+@Java('classes.ParserUtil')
+@Dart('classes#ParserUtil')
+server class ParserUtil {
+    static Boolean isDouble(String s);
+
+    static Boolean isSpace(String s);
+
+    static Boolean isLetter(String s);
+
+    static Boolean isNameChar(String s);
+
+    static Boolean isFuncChar(String s);
+
+    static Boolean containsCapital(String s);
+
+    static Boolean isDigit(String s);
+
+    static Boolean isBinDigit(String s);
+
+    static Boolean isHexDigit(String s);
+
+    static Boolean isOctDigit(String s);
+
+    // static Boolean isKeyKind(Kind k);
+}

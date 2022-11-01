@@ -1,0 +1,198 @@
+server class TypeToken {
+
+    TypeKind kind;
+
+    String lit;
+
+    Integer lineNo = 0;
+
+    Integer pos = 0;
+
+    Integer len = 0;
+
+    Integer index = 0;
+
+    static Integer preLowest = 0;
+    static Integer preCond = 1;
+    static Integer preInAs = 2;
+    static Integer preAssign = 3;
+    static Integer preEq = 4;
+    static Integer preSum = 5;
+    static Integer preProduct = 6;
+    static Integer prePrefix = 7;
+    static Integer prePostfix = 8;
+    static Integer preCall = 9;
+    static Integer preIndex = 10;
+    
+    static Map<TypeKind,String> tokenStrs = buildTokenStrs();
+    static Map<String, TypeKind> keywords = buildKeys();
+    static Map<TypeKind, Integer> precedenceMap = buildPrecedence();
+    static List<TypeKind> infixes = buildInfixes();
+
+    static List<TypeKind> assignTokens = [
+        TypeKind.Assign,
+        TypeKind.PlusAssign,
+        TypeKind.MinusAssign,
+        TypeKind.MultAssign,
+        TypeKind.DivAssign,
+        TypeKind.XorAssign,
+        TypeKind.ModAssign,
+        TypeKind.OrAssign,
+        TypeKind.AndAssign,
+        TypeKind.RightShiftAssign,
+        TypeKind.LeftShiftAssign,
+    ];
+
+    static Map<String, TypeKind> buildKeys(){
+        Map<String, TypeKind> res = Map<String, TypeKind>();
+        for(TypeKind k in TypeKind.values){
+            // TODO: Put this back. We need to fix this for OptionSets in general.
+            // if(k._name.startsWith('key')){
+            // if(ParserUtil.isKeyKind(k)) {
+                String key = tokenStrs.get(k);
+                res.set(key, k);
+            // }
+        }
+        return res;
+    }
+
+    static Map<TypeKind, String> buildTokenStrs() {
+        Map<TypeKind, String> res = Map<TypeKind, String>();
+        res.set(TypeKind.Unknown, 'unknown');
+        res.set(TypeKind.Comma, ',');
+        res.set(TypeKind.Semicolon, ';');
+        res.set(TypeKind.Colon, ':');
+        res.set(TypeKind.Arrow, '=>');
+        res.set(TypeKind.Hash, '#');
+        res.set(TypeKind.At, '@');
+        res.set(TypeKind.Lcbr, '{');
+        res.set(TypeKind.Rcbr, '}');
+        res.set(TypeKind.Lpar, '(');
+        res.set(TypeKind.Rpar, ')');
+        res.set(TypeKind.Lsbr, '[');
+        res.set(TypeKind.Rsbr, ']');
+        res.set(TypeKind.Gt, '>');
+        res.set(TypeKind.Lt, '<');
+        res.set(TypeKind.CommentSingle, '// comment');
+        res.set(TypeKind.CommentMulti, '/* comment');
+        res.set(TypeKind.Dot, '.');
+        return res;
+    }
+    static Map<TypeKind, Integer> buildPrecedence() {
+        Map<TypeKind, Integer> res = Map<TypeKind, Integer>();
+        res.set(TypeKind.Plus, preSum);
+        res.set(TypeKind.Minus, preSum);
+        res.set(TypeKind.Mul, preProduct);
+        res.set(TypeKind.Div, preProduct);
+        res.set(TypeKind.Mod, preProduct);
+        res.set(TypeKind.Xor, preSum);
+        res.set(TypeKind.Pipe, preSum);
+        res.set(TypeKind.Inc, prePostfix);
+        res.set(TypeKind.Dec, prePostfix);
+        res.set(TypeKind.And, preCond);
+        res.set(TypeKind.Or, preCond);
+        res.set(TypeKind.Question, preCond);
+        res.set(TypeKind.DoubleQuestion, preCond);
+        res.set(TypeKind.LeftShift, preProduct);
+        res.set(TypeKind.RightShift, preProduct);
+        res.set(TypeKind.Assign, preAssign);
+        res.set(TypeKind.PlusAssign, preAssign);
+        res.set(TypeKind.MinusAssign, preAssign);
+        res.set(TypeKind.DivAssign, preAssign);
+        res.set(TypeKind.MultAssign, preAssign);
+        res.set(TypeKind.XorAssign, preAssign);
+        res.set(TypeKind.ModAssign, preAssign);
+        res.set(TypeKind.OrAssign, preAssign);
+        res.set(TypeKind.AndAssign, preAssign);
+        res.set(TypeKind.RightShiftAssign, preAssign);
+        res.set(TypeKind.LeftShiftAssign, preAssign);
+        res.set(TypeKind.Lsbr, preIndex);
+        res.set(TypeKind.Eq, preEq);
+        res.set(TypeKind.Ne, preEq);
+        res.set(TypeKind.Gt, preEq);
+        res.set(TypeKind.Lt, preEq);
+        res.set(TypeKind.Ge, preEq);
+        res.set(TypeKind.Le, preEq);
+        res.set(TypeKind.Dot, preCall);
+        res.set(TypeKind.Map, preCall);
+        res.set(TypeKind.DotDot, preCall);
+        res.set(TypeKind.Ellipses, preCall);
+        return res;
+    }
+    static List<TypeKind> buildInfixes(){
+        return [TypeKind.Plus, TypeKind.Minus, TypeKind.Mod, TypeKind.Mul, TypeKind.Div, 
+        TypeKind.Eq, TypeKind.Ne, TypeKind.Gt, TypeKind.Lt, TypeKind.Ge, TypeKind.Le, TypeKind.Or, TypeKind.Xor, 
+	    TypeKind.And, TypeKind.Pipe, TypeKind.Amp, TypeKind.LeftShift, TypeKind.RightShift];
+    }
+
+    static Boolean isAssign(TypeKind kind) {
+        return assignTokens.contains(kind);
+    }
+
+    Integer get precedence {
+        if(precedenceMap.containsKey(this.kind)){
+            return precedenceMap.get(this.kind);
+        } else {
+            if(kind == TypeKind.Name) {
+                if(lit =='is' || lit == 'as') {
+                    return preInAs;
+                }
+            }
+            return 0;
+        }
+    }
+
+    static TypeKind keyToToken(String key){
+        return keywords.get(key);
+    }
+
+    static Boolean isKey(String key) {
+        return keyToToken(key) != null;
+    }
+
+    static String keyToStr(TypeKind kind){
+        return tokenStrs.get(kind);
+    }
+
+    String toString(){
+        return keyToStr(this.kind) + ' "' + this.lit + '"';
+    }
+
+
+
+    Boolean isScalar (){
+        return this.kind == TypeKind.Number || this.kind == TypeKind.String;
+    }
+
+    Boolean isUnary() {
+        return this.kind == TypeKind.Plus
+            || this.kind == TypeKind.Minus
+            || this.kind == TypeKind.Not
+            || this.kind == TypeKind.BitNot
+            || this.kind == TypeKind.Mul
+            || this.kind == TypeKind.Amp;
+    }
+
+    Boolean isRelational() {
+        return this.kind == TypeKind.Lt
+            || this.kind == TypeKind.Le
+            || this.kind == TypeKind.Gt
+            || this.kind == TypeKind.Ge
+            || this.kind == TypeKind.Eq
+            || this.kind == TypeKind.Ne;
+    }
+
+    static Boolean isInfix(TypeKind kind){
+	    return infixes.contains(kind);
+    }
+
+    static Boolean isPrefix(TypeKind kind) {
+        return kind == TypeKind.Inc || kind == TypeKind.Dec || kind == TypeKind.Minus || kind == TypeKind.Plus;
+    }
+
+    static Boolean isPostfix(TypeKind kind) {
+        return kind == TypeKind.Inc || kind == TypeKind.Dec;
+    }
+    
+}
+

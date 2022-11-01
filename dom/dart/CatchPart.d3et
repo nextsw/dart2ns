@@ -1,0 +1,6 @@
+class CatchPart {
+    String exp;
+    Block body;
+    String stackTrace;
+    DataType onType;
+}

@@ -1,0 +1,11 @@
+class NamedArgument {
+    String name;
+    List<Comment> beforeComments = [];
+    List<Comment> afterComments = [];
+    Expression value;
+    NamedArgument({
+        this.name, 
+        this.value,
+        this.afterComments,
+    });
+}

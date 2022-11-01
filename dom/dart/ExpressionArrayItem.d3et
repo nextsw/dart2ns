@@ -1,0 +1,4 @@
+class ExpressionArrayItem extends ArrayItem{
+    Expression exp;
+    ExpressionArrayItem({this.exp});
+}

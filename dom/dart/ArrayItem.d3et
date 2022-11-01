@@ -1,0 +1,4 @@
+class ArrayItem extends Expression {
+    List<Comment> afterComments = [];
+    List<Comment> beforeComments = [];
+}

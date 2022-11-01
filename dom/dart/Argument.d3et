@@ -1,0 +1,5 @@
+class Argument {
+    Expression arg;
+    List<Comment> afterComments = [];
+    Argument({this.arg, this.afterComments});
+}

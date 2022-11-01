@@ -1,0 +1,1563 @@
+server class TypeParser {
+
+    TypeScanner scanner;
+
+    TypeToken tok;
+
+    TypeToken prevTok;
+
+    TypeToken peekTok;
+
+    TypeToken peekTok2;
+
+    TypeToken peekTok3;
+
+    Boolean expectingType = false;
+
+    Boolean insideStrInterp = false;
+
+    List<GenError> errors = [];
+
+    TypeParser({this.scanner});
+
+    static List<TopDecl> parse(String basePath, String text) {
+        List<TopDecl> res = [];
+        TypeParser p = TypeParser(
+            scanner: TypeScanner(text),
+        );
+        p.readFirstToken();
+        while (p.readTopObject(basePath, res)) {
+        }
+        p.eatComments();
+        p.check(TypeKind.Eof);
+        return res;
+    }
+
+    static void updateErrorsPath(String prop, List<GenError> errors) {
+        errors.forEach((e) {
+            e.path = preparePath(prop, e.path);
+        });
+    }
+
+    static String preparePath(String prop, String path) {
+        if (path == null) {
+            return prop;
+        } else if (path.startsWith('[')) {
+            return prop + path;
+        }
+        return prop + '.' + path;
+    }
+
+    Boolean readTopObject(String basePath, List<TopDecl> list) {
+        TypeToken start = tok;
+        eatComments();
+        TopDecl obj = null;
+        List<Annotation> annotations = [];
+        if (isKey(tok, 'library')) {
+            String lib = readLibrary();
+            return true;
+        } else if (isKey(tok, 'export')) {
+            List<TopDecl> objs = readImportOrExport(basePath);
+            list.addAll(objs);
+            return true;
+        } else if(isKey(tok, 'import')) {
+            List<TopDecl> objs = readImportOrExport(basePath);
+            list.addAll(objs);
+            return true;
+        }
+        
+        if (tok.kind == TypeKind.At) {
+            annotations = readAnnotations();
+        } else if (isKey(tok, 'typedef')) {
+            obj = readTypeDef(annotations);
+        } else if (isKey(tok, 'enum')) {
+            obj = readEnum(annotations);
+        } else if (tok.kind == TypeKind.Eof) {
+            obj = null;
+        } else if (isKey(tok, 'class') || isKey(tok, 'abstract')) {
+            obj = readClass(annotations, start);
+        } else {
+            ClassMember mem = readClassMember();
+        }
+        if(obj != null) {
+            list.add(obj);
+        }
+        return true;
+    }
+
+    List<TopDecl> readImportOrExport(String basePath) {
+        next();
+        check(TypeKind.String);
+        String path = tok.lit;
+        String fileConent = readFileFromPath(basePath, path);
+        List<TopDecl> objs = TypeParser.parse(path, fileConent);
+        next();
+        while(tok.kind != TypeKind.Semicolon) {
+            // Ignoring the Show spec
+            next();
+        }
+        check(TypeKind.Semicolon);
+        return objs;
+    }
+
+    static String readFileFromPath(String basePath, String path) {
+        if(path.startsWith('package:')) {
+
+        } else if(path.startsWith('dart:')) {
+
+        } else {
+
+        }
+        return '';
+    }
+
+    String readLibrary(){
+        next();
+        String lib  = checkName();
+        check(TypeKind.Semicolon);
+        return lib;
+    }
+
+    List<Annotation> readAnnotations() {
+        List<Annotation> res = [];
+        while (tok.kind == TypeKind.At) {
+            Annotation at = readAnnotation();
+            res.add(at);
+        }
+        return res;
+    }
+
+    Annotation readAnnotation() {
+        TypeToken start = tok;
+        next();
+        String name = checkName();
+        String value = null;
+        if (tok.kind == TypeKind.Lpar) {
+            next();
+            if (tok.kind == TypeKind.String) {
+                value = tok.lit;
+                next();
+            }
+            check(TypeKind.Rpar);
+        }
+        return Annotation(
+            name: name,
+            value: value,
+        );
+    }
+
+    Enum readEnum(List<Annotation> annotations) {
+        TypeToken start = tok;
+        checkKey('enum');
+        String name = checkName();
+        check(TypeKind.Lcbr);
+        Enum data = Enum(name);
+        data.values.clear();
+        while (tok.kind != TypeKind.Rcbr && tok.kind != TypeKind.Eof) {
+            eatComments();
+            String id = checkName();
+            data.values.add(id);
+            eatComments();
+            if (tok.kind != TypeKind.Comma) {
+                break;
+            } else {
+                next();
+            }
+        }
+        check(TypeKind.Rcbr);
+        data.annotations = annotations;
+        return data;
+    }
+
+    void checkKey(String key) {
+        if (isKey(tok, key)) {
+            next();
+        } else {
+            error('Expected: ' + key + ' found ' + tok.lit);
+        }
+    }
+
+    Typedef readTypeDef(List<Annotation> annotations) {
+        TypeToken start = tok;
+        checkKey('typedef');
+        String name = checkName();
+        TypeParams typeParams = null;
+        if (tok.kind == TypeKind.Lt) {
+            typeParams = readTypeParams();
+        }
+        check(TypeKind.Assign);
+        DataType retType = readType();
+        String fn = checkName();
+        MethodParams params = readMethodParams();
+        check(TypeKind.Semicolon);
+        Typedef data = Typedef(name);
+        data.generics = typeParams;
+        data.method = MethodDecl(
+            name: '$',
+            params: params,
+            returnType: retType,
+        );
+        data.annotations = annotations;
+        return data;
+    }
+
+    TypeParams readTypeParams() {
+        TypeToken start = tok;
+        // Need to call next here to move over the "<"
+        check(TypeKind.Lt);
+        TypeParams params = TypeParams();
+        while (true) {
+            if (tok.kind == TypeKind.Gt) {
+                break;
+            }
+            String name = checkName();
+            DataType type = null;
+            if (isKey(tok, 'extends')) {
+                next();
+                type = readType();
+            }
+            params.params.add(TypeParam(
+                name: name,
+                extendType: type,
+            ));
+            if (this.tok.kind != TypeKind.Comma) {
+                break;
+            } else {
+                next();
+            }
+        }
+        // Need to call next here to move over the ">"
+        check(TypeKind.Gt);
+        return params;
+    }
+
+    MethodParams readMethodParams() {
+        check(TypeKind.Lpar);
+        MethodParams params = MethodParams();
+        while (true) {
+            List<Comment> comments = eatComments();
+            if (tok.kind == TypeKind.Lsbr) {
+                params.optionalParams = readParams(TypeKind.Lsbr, TypeKind.Rsbr);
+            } else if (tok.kind == TypeKind.Lcbr) {
+                params.namedParams = readParams(TypeKind.Lcbr, TypeKind.Rcbr);
+            }
+            if (tok.kind == TypeKind.Eof || tok.kind == TypeKind.Rpar) {
+                break;
+            }
+            params.positionalParams.add(readParam());
+            if (tok.kind == TypeKind.Comma) {
+                next();
+            }
+        }
+        check(TypeKind.Rpar);
+        return params;
+    }
+
+    List<MethodParam> readParams(TypeKind start, TypeKind end) {
+        List<MethodParam> params = [];
+        check(start);
+        while (true) {
+            List<Comment> comments = eatComments();
+            if (tok.kind == end || tok.kind == TypeKind.Eof) {
+                break;
+            }
+            MethodParam param = readParam();
+            param.beforeComments = comments;
+            params.add(param);
+            if (tok.kind == TypeKind.Comma) {
+                next();
+            }
+        }
+        check(end);
+        return params;
+    }
+
+    MethodParam readParam() {
+        TypeToken start = tok;
+        List<Annotation> annotations = [];
+        String name = null;
+        MethodParams fparams = null;
+        Expression def = null;
+        DataType type = null;
+        if (tok.kind == TypeKind.At) {
+            annotations = readAnnotations();
+        }
+        Boolean hasThis = false;
+        if (isKey(tok, 'this')) {
+            hasThis = true;
+            next();
+            check(TypeKind.Dot);
+            name = checkName();
+        } else {
+            type = readType();
+            name = checkName();
+            if (tok.kind == TypeKind.Lpar) {
+                fparams = readMethodParams();
+            }
+        }
+        if (tok.kind == TypeKind.Assign) {
+            def = expr(0);
+            next();
+        }
+        Boolean deprecated = annotations.any((x) => x.name == 'deprecated');
+        Boolean required = annotations.any((x) => x.name == 'required');
+        return MethodParam(
+            thisToken: hasThis ? 'this': null,
+            name: name,
+            dataType: type,
+            deprecated: deprecated,
+            required: required,
+            annotations: annotations,
+            defaultValue: def,
+        );
+    }
+
+    ClassDecl readClass(List<Annotation> annotations, TypeToken start) {
+        Boolean isAbstract = false;
+        Boolean isClient = false;
+        Boolean isServer = false;
+        if (isKey(tok, 'abstract')) {
+            isAbstract = true;
+            next();
+        }
+        if (isKey(tok, 'client')) {
+            isClient = true;
+            next();
+        } else if (isKey(tok, 'server')) {
+            isServer = true;
+            next();
+        }
+        checkKey('class');
+        String name = checkName();
+        ClassDecl cls = ClassDecl(name);
+        cls.isAbstract = isAbstract;
+        if (tok.kind == TypeKind.Lt) {
+            cls.generics = readTypeParams();
+        }
+        if (isKey(tok, 'extends')) {
+            next();
+            cls.extendType = readType();
+        }
+        cls.impls.clear();
+        if (isKey(tok, 'implements')) {
+            next();
+            while (true) {
+                cls.impls.add(readType());
+                if (tok.kind != TypeKind.Comma) {
+                    break;
+                }
+                next();
+            }
+        }
+        if (isKey(tok, 'with')) {
+            next();
+            while (true) {
+                cls.mixins.add(readType());
+                if (tok.kind != TypeKind.Comma) {
+                    break;
+                }
+                next();
+            }
+        }
+        check(TypeKind.Lcbr);
+        cls.members.clear();
+        while (true) {
+            List<Comment> comments = eatComments();
+            if (tok.kind == TypeKind.Rcbr || tok.kind == TypeKind.Eof) {
+                break;
+            }
+            ClassMember member = readClassMember();
+            member.comments = comments;
+            cls.members.add(member);
+        }
+        check(TypeKind.Rcbr);
+        cls.annotations = annotations;
+        return cls;
+    }
+
+    ClassMember readClassMember() {
+        List<Comment> comments = eatComments();
+        TypeToken start = tok;
+        List<Annotation> annotations = readAnnotations();
+        Boolean isStatic = false;
+        Boolean isFinal = false;
+        Boolean isConst = false;
+        Boolean isFactory = false;
+        Boolean isAbstract = false;
+        ASyncType asyncType = ASyncType.NONE;
+        if (isKey(tok, 'static')) {
+            isStatic = true;
+            next();
+        }
+        if (isKey(tok, 'final')) {
+            isFinal = true;
+            next();
+        }
+        if (isKey(tok, 'const')) {
+            isConst = true;
+            next();
+        }
+        if (isKey(tok, 'factory')) {
+            isFactory = true;
+            next();
+        }
+        if (isKey(tok, 'abstract')) {
+            isAbstract = true;
+            next();
+        }
+        String fac = null;
+        String name = null;
+        Expression init = null;
+        if (peekTok.kind == TypeKind.Dot) {
+            fac = checkName();
+            next();
+        }
+        DataType type = null;
+        if (fac == null && isDeclaration()) {
+            // Field Decl
+            type = readType();
+            if (peekTok.kind == TypeKind.Exp || peekTok.kind == TypeKind.Semicolon) {
+                name = checkName();
+                Expression exp = null;
+                if (tok.kind == TypeKind.Exp) {
+                    exp = expr(0);
+                    next();
+                    check(TypeKind.Semicolon);
+                } else {
+                    next();
+                }
+                return FieldDecl(
+                    name: name,
+                    type: type,
+                    value: exp,
+                    static: isStatic,
+                    final: isFinal,
+                    const: isConst,
+                    comments: comments,
+                );
+            }
+        }
+        // Method Decal
+        Block body = null;
+        TypeParams typeParams = null;
+        Boolean isSet = false;
+        Boolean isGet = false;
+        if (!isFactoryDecl()) {
+            if (type == null) {
+                type = readType();
+            }
+            if (peekTok.kind == TypeKind.Name) {
+                if (isKey(tok, 'set')) {
+                    isSet = true;
+                    next();
+                } else if (isKey(tok, 'get')) {
+                    isGet = true;
+                    next();
+                }
+            }
+        }
+        if (name == null) {
+            name = checkName();
+        }
+        if (tok.kind == TypeKind.Lt) {
+            typeParams = readTypeParams();
+        }
+        MethodParams params = null;
+        if (!isGet) {
+            params = readMethodParams();
+        }
+        if (tok.kind == TypeKind.Colon) {
+            //init call
+            init = expr(0);
+            next();
+        }
+        if (isKey(tok, 'async')) {
+            next();
+            asyncType = ASyncType.ASYNC;
+        }
+        if (tok.kind == TypeKind.Lcbr) {
+            body = readBlock(true);
+            next();
+        } else {
+            check(TypeKind.Semicolon);
+        }
+        return MethodDecl(
+            name: name,
+            final: isFinal,
+            static: isStatic,
+            const: isConst,
+            setter: isSet,
+            getter: isGet,
+            factory: isFactory,
+            params: params,
+            init: init,
+            factoryName: fac,
+            returnType: type,
+            generics: typeParams,
+            body: body,
+            annotations: annotations,
+            asyncType: asyncType,
+        );
+    }
+
+    Boolean isFactoryDecl() {
+        return (tok.kind == TypeKind.Name && peekTok.kind == TypeKind.Dot) || (tok.kind == TypeKind.Name && (peekTok.kind == TypeKind.Lt || peekTok.kind == TypeKind.Lpar));
+    }
+
+    List<String> readPath() {
+        check(TypeKind.At);
+        List<String> list = [];
+        while (true) {
+            String name = checkName();
+            list.add(name);
+            if (tok.kind != TypeKind.Dot) {
+                break;
+            }
+            next();
+        }
+        return list;
+    }
+
+    Block readBlock(Boolean withBraces) {
+        Block block = Block();
+        if (withBraces) {
+            check(TypeKind.Lcbr);
+            // check() already calls next once.
+            // next();
+            
+        }
+        while (true) {
+            List<Comment> comments = eatComments();
+            if (tok.kind == TypeKind.Rcbr || tok.kind == TypeKind.Eof) {
+                block.afterComments = comments;
+                break;
+            }
+            Statement smt = readStatement(
+                comments: comments,
+            );
+            if (smt == null) {
+                block.afterComments = comments;
+                break;
+            }
+            block.statements.add(smt);
+        }
+        if (withBraces) {
+            check(TypeKind.Rcbr);
+            // check() already calls next once.
+            // next();
+            
+        }
+        return block;
+    }
+
+    Statement readStatement({Boolean skipSemiColon = false, List<Comment> comments}) {
+        comments = comments != null ? comments : eatComments();
+        Statement smt = null;
+        TypeToken start = tok;
+        if (isKey(tok, 'return')) {
+            smt = readReturn();
+        } else if (isKey(tok, 'throw')) {
+            smt = readThrow();
+        } else if (isKey(tok, 'for')) {
+            smt = readFor();
+        } else if (isKey(tok, 'while')) {
+            smt = readWhile();
+        } else if (isKey(tok, 'do')) {
+            smt = readDoWhile();
+        } else if (isKey(tok, 'switch')) {
+            smt = readSwitch();
+        } else if (isKey(tok, 'if')) {
+            smt = readIf();
+        } else if (isKey(tok, 'try')) {
+            smt = readTry();
+        } else if (isKey(tok, 'break')) {
+            next();
+            check(TypeKind.Semicolon);
+            smt = Break();
+        } else if (isKey(tok, 'continue')) {
+            next();
+            check(TypeKind.Semicolon);
+            smt = Continue();
+        } else if (tok.kind == TypeKind.Lcbr) {
+            smt = readBlock(true);
+        } else {
+            // Declaraton, Assignment, Method Call
+            Boolean isPrefix = TypeToken.isPrefix(this.tok.kind);
+            if (isDeclaration()) {
+                smt = readDecl();
+            } else {
+                // must be assignment or method call
+                Expression exp = expr(0);
+                if (TypeToken.isAssign(tok.kind)) {
+                    // Assignment
+                    smt = readAssignment(exp, start);
+                } else if (isPrefix) {
+                    smt = exp as PrefixExpression;
+                } else if (TypeToken.isPostfix(this.prevTok.kind)) {
+                    smt = exp as PostfixExpression;
+                } else if (exp is MethodCall) {
+                    smt = exp as MethodCall;
+                } else {
+                    error('Unknown expression/statement');
+                }
+            }
+            if (!skipSemiColon) {
+                // We'll need to ignore the semi-colon after the "reset" part of a traditional for loop. No one writes a semi-colon there.
+                check(TypeKind.Semicolon);
+            }
+        }
+        smt.comments = comments;
+        return smt;
+    }
+
+    Assignment readAssignment(Expression left, TypeToken start) {
+        TypeToken opt = tok;
+        String op = tok.lit;
+        next();
+        Expression val = expr(0);
+        return Assignment(
+            op: op,
+            left: left as FieldOrEnumExpression,
+            right: val,
+        );
+    }
+
+    Statement readDecl() {
+        TypeToken start = this.tok;
+        DataType type = readType();
+        String name = checkName();
+        Expression init = null;
+        if (tok.kind != TypeKind.Semicolon) {
+            if (!TypeToken.isAssign(tok.kind)) {
+                error('Expecting an assign operator');
+            } else {
+                next();
+                // Skip over the assign op
+                
+            }
+            init = expr(0);
+        }
+        return Declaration(
+            type: type,
+            name: name,
+            assignment: init,
+        );
+    }
+
+    Boolean isDeclaration() {
+        //Check if it simple declation i.e Integer a; or Integer b = __;
+        Boolean simpleD = (tok.kind == TypeKind.Name && peekTok.kind == TypeKind.Name && (peekTok2.kind == TypeKind.Semicolon || peekTok2.kind == TypeKind.Assign));
+        Boolean isType = tok.kind == TypeKind.Name && peekTok.kind == TypeKind.Lt && peekTok2.kind == TypeKind.Name && (peekTok3.kind == TypeKind.Gt || peekTok3.kind == TypeKind.Comma || peekTok3.kind == TypeKind.Lt);
+        return simpleD || isType;
+    }
+
+    Statement readDoWhile() {
+        TypeToken start = this.tok;
+        next();
+        // Skip over "do"
+        Block block = readBlock(true);
+        next();
+        // Skip over "while"
+        check(TypeKind.Lpar);
+        Expression test = expr(0);
+        check(TypeKind.Rpar);
+        check(TypeKind.Semicolon);
+        return DoWhileLoop(
+            body: block,
+            test: test,
+        );
+    }
+
+    Statement readTry() {
+        TypeToken start = this.tok;
+        next();
+        TryCatcheStatment tcs = TryCatcheStatment();
+        tcs.body = readBlock(true);
+        Block finallyBlock = null;
+        while (isKey(tok, 'on') || isKey(tok, 'catch')) {
+            //read catche
+            TypeToken startC = this.tok;
+            CatchPart catchPart = CatchPart();
+            if (isKey(tok, 'on')) {
+                next();
+                catchPart.onType = readType();
+            }
+            checkKey('catch');
+            check(TypeKind.Lpar);
+            String name = checkName();
+            String asName = null;
+            if (tok.kind == TypeKind.Comma) {
+                next();
+                asName = checkName();
+            }
+            check(TypeKind.Rpar);
+            catchPart.exp = name;
+            catchPart.stackTrace = asName;
+            catchPart.body = readBlock(true);
+            tcs.catchParts.add(catchPart);
+        }
+        if (isKey(tok, 'finally')) {
+            next();
+            tcs.finallyBody = readBlock(true);
+        }
+        return tcs;
+    }
+
+    Statement readIf() {
+        TypeToken start = this.tok;
+        next();
+        check(TypeKind.Lpar);
+        Expression test = expr(0);
+        check(TypeKind.Rpar);
+        Block block = readBlock(true);
+        Statement elseS = null;
+        if (isKey(tok, 'else')) {
+            next();
+            elseS = readStatement();
+        }
+        return IfStatement(
+            test: test,
+            thenStatement: block,
+            elseStatement: elseS,
+        );
+    }
+
+    Statement readSwitch() {
+        TypeToken start = this.tok;
+        next();
+        check(TypeKind.Lpar);
+        Expression test = expr(0);
+        SwitchStatement ss = SwitchStatement(
+            test: test,
+        );
+        check(TypeKind.Rpar);
+        check(TypeKind.Lcbr);
+        while (tok.kind != TypeKind.Rcbr) {
+            List<Comment> comments = eatComments();
+            if (isKey(tok, 'case')) {
+                next();
+                SwitchCaseBlock caseBlock = SwitchCaseBlock();
+                caseBlock.tests.add(expr(0));
+                // while(true) {
+                //     if(tok.kind != TypeKind.Comma) {
+                //         break;
+                //     }
+                // }
+                check(TypeKind.Colon);
+                while (isKey(this.tok, 'case')) {
+                    next();
+                    caseBlock.tests.add(expr(0));
+                    check(TypeKind.Colon);
+                }
+                while (true) {
+                    List<Comment> comments2 = eatComments();
+                    if (tok.kind == TypeKind.Rcbr || isKey(tok, 'case') || isKey(tok, 'default')) {
+                        break;
+                    }
+                    Statement smt = readStatement(
+                        comments: comments2,
+                    );
+                    if (smt == null) {
+                        break;
+                    }
+                    caseBlock.statements.add(smt);
+                }
+                ss.cases.add(caseBlock);
+            } else if (isKey(this.tok, 'default')) {
+                next();
+                check(TypeKind.Colon);
+                while (tok.kind != TypeKind.Rcbr) {
+                    ss.defaults.add(readStatement());
+                }
+                break;
+            } else {
+                break;
+            }
+        }
+        check(TypeKind.Rcbr);
+        return ss;
+    }
+
+    Boolean isKey(TypeToken token, String key) {
+        return token.kind == TypeKind.Name && token.lit == key;
+    }
+
+    Statement readWhile() {
+        TypeToken start = this.tok;
+        next();
+        check(TypeKind.Lpar);
+        Expression test = expr(0);
+        check(TypeKind.Rpar);
+        Block block = readBlock(true);
+        return WhileLoop(
+            body: block,
+            test: test,
+        );
+    }
+
+    Statement readFor() {
+        TypeToken start = this.tok;
+        next();
+        check(TypeKind.Lpar);
+        Boolean forEachLoop = false;
+        forEachLoop = (tok.kind == TypeKind.Name && peekTok.kind == TypeKind.Name && isKey(peekTok2, 'in'));
+        Boolean nextIsType = peekTok.kind == TypeKind.Lt && peekTok2.kind == TypeKind.Name && (peekTok3.kind == TypeKind.Gt || peekTok3.kind == TypeKind.Comma || peekTok3.kind == TypeKind.Lt);
+        forEachLoop = forEachLoop || (tok.kind == TypeKind.Name && nextIsType);
+        if (forEachLoop) {
+            DataType type = readType();
+            String name = checkName();
+            checkKey('in');
+            Expression exp = expr(0);
+            check(TypeKind.Rpar);
+            Block block = readBlock(true);
+            return ForEachLoop(
+                body: block,
+                dataType: type,
+                name: name,
+                collection: exp,
+            );
+        } else {
+            // Normal for loop
+            List<Statement> inits = [];
+            // Need to check prevTok also here since semi-colon is check()-ed while reading statement.
+            // TODO: Check if this also happens for EOF
+            while (true) {
+                if (tok.kind == TypeKind.Semicolon || tok.kind == TypeKind.Eof) {
+                    break;
+                }
+                inits.add(readStatement());
+                if (tok.kind != TypeKind.Comma) {
+                    break;
+                }
+                next();
+            }
+            Declaration decl = null;
+            if ((inits.length > 0) && (inits.get(0) is Declaration)) {
+                decl = inits.removeAt(0) as Declaration;
+            }
+            Expression exp = expr(0);
+            next();
+            // Skip over the semi-colon
+            List<Statement> resets = [];
+            while (true) {
+                if (tok.kind == TypeKind.Rpar || tok.kind == TypeKind.Eof) {
+                    break;
+                }
+                resets.add(readStatement(
+                    skipSemiColon: true,
+                ));
+                if (tok.kind != TypeKind.Comma) {
+                    break;
+                }
+                next();
+            }
+            check(TypeKind.Rpar);
+            Block block = readBlock(true);
+            return ForLoop(
+                body: block,
+                decl: decl,
+                test: exp,
+                inits: inits,
+                resets: resets,
+            );
+        }
+    }
+
+    ThrowStatement readThrow() {
+        TypeToken start = this.tok;
+        next();
+        ThrowStatement ret = ThrowStatement();
+        ret.exp = expr(0);
+        check(TypeKind.Semicolon);
+        return ret;
+    }
+
+    Return readReturn() {
+        TypeToken start = this.tok;
+        next();
+        Return ret = Return();
+        if (tok.kind != TypeKind.Semicolon) {
+            ret.expression = expr(0);
+        }
+        check(TypeKind.Semicolon);
+        return ret;
+    }
+
+    Expression expr(Integer precedence) {
+        List<Comment> comments = eatComments();
+        Expression node = null;
+        TypeToken start = this.tok;
+        switch (tok.kind) {
+            case TypeKind.Name:
+                {
+                    if (isKey(tok, 'true') || isKey(tok, 'false')) {
+                        node = LiteralExpression(
+                            type: LiteralType.TypeBoolean,
+                            value: tok.lit,
+                        );
+                        next();
+                    } else if (isKey(tok, 'null')) {
+                        node = NullExpression();
+                        next();
+                    } else if (peekTok.kind == TypeKind.Arrow) {
+                        return singleParamLambda();
+                    } else if (isKey(tok, 'switch')) {
+                        return switchExpr();
+                    } else {
+                        node = nameExpr();
+                    }
+                }
+
+            case TypeKind.String:
+                {
+                    node = stringExpr();
+                }
+
+            case TypeKind.Minus:
+                {
+                    node = prefixExpr();
+                }
+
+            case TypeKind.Mul:
+                {
+                    node = prefixExpr();
+                }
+
+            case TypeKind.Not:
+                {
+                    node = prefixExpr();
+                }
+
+            case TypeKind.BitNot:
+                {
+                    node = prefixExpr();
+                }
+
+            case TypeKind.Number:
+                {
+                    node = parseNumberLiteral();
+                }
+
+            case TypeKind.Lpar:
+                {
+                    node = parOrLambdaExpr();
+                }
+
+            case TypeKind.Lsbr:
+                {
+                    ArrayExpression arr = arrayInit(true);
+                    node = arr;
+                }
+
+            case TypeKind.Lcbr:
+                {
+                    ArrayExpression arr = arrayInit(false);
+                    node = arr;
+                }
+
+            case TypeKind.Lt:
+                {
+                    check(TypeKind.Lt);
+                    DataType type = readType();
+                    check(TypeKind.Gt);
+                    ArrayExpression arr = arrayInit(true);
+                    arr.enforceType = type;
+                    node = arr;
+                }
+
+            case TypeKind.Inc:
+            case TypeKind.Dec:
+                {
+                    String prefix = this.tok.lit;
+                    next();
+                    Expression exp = expr(precedence);
+                    node = PrefixExpression(
+                        prefix: prefix,
+                        on: exp,
+                    );
+                }
+
+            default: 
+                {
+                    error('bad token: ' + tok.kind.toString());
+                }
+
+        }
+        while (precedence < tok.precedence) {
+            if (tok.kind == TypeKind.Dot) {
+                node = dotExpr(node, false, false);
+            } else if (tok.kind == TypeKind.Lsbr) {
+                node = indexExpr(node);
+            } else if (isKey(tok, 'as')) {
+                next();
+                DataType type = readType();
+                node = TypeCastOrCheckExpression(
+                    check: false,
+                    dataType: type,
+                    exp: node,
+                );
+            } else if (isKey(tok, 'is')) {
+                next();
+                DataType type = readType();
+                node = TypeCastOrCheckExpression(
+                    check: true,
+                    dataType: type,
+                    exp: node,
+                );
+            } else if (tok.kind == TypeKind.LeftShift) {
+                TypeToken ttok = tok;
+                next();
+                Expression right = expr(precedence - 1);
+                node = BinaryExpression(
+                    op: ttok.lit,
+                    left: node,
+                    right: right,
+                );
+            } else if (TypeToken.isInfix(tok.kind)) {
+                node = infixExpr(node);
+            } else if (tok.kind == TypeKind.Inc || tok.kind == TypeKind.Dec) {
+                node = PostfixExpression(
+                    postfix: tok.lit,
+                    on: node,
+                );
+                next();
+            } else if (this.tok.kind == TypeKind.Question) {
+                next();
+                if (tok.kind == Dot){
+                    node = dotExpr(node, true, false);
+                } else {
+                    return ternaryExpr(node);
+                }
+            } else if (this.tok.kind == TypeKind.Not) {
+                next();
+                if (tok.kind == Dot){
+                    node = dotExpr(node, false, true);
+                } else {
+                    error('Not sure what should happen here');
+                }
+            } else {
+                return node;
+            }
+        }
+        if (node != null) {
+            node.comments = comments;
+        }
+        return node;
+    }
+
+    Boolean isType() {
+        return tok.kind == TypeKind.Lt && peekTok.kind == TypeKind.Name && (peekTok2.kind == TypeKind.Gt || peekTok2.kind == TypeKind.Comma || peekTok2.kind == TypeKind.Lt);
+    }
+
+    Expression parOrLambdaExpr() {
+        TypeToken start = this.tok;
+        check(TypeKind.Lpar);
+        Expression exp = null;
+        if (tok.kind != TypeKind.Rpar) {
+            exp = expr(0);
+        }
+        Boolean isLambda = this.peekTok.kind == TypeKind.Arrow || this.peekTok.kind == TypeKind.Lcbr;
+        if (this.tok.kind == TypeKind.Rpar && !isLambda) {
+            next();
+            return ParExpression(
+                exp: exp,
+            );
+        } else {
+            if (exp == null) {
+                return lambdaExp([]);
+            }
+            return lambdaExp([
+                exp as FieldOrEnumExpression,
+            ]);
+        }
+    }
+
+    Expression lambdaExp(List<FieldOrEnumExpression> exprs) {
+        TypeToken start = tok;
+        while (tok.kind != TypeKind.Rpar) {
+            if (tok.kind == TypeKind.Comma) {
+                next();
+            } else {
+                break;
+            }
+            exprs.add(expr(0) as FieldOrEnumExpression);
+        }
+        next();
+        // Remove the rpar
+        List<Param> params = exprs.map((one) {
+            return Param(
+                name: one.name,
+            );
+        }).toList();
+        LambdaExpression exp = LambdaExpression(
+            params: params,
+        );
+        if (this.tok.kind == TypeKind.Arrow) {
+            next();
+            Expression val = expr(0);
+            if (TypeToken.isAssign(this.tok.kind)) {
+                // Added because Assignment is only being read as part of a statement.
+                val = readAssignment(val, start);
+            }
+            exp.expression = val;
+        } else if (this.tok.kind == TypeKind.Lcbr) {
+            exp.body = readBlock(true);
+        }
+        return exp;
+    }
+
+    Expression singleParamLambda() {
+        TypeToken start = tok;
+        String name = checkName();
+        check(TypeKind.Arrow);
+        List<Param> params = [
+            Param(
+                name: name,
+            ),
+        ];
+        LambdaExpression exp = LambdaExpression(
+            params: params,
+        );
+        exp.expression = expr(0);
+        return exp;
+    }
+
+    Expression ternaryExpr(Expression condition) {
+        Expression yes = expr(0);
+        check(TypeKind.Colon);
+        Expression no = expr(0);
+        TerinaryExpression exp = TerinaryExpression(
+            condition: condition,
+            ifTrue: yes,
+            ifFalse: no,
+        );
+        return exp;
+    }
+
+    Expression switchExpr() {
+        TypeToken start = this.tok;
+        checkKey('switch');
+        check(TypeKind.Lpar);
+        Expression test = expr(0);
+        SwitchExpression exp = SwitchExpression(
+            on: test,
+        );
+        check(TypeKind.Rpar);
+        check(TypeKind.Lcbr);
+        while (tok.kind != TypeKind.Rcbr) {
+            if (isKey(tok, 'case')) {
+                next();
+                CaseExpression caseExp = CaseExpression();
+                while (true) {
+                    caseExp.tests.add(expr(0));
+                    if (tok.kind != TypeKind.Comma) {
+                        break;
+                    }
+                }
+                check(TypeKind.Colon);
+                caseExp.result = expr(0);
+                exp.cases.add(caseExp);
+            } else if (isKey(tok, 'default')) {
+                next();
+                check(TypeKind.Colon);
+                exp.onElse = expr(0);
+                break;
+            } else {
+                break;
+            }
+        }
+        check(TypeKind.Rcbr);
+        return exp;
+    }
+
+    Expression infixExpr(Expression left) {
+        TypeToken ttok = tok;
+        TypeKind op = tok.kind;
+        Integer precedence = tok.precedence;
+        next();
+        if (isKey(ttok, 'as') || isKey(ttok, 'is')) {
+            expectingType = true;
+        }
+        Expression right = expr(precedence);
+        return BinaryExpression(
+            op: ttok.lit,
+            left: left,
+            right: right,
+        );
+    }
+
+    DataType readType() {
+        TypeToken start = tok;
+        String name = checkName();
+        Boolean nextType = isType();
+        DataType type = DataType(name);
+        if (nextType) {
+            type.args = readTypeArgs();
+        }
+        if(tok.kind == TypeKind.Question){
+            type.optional = true;
+            next();
+        }
+        return type;
+    }
+
+    List<DataType> readTypeArgs() {
+        TypeToken start = tok;
+        // Need to call next here to move over the "<"
+        if (this.tok.kind == TypeKind.Lt) {
+            next();
+        }
+        List<DataType> args = [];
+        while (true) {
+            DataType sub = readType();
+            args.add(sub);
+            if (this.tok.kind != TypeKind.Comma) {
+                break;
+            } else {
+                next();
+            }
+        }
+        // Need to call next here to move over the ">"
+        if (this.tok.kind == TypeKind.Gt) {
+            next();
+        }
+        return args;
+    }
+
+    void error(String msg) {
+        // TODO 
+    }
+
+    void readFirstToken() {
+        next();
+        next();
+        next();
+        next();
+    }
+
+    void next() {
+        prevTok = tok;
+        tok = peekTok;
+        peekTok = peekTok2;
+        peekTok2 = peekTok3;
+        peekTok3 = scanner.scan();
+    }
+
+    ArrayExpression arrayInit(Boolean isList) {
+        ArrayExpression arrExp = ArrayExpression();
+        DataType type = null;
+        if (isType()) {
+            arrExp.enforceType = readType();
+        }
+        TypeKind start = isList ? TypeKind.Lsbr : TypeKind.Lcbr;
+        TypeKind end = isList ? TypeKind.Rsbr : TypeKind.Rcbr;
+        check(start);
+        while (true) {
+            List<Comment> comments = eatComments();
+            if (tok.kind == end || tok.kind == TypeKind.Eof) {
+                break;
+            }
+            ArrayItem item = arrayItem(
+                comments: comments,
+            );
+            arrExp.values.add(item);
+            List<Comment> comments2 = eatComments();
+            item.afterComments = comments2;
+            if (tok.kind != TypeKind.Comma) {
+                break;
+            } else {
+                next();
+            }
+        }
+        check(end);
+        arrExp.list = isList;
+        return arrExp;
+    }
+
+    ArrayItem arrayItem({List<Comment> comments}) {
+        comments = comments != null ? comments : eatComments();
+        TypeToken start = this.tok;
+        switch (tok.kind) {
+            case TypeKind.Ellipses:
+                {
+                    next();
+                    Boolean checkNull = tok.kind == TypeKind.Question;
+                    if(checkNull) {
+                        next();
+                    }
+                    Expression exp = expr(0);
+                    return CollectionSpread(
+                        checkNull: checkNull,
+                        values: exp,
+                        beforeComments: comments,
+                    );
+                }
+
+            default: 
+                {
+                    if (isKey(tok, 'if')) {
+                        next();
+                        check(TypeKind.Lpar);
+                        Expression test = expr(0);
+                        check(TypeKind.Rpar);
+                        ArrayItem exp = arrayItem();
+                        ArrayItem elseS = null;
+                        if (isKey(tok, 'else')) {
+                            next();
+                            elseS = arrayItem();
+                        }
+                        CollectionIf cif = CollectionIf(
+                            test: test,
+                            thenItem: exp,
+                            elseItem: elseS,
+                        );
+                        cif.beforeComments = comments;
+                        return cif;
+                    } else if (isKey(tok, 'for')) {
+                        next();
+                        check(TypeKind.Lpar);
+                        DataType type = readType();
+                        String name = checkName();
+                        checkKey('in');
+                        Expression exp = expr(0);
+                        check(TypeKind.Rpar);
+                        ArrayItem value = arrayItem();
+                        CollectionFor cFor =  CollectionFor(
+                            value: value,
+                            dataType: type,
+                            name: name,
+                            collection: exp,
+                        );
+                        cFor.beforeComments  = comments;
+                        return cFor;
+                    } else {
+                        Expression exp = expr(0);
+                        ExpressionArrayItem item =  ExpressionArrayItem(
+                            exp: exp,
+                        );
+                        item.beforeComments = comments;
+                        return item;
+                    }
+                }
+
+        }
+    }
+
+    void check(TypeKind expected) {
+        if (tok.kind != expected) {
+            if (tok.kind == TypeKind.Name) {
+                error('unexpected name `' + tok.lit + '`, expecting ' + expected.toString());
+            } else {
+                error('unexpected name `' + tok.kind.toString() + '`, expecting ' + expected.toString());
+            }
+        }
+        next();
+    }
+
+    Expression parseNumberLiteral() {
+        String lit = tok.lit;
+        Expression node;
+        if (ParserUtil.isDouble(lit)) {
+            node = LiteralExpression(
+                type: LiteralType.TypeDouble,
+                value: lit,
+            );
+        } else {
+            node = LiteralExpression(
+                type: LiteralType.TypeInteger,
+                value: lit,
+            );
+        }
+        next();
+        return node;
+    }
+
+    Expression prefixExpr() {
+        TypeToken ttok = tok;
+        next();
+        Expression right = (ttok.kind == TypeKind.Minus ? expr(TypeToken.preCall) : expr(TypeToken.prePrefix));
+        return PrefixExpression(
+            prefix: ttok.lit,
+            on: right,
+        );
+    }
+
+    Expression vweb() {
+        return null;
+    }
+
+    Expression stringExpr() {
+        TypeToken start = tok;
+        Boolean isRaw = tok.kind == TypeKind.Name && tok.lit == 'r';
+        if (isRaw) {
+            next();
+        }
+        String value = tok.lit;
+        Expression node;
+        if (peekTok.kind != TypeKind.Dollar) {
+            next();
+            node = LiteralExpression(
+                type: LiteralType.TypeString,
+                value: isRaw ? value: value,
+                isRawString: isRaw,
+            );
+            return node;
+        }
+        // Handle string interpolation
+        return null;
+    }
+
+    Expression nameExpr() {
+        if (expectingType) {
+            expectingType = false;
+            DataType type = readType();
+            //TODO
+            
+        }
+        //Raw Strings
+        if (tok.lit == 'r' && peekTok.kind == TypeKind.String && !insideStrInterp) {
+            return stringExpr();
+        }
+        String name = checkName();
+        if (isType() || tok.kind == TypeKind.Lpar) {
+            return callExpr(name);
+        }
+        return FieldOrEnumExpression(
+            name: name,
+        );
+    }
+
+    MethodCall callExpr(String name) {
+        TypeToken start = this.tok;
+        List<DataType> typeArgs = null;
+        if (isType()) {
+            typeArgs = readTypeArgs();
+        }
+        check(TypeKind.Lpar);
+        MethodCall mCall = MethodCall(
+            name: name,
+            typeArgs: typeArgs,
+        );
+        while (true) {
+            List<Comment> comments = eatComments();
+            if (tok.kind == TypeKind.Rpar || tok.kind == TypeKind.Eof || peekTok.kind == TypeKind.Colon) {
+                break;
+            }
+            Argument arg = readArg();
+            arg.arg.comments = comments;
+            mCall.positionArgs.add(arg);
+            if (tok.kind != TypeKind.Comma) {
+                break;
+            }
+            check(TypeKind.Comma);
+        }
+        while (true) {
+            List<Comment> comments2 = eatComments();
+            if (tok.kind == TypeKind.Rpar || tok.kind == TypeKind.Eof || peekTok.kind != TypeKind.Colon) {
+                break;
+            }
+            NamedArgument arg = readNamedArg();
+            arg.beforeComments = comments2;
+            mCall.namedArgs.add(arg);
+            if (tok.kind != TypeKind.Comma) {
+                break;
+            }
+            check(TypeKind.Comma);
+        }
+        check(TypeKind.Rpar);
+        return mCall;
+    }
+
+    List<Comment> eatComments() {
+        List<Comment> comments = [];
+        while (tok.kind == TypeKind.CommentSingle || tok.kind == TypeKind.CommentMulti) {
+            comments.add(comment());
+        }
+        return comments;
+    }
+
+    Comment comment() {
+        TypeToken start = tok;
+        String text = tok.lit;
+        next();
+        if (start.kind == TypeKind.CommentMulti) {
+            text = trimLines(text, start.index - 1);
+        }
+        return Comment(text, start.kind == TypeKind.CommentMulti ? CommentType.MULTI : CommentType.SINGLE);
+    }
+
+    String trimLines(String text, Integer index) {
+        List<String> lines = text.split('\n');
+        lines = lines.map((l) {
+            String line = l.trimLeft();
+            Integer removed = l.length - line.length;
+            Integer from = removed;
+            if (index > 0) {
+                removed = Math.minInt(index, from);
+            }
+            String res = l.substring(from);
+            return res;
+        }).toList();
+        return lines.join('\n');
+    }
+
+    Expression indexExpr(Expression left) {
+        TypeToken start = this.tok;
+        next();
+        Expression idx = expr(0);
+        check(TypeKind.Rsbr);
+        return ArrayAccess(
+            on: left,
+            index: idx,
+        );
+    }
+
+    Expression dotExpr(Expression left, Boolean checkNull, Boolean notNull) {
+        TypeToken start = this.tok;
+        next();
+        String name = checkName();
+        if (isType() || tok.kind == TypeKind.Lpar) {
+            MethodCall call = callExpr(name);
+            call.on = left;
+            call.checkNull = checkNull;
+            call.notNull = notNull;
+            return call;
+        } else {
+            return FieldOrEnumExpression(
+                on: left,
+                name: name,
+                checkNull: checkNull,
+                notNull: notNull,
+            );
+        }
+    }
+
+    Argument readArg() {
+        Expression exp = expr(0);
+        List<Comment> comments2 = eatComments();
+        return Argument(
+            arg: exp,
+            afterComments: comments2,
+        );
+    }
+
+    NamedArgument readNamedArg() {
+        TypeToken start = this.tok;
+        String name = checkName();
+        check(TypeKind.Colon);
+        Expression value = expr(0);
+        List<Comment> comments2 = eatComments();
+        return NamedArgument(
+            name: name,
+            value: value,
+            afterComments: comments2,
+        );
+    }
+
+    String checkName() {
+        String lit = tok.lit;
+        check(TypeKind.Name);
+        return lit;
+    }
+
+}

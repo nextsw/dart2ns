@@ -1,0 +1,5 @@
+class ArrayExpression extends Expression{
+    DataType enforceType;
+    List<ArrayItem> values = [];
+    Boolean list;
+}

@@ -1,0 +1,6 @@
+class TryCatcheStatment extends Statement {
+    Block body;
+    Block finallyBody;
+    List<CatchPart> catchParts = [];
+    TryCatcheStatment({this.body, this.finallyBody, this.catchParts});
+}

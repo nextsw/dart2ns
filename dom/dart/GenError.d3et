@@ -1,0 +1,4 @@
+class GenError {
+    String error;
+    String path;
+}

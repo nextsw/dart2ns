@@ -1,0 +1,7 @@
+class FieldOrEnumExpression extends Expression {
+    String name;
+    Expression on;
+    Boolean checkNull;
+    Boolean notNull;
+    FieldOrEnumExpression({this.on, this.name, this.checkNull, this.notNull});
+}

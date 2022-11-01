@@ -1,0 +1,3 @@
+class NullExpression extends Expression {
+    
+}

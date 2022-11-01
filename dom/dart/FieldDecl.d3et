@@ -1,0 +1,10 @@
+class FieldDecl extends ClassMember {
+    String name;
+    DataType type;
+    Expression value;
+    Boolean static;
+    Boolean final;
+    Boolean const;
+    List<Comment> comments = [];
+    FieldDecl({this.name, this.type, this.value, this.static, this.final, this.const, this.comments});
+}

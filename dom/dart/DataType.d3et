@@ -1,0 +1,6 @@
+class DataType {
+    String name;
+    Boolean optional;
+    List<DataType> args = [];
+    DataType(this.name, [this.optional = false]);
+}

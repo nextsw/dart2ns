@@ -1,0 +1,6 @@
+enum TopDeclType {
+    Class,
+    Typedef,
+    Const,
+    Enum,
+}
