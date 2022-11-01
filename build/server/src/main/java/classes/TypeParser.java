@@ -19,6 +19,7 @@ public class TypeParser {
   public boolean insideStrInterp = false;
   public List<GenError> errors = ListExt.asList();
 private Dart2NSContext context;
+private TokenFrame savedFrame;
 
   public TypeParser(Dart2NSContext context, TypeScanner scanner) {
 	  this.context = context;
@@ -87,7 +88,7 @@ private Dart2NSContext context;
     } else if (isKey(this.tok, "class") || isKey(this.tok, "abstract")) {
       obj = readClass(annotations, start);
     } else {
-      ClassMember mem = readClassMember();
+      obj = readClassMember("");
     }
     if (obj != null) {
       list.add(obj);
@@ -207,7 +208,8 @@ private Dart2NSContext context;
             params,
             retType,
             false,
-            false);
+            false,
+            null);
     data.annotations = annotations;
     return data;
   }
@@ -305,11 +307,12 @@ private Dart2NSContext context;
       name = checkName();
       if (this.tok.kind == TypeKind.Lpar) {
         fparams = readMethodParams();
+        name = checkName();
       }
     }
     if (this.tok.kind == TypeKind.Assign) {
-      def = expr(0l);
       next();
+      def = expr(0l);
     }
     boolean deprecated =
         ListExt.any(
@@ -324,7 +327,7 @@ private Dart2NSContext context;
               return Objects.equals(x.name, "required");
             });
     return new MethodParam(
-        annotations, type, def, deprecated, name, required, hasThis ? "this" : null);
+        annotations, type, def, deprecated, name, required, hasThis ? "this" : null, fparams);
   }
 
   public ClassDecl readClass(List<Annotation> annotations, TypeToken start) {
@@ -381,7 +384,7 @@ private Dart2NSContext context;
       if (this.tok.kind == TypeKind.Rcbr || this.tok.kind == TypeKind.Eof) {
         break;
       }
-      ClassMember member = readClassMember();
+      ClassMember member = readClassMember(cls.name);
       member.comments = comments;
       cls.members.add(member);
     }
@@ -390,7 +393,7 @@ private Dart2NSContext context;
     return cls;
   }
 
-  public ClassMember readClassMember() {
+  public ClassMember readClassMember(String className) {
     List<Comment> comments = eatComments();
     TypeToken start = this.tok;
     List<Annotation> annotations = readAnnotations();
@@ -423,7 +426,10 @@ private Dart2NSContext context;
     String fac = null;
     String name = null;
     Expression init = null;
-    if (this.peekTok.kind == TypeKind.Dot) {
+    if (this.peekTok.kind == TypeKind.Dot 
+    		&& this.tok.kind == TypeKind.Name
+    		&& this.peekTok2.kind == TypeKind.Name
+    		&& this.peekTok3.kind == TypeKind.Lpar) {
       fac = checkName();
       next();
     }
@@ -453,13 +459,16 @@ private Dart2NSContext context;
      Method Decal
     */
     Block body = null;
+    Expression exp = null;
     TypeParams typeParams = null;
     boolean isSet = false;
     boolean isGet = false;
-    if (!isFactoryDecl()) {
-      if (type == null) {
-        type = readType();
-      }
+    if (fac == null) {
+    	if(this.tok.kind == TypeKind.Name && this.tok.lit.equals(className)) {
+    		// constructor
+    	} else {
+    		type = readType();
+    	}
       if (this.peekTok.kind == TypeKind.Name) {
         if (isKey(this.tok, "set")) {
           isSet = true;
@@ -470,9 +479,7 @@ private Dart2NSContext context;
         }
       }
     }
-    if (name == null) {
-      name = checkName();
-    }
+    name = checkName();
     if (this.tok.kind == TypeKind.Lt) {
       typeParams = readTypeParams();
     }
@@ -485,7 +492,12 @@ private Dart2NSContext context;
       init call
       */
     	next();
-      init = expr(0l);
+      Block block = new Block();
+      init = block;
+      do {
+      Statement stmt = readStatement(ListExt.asList(), true);
+      block.statements.add(stmt);
+      }while(tok.kind == TypeKind.Comma);
     }
     if (isKey(this.tok, "async")) {
       next();
@@ -493,7 +505,10 @@ private Dart2NSContext context;
     }
     if (this.tok.kind == TypeKind.Lcbr) {
       body = readBlock(true);
-      next();
+    } else if(this.tok.kind == TypeKind.Arrow) {
+    	next();
+    	exp = expr(0l);
+    	check(TypeKind.Semicolon);
     } else {
       check(TypeKind.Semicolon);
     }
@@ -512,15 +527,36 @@ private Dart2NSContext context;
         params,
         type,
         isSet,
-        isStatic);
+        isStatic,
+        exp);
   }
 
   private void restore() {
-	scanner.save();
+	  if(savedFrame == null) 
+	  {
+		  error("No saved frame found");
+	  }
+	scanner.restore();
+	this.tok = savedFrame.tok;
+	this.peekTok = savedFrame.peekTok;
+	this.peekTok2 = savedFrame.peekTok2;
+	this.peekTok3 = savedFrame.peekTok3;
+	this.peekTok4 = savedFrame.peekTok4;
+	this.prevTok = savedFrame.prevTok;
+	savedFrame= null;
 }
 
 private void save() {
-	scanner.restore();
+	scanner.save();
+	TokenFrame frame = new TokenFrame();
+	frame.tok = this.tok;
+	frame.peekTok = this.peekTok;
+	frame.peekTok2 = this.peekTok2;
+	frame.peekTok3 = this.peekTok3;
+	frame.peekTok4 = this.peekTok4;
+	frame.prevTok = this.prevTok;
+	this.savedFrame = frame;
+	
 }
 
 public boolean isFactoryDecl() {
@@ -583,6 +619,9 @@ public boolean isFactoryDecl() {
       smt = readReturn();
     } else if (isKey(this.tok, "throw")) {
       smt = readThrow();
+    } else if (isKey(this.tok, "assert")) {
+    	next();
+        smt = readThrow();
     } else if (isKey(this.tok, "for")) {
       smt = readFor();
     } else if (isKey(this.tok, "while")) {
@@ -1222,6 +1261,10 @@ public boolean isFactoryDecl() {
   public DataType readType() {
     TypeToken start = this.tok;
     String name = checkName();
+    if(this.tok.kind == TypeKind.Dot) {
+    	next();
+    	name = name + "." + checkName();
+    }
     boolean nextType = isType();
     DataType type = new DataType(name, false);
     if (nextType) {
@@ -1448,11 +1491,16 @@ public boolean isFactoryDecl() {
   public MethodCall callExpr(String name) {
     TypeToken start = this.tok;
     List<DataType> typeArgs = null;
+    String factoryName = null;
     if (isType()) {
       typeArgs = readTypeArgs();
     }
+    if(this.tok.kind == TypeKind.Dot) {
+    	next();
+    	factoryName = checkName();
+    }
     check(TypeKind.Lpar);
-    MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs);
+    MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs, factoryName);
     while (true) {
       List<Comment> comments = eatComments();
       if (this.tok.kind == TypeKind.Rpar

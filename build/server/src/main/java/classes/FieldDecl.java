@@ -20,6 +20,7 @@ public class FieldDecl extends ClassMember {
       boolean staticValue,
       DataType type,
       Expression value) {
+	  super(name, TopDeclType.Field, null);
     this.comments = comments;
     this.constValue = constValue;
     this.finalValue = finalValue;

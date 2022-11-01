@@ -4,5 +4,7 @@ public enum TopDeclType {
   Class,
   Typedef,
   Const,
-  Enum;
+  Enum,
+  Field,
+  Method,
 }

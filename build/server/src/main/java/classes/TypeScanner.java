@@ -85,7 +85,6 @@ private long savedPos;
           this.pos += prefixZeroNum;
         }
         String num = identNumber();
-        this.pos++;
         return newToken(TypeKind.Number, num, StringExt.length(num));
       }
       switch (c) {

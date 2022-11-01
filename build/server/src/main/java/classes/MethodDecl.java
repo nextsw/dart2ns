@@ -20,6 +20,7 @@ public class MethodDecl extends ClassMember {
   public Block body;
   public ASyncType asyncType;
   public String content;
+  public Expression exp;
 
   public MethodDecl(
       List<Annotation> annotations,
@@ -36,7 +37,9 @@ public class MethodDecl extends ClassMember {
       MethodParams params,
       DataType returnType,
       boolean setter,
-      boolean staticValue) {
+      boolean staticValue,
+      Expression exp) {
+	  super(name, TopDeclType.Method, null);
     this.annotations = annotations;
     this.asyncType = asyncType;
     this.body = body;
@@ -52,5 +55,6 @@ public class MethodDecl extends ClassMember {
     this.returnType = returnType;
     this.setter = setter;
     this.staticValue = staticValue;
+    this.exp = exp;
   }
 }
