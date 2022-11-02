@@ -23,7 +23,7 @@ public class TypeScanner {
   public String quote;
   public long noLines = 0l;
   public long eofs = 0l;
-private long savedPos;
+  public long savedPos = 0l;
 
   public TypeScanner(String text) {
     this.text = text;
@@ -833,11 +833,11 @@ private long savedPos;
     return name;
   }
 
-public void save() {
-	this.savedPos = this.pos;
-}
+  public void save() {
+    this.savedPos = this.pos;
+  }
 
-public void restore() {
-	this.pos = this.savedPos;
-}
+  public void restore() {
+    this.pos = this.savedPos;
+  }
 }

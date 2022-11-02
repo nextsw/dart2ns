@@ -12,7 +12,6 @@ public class MethodParam {
   public DataType dataType;
   public String name;
   public List<Annotation> annotations = ListExt.asList();
-  public MethodParams fParams;
 
   public MethodParam(
       List<Annotation> annotations,
@@ -21,8 +20,7 @@ public class MethodParam {
       boolean deprecated,
       String name,
       boolean required,
-      String thisToken,
-      MethodParams fParams) {
+      String thisToken) {
     this.annotations = annotations;
     this.dataType = dataType;
     this.defaultValue = defaultValue;
@@ -30,6 +28,5 @@ public class MethodParam {
     this.name = name;
     this.required = required;
     this.thisToken = thisToken;
-    this.fParams = fParams;
   }
 }

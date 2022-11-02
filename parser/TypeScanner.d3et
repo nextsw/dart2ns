@@ -32,6 +32,8 @@ server class TypeScanner {
 
     Integer eofs = 0;
 
+    Integer savedPos = 0;
+
     TypeScanner(this.text);
 
     TypeToken scan() {
@@ -84,10 +86,8 @@ server class TypeScanner {
                     pos += prefixZeroNum;
                 }
                 String num = identNumber();
-                this.pos++;
                 return newToken(TypeKind.Number, num, num.length);
             }
-            this.pos++;
             switch (c) {
                 case '+':
                     {
@@ -201,7 +201,6 @@ server class TypeScanner {
                     }
                 case '\'':
                     {
-                        this.pos--;
                         String identStr = identString();
                         return newToken(TypeKind.String, identStr, identStr.length + 2);
                     }
@@ -726,5 +725,13 @@ server class TypeScanner {
         String name = text.substring(start, pos);
         pos--;
         return name;
+    }
+
+    void save(){
+        this.savedPos = this.pos;
+    }
+
+    void restore() {
+        this.pos = this.savedPos;
     }
 }

@@ -4,5 +4,5 @@ abstract class TopDecl {
     String path;
     List<GenError> errors;
     List<Annotation> annotations;
-    TopDecl(this.name, this.type, {this.path});
+    TopDecl(this.name, this.type, this.path);
 }

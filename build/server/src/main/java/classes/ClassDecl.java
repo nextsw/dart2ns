@@ -12,6 +12,6 @@ public class ClassDecl extends TopDecl {
   public List<DataType> mixins = ListExt.asList();
 
   public ClassDecl(String name) {
-    super(name, TopDeclType.Class, null);
+    super(name, TopDeclType.Class, "");
   }
 }

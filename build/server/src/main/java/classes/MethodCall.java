@@ -11,18 +11,15 @@ public class MethodCall extends Statement {
   public boolean checkNull = false;
   public boolean notNull = false;
   public Expression on;
-  public String factoryNme;
 
   public MethodCall(
       String name,
       List<NamedArgument> namedArgs,
       List<Argument> positionArgs,
-      List<DataType> typeArgs,
-      String factoryName) {
+      List<DataType> typeArgs) {
     this.name = name;
     this.namedArgs = namedArgs;
     this.positionArgs = positionArgs;
     this.typeArgs = typeArgs;
-    this.factoryNme = factoryName;
   }
 }

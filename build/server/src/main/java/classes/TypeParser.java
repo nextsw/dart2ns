@@ -1,5 +1,6 @@
 package classes;
 
+import d3e.core.D3ELogger;
 import d3e.core.IterableExt;
 import d3e.core.ListExt;
 import d3e.core.MathExt;
@@ -18,21 +19,20 @@ public class TypeParser {
   public boolean expectingType = false;
   public boolean insideStrInterp = false;
   public List<GenError> errors = ListExt.asList();
-private Dart2NSContext context;
-private TokenFrame savedFrame;
+  public Dart2NSContext context;
+  public List<TokenFrame> savedFrames = ListExt.asList();
 
   public TypeParser(Dart2NSContext context, TypeScanner scanner) {
-	  this.context = context;
+    this.context = context;
     this.scanner = scanner;
   }
 
   public static List<TopDecl> parse(Dart2NSContext context, String path) {
     List<TopDecl> res = ListExt.asList();
     String content = context.path2Content(path);
-    if(content.isEmpty()) {
-    	return res;
+    if (content.isEmpty()) {
+      return res;
     }
-    System.out.println("Parsing Started: " + path);
     context.push(path);
     TypeParser p = new TypeParser(context, new TypeScanner(content));
     p.readFirstToken();
@@ -40,7 +40,6 @@ private TokenFrame savedFrame;
     p.eatComments();
     p.check(TypeKind.Eof);
     context.pop();
-    System.out.println("Parsing Finished: " + path);
     return res;
   }
 
@@ -93,15 +92,14 @@ private TokenFrame savedFrame;
     if (obj != null) {
       list.add(obj);
       return true;
-    } else {
-    	return false;
     }
+    return false;
   }
 
   public List<TopDecl> readImportOrExport() {
     next();
-    String path = tok.lit;
-    List<TopDecl> objs = TypeParser.parse(context, path);
+    String path = this.tok.lit;
+    List<TopDecl> objs = TypeParser.parse(this.context, path);
     next();
     while (this.tok.kind != TypeKind.Semicolon) {
       /*
@@ -113,6 +111,13 @@ private TokenFrame savedFrame;
     return objs;
   }
 
+  public static String readFileFromPath(String basePath, String path) {
+    if (StringExt.startsWith(path, "package:", 0l)) {
+    } else if (StringExt.startsWith(path, "dart:", 0l)) {
+    } else {
+    }
+    return "";
+  }
 
   public String readLibrary() {
     next();
@@ -198,6 +203,7 @@ private TokenFrame savedFrame;
             null,
             null,
             false,
+            null,
             false,
             null,
             false,
@@ -208,8 +214,7 @@ private TokenFrame savedFrame;
             params,
             retType,
             false,
-            false,
-            null);
+            false);
     data.annotations = annotations;
     return data;
   }
@@ -305,14 +310,10 @@ private TokenFrame savedFrame;
     } else {
       type = readType();
       name = checkName();
-      if (this.tok.kind == TypeKind.Lpar) {
-        fparams = readMethodParams();
-        name = checkName();
-      }
     }
     if (this.tok.kind == TypeKind.Assign) {
-      next();
       def = expr(0l);
+      next();
     }
     boolean deprecated =
         ListExt.any(
@@ -327,7 +328,7 @@ private TokenFrame savedFrame;
               return Objects.equals(x.name, "required");
             });
     return new MethodParam(
-        annotations, type, def, deprecated, name, required, hasThis ? "this" : null, fparams);
+        annotations, type, def, deprecated, name, required, hasThis ? "this" : null);
   }
 
   public ClassDecl readClass(List<Annotation> annotations, TypeToken start) {
@@ -423,70 +424,43 @@ private TokenFrame savedFrame;
       isAbstract = true;
       next();
     }
-    save();
-    FieldDecl field = readFieldDecl();
-    if(field != null) {
-    	field.abstract = isAbstract;
-    }
-    restore();
-    
-    String fac = null;
-    String name = null;
-    Expression init = null;
-    if (this.peekTok.kind == TypeKind.Dot 
-    		&& this.tok.kind == TypeKind.Name
-    		&& this.peekTok2.kind == TypeKind.Name
-    		&& this.peekTok3.kind == TypeKind.Lpar) {
-      fac = checkName();
-      next();
-    }
     DataType type = null;
-    if (fac == null && isDeclaration()) {
-    	save();
-      /*
-       Field Decl
-      */
+    if (!isFactory) {
       type = readType();
-      name = checkName();
-        Expression exp = null;
-        if (this.tok.kind == TypeKind.Assign) {
-          next();
-          exp = expr(0l);
-          check(TypeKind.Semicolon);
-          return new FieldDecl(comments, isConst, isFinal, name, isStatic, type, exp);
-        } else if (this.tok.kind == TypeKind.Semicolon){
-          next();
-          return new FieldDecl(comments, isConst, isFinal, name, isStatic, type, exp);
-        } else {
-        	restore();
-        }
-        
+    }
+    String name = checkName();
+    if (this.tok.kind == TypeKind.Semicolon || this.tok.kind == TypeKind.Assign) {
+      Expression init = null;
+      if (this.tok.kind == TypeKind.Assign) {
+        init = expr(0l);
+      }
+      check(TypeKind.Semicolon);
+      return new FieldDecl(annotations, comments, isConst, isFinal, name, isStatic, type, init);
     }
     /*
      Method Decal
     */
-    Block body = null;
-    Expression exp = null;
-    TypeParams typeParams = null;
     boolean isSet = false;
     boolean isGet = false;
-    if (fac == null) {
-    	if(this.tok.kind == TypeKind.Name && this.tok.lit.equals(className)) {
-    		// constructor
-    	} else {
-    		type = readType();
-    	}
-      if (this.peekTok.kind == TypeKind.Name) {
-        if (isKey(this.tok, "set")) {
-          isSet = true;
-          next();
-        } else if (isKey(this.tok, "get")) {
-          isGet = true;
-          next();
-        }
+    Block body = null;
+    Block init = null;
+    Expression exp = null;
+    if (isFactory) {
+      if (!(Objects.equals(name, className))) {
+        error("Factory method should have same class name");
+      }
+      check(TypeKind.Dot);
+      name = checkName();
+    } else {
+      if (Objects.equals(name, "set") && this.tok.kind == TypeKind.Name) {
+        isSet = true;
+        name = checkName();
+      } else if (Objects.equals(name, "get") && this.tok.kind == TypeKind.Name) {
+        isGet = true;
+        name = checkName();
       }
     }
-    name = checkName();
+    TypeParams typeParams = null;
     if (this.tok.kind == TypeKind.Lt) {
       typeParams = readTypeParams();
     }
@@ -495,27 +469,24 @@ private TokenFrame savedFrame;
       params = readMethodParams();
     }
     if (this.tok.kind == TypeKind.Colon) {
-      /*
-      init call
-      */
-    	next();
-      Block block = new Block();
-      init = block;
-      do {
-      Statement stmt = readStatement(ListExt.asList(), true);
-      block.statements.add(stmt);
-      }while(tok.kind == TypeKind.Comma);
-    }
-    if (isKey(this.tok, "async")) {
       next();
-      asyncType = ASyncType.ASYNC;
+      init = new Block();
+      do {
+        Statement stmt = readStatement(ListExt.List(), false);
+        init.statements.add(stmt);
+      } while (this.tok.kind == TypeKind.Comma);
+    } else {
+      if (isKey(this.tok, "async")) {
+        next();
+        asyncType = ASyncType.ASYNC;
+      }
     }
     if (this.tok.kind == TypeKind.Lcbr) {
       body = readBlock(true);
-    } else if(this.tok.kind == TypeKind.Arrow) {
-    	next();
-    	exp = expr(0l);
-    	check(TypeKind.Semicolon);
+    } else if (this.tok.kind == TypeKind.Arrow) {
+      next();
+      exp = expr(0l);
+      check(TypeKind.Semicolon);
     } else {
       check(TypeKind.Semicolon);
     }
@@ -524,8 +495,9 @@ private TokenFrame savedFrame;
         asyncType,
         body,
         isConst,
+        exp,
         isFactory,
-        fac,
+        null,
         isFinal,
         typeParams,
         isGet,
@@ -534,64 +506,10 @@ private TokenFrame savedFrame;
         params,
         type,
         isSet,
-        isStatic,
-        exp);
+        isStatic);
   }
 
-  private FieldDecl readFieldDecl() {
-	  boolean isStatic = false;
-	    boolean isFinal = false;
-	    boolean isConst = false;
-	    if (isKey(this.tok, "static")) {
-	      isStatic = true;
-	      next();
-	    }
-	    if (isKey(this.tok, "final")) {
-	      isFinal = true;
-	      next();
-	    }
-	    if (isKey(this.tok, "const")) {
-	      isConst = true;
-	      next();
-	    }
-	    if (isKey(this.tok, "factory")) {
-	      return null;
-	    }
-	    if (isKey(this.tok, "abstract")) {
-	      return null;
-	    }
-	return null;
-}
-
-private void restore() {
-	  if(savedFrame == null) 
-	  {
-		  error("No saved frame found");
-	  }
-	scanner.restore();
-	this.tok = savedFrame.tok;
-	this.peekTok = savedFrame.peekTok;
-	this.peekTok2 = savedFrame.peekTok2;
-	this.peekTok3 = savedFrame.peekTok3;
-	this.peekTok4 = savedFrame.peekTok4;
-	this.prevTok = savedFrame.prevTok;
-	savedFrame= null;
-}
-
-private void save() {
-	scanner.save();
-	TokenFrame frame = new TokenFrame();
-	frame.tok = this.tok;
-	frame.peekTok = this.peekTok;
-	frame.peekTok2 = this.peekTok2;
-	frame.peekTok3 = this.peekTok3;
-	frame.peekTok4 = this.peekTok4;
-	frame.prevTok = this.prevTok;
-	this.savedFrame = frame;
-	
-}
-
-public boolean isFactoryDecl() {
+  public boolean isFactoryDecl() {
     return (this.tok.kind == TypeKind.Name && this.peekTok.kind == TypeKind.Dot)
         || (this.tok.kind == TypeKind.Name
             && (this.peekTok.kind == TypeKind.Lt || this.peekTok.kind == TypeKind.Lpar));
@@ -651,9 +569,6 @@ public boolean isFactoryDecl() {
       smt = readReturn();
     } else if (isKey(this.tok, "throw")) {
       smt = readThrow();
-    } else if (isKey(this.tok, "assert")) {
-    	next();
-        smt = readThrow();
     } else if (isKey(this.tok, "for")) {
       smt = readFor();
     } else if (isKey(this.tok, "while")) {
@@ -749,12 +664,6 @@ public boolean isFactoryDecl() {
         (this.tok.kind == TypeKind.Name
             && this.peekTok.kind == TypeKind.Name
             && (this.peekTok2.kind == TypeKind.Semicolon || this.peekTok2.kind == TypeKind.Assign));
-    boolean simplePackageD =
-            (this.tok.kind == TypeKind.Name
-            	&& this.peekTok.kind == TypeKind.Dot
-                && this.peekTok2.kind == TypeKind.Name
-                && this.peekTok3.kind == TypeKind.Question
-                && this.peekTok4.kind == TypeKind.Name);
     boolean isType =
         this.tok.kind == TypeKind.Name
             && this.peekTok.kind == TypeKind.Lt
@@ -762,7 +671,7 @@ public boolean isFactoryDecl() {
             && (this.peekTok3.kind == TypeKind.Gt
                 || this.peekTok3.kind == TypeKind.Comma
                 || this.peekTok3.kind == TypeKind.Lt);
-    return simpleD || isType || simplePackageD;
+    return simpleD || isType;
   }
 
   public Statement readDoWhile() {
@@ -1290,21 +1199,38 @@ public boolean isFactoryDecl() {
     return new BinaryExpression(left, ttok.lit, right);
   }
 
-  public DataType readType() {
-    TypeToken start = this.tok;
+  public ValueType readValueType() {
     String name = checkName();
-    if(this.tok.kind == TypeKind.Dot) {
-    	next();
-    	name = name + "." + checkName();
+    String packageValue;
+    if (this.tok.kind == TypeKind.Dot) {
+      next();
+      packageValue = name;
+      name = checkName();
     }
     boolean nextType = isType();
-    DataType type = new DataType(name, false);
+    ValueType type = new ValueType(name, false);
+    type.in = packageValue;
     if (nextType) {
       type.args = readTypeArgs();
     }
     if (this.tok.kind == TypeKind.Question) {
       type.optional = true;
       next();
+    }
+    return type;
+  }
+
+  public DataType readType() {
+    DataType type = readValueType();
+    if (isKey(this.peekTok, "Function")) {
+      next();
+      MethodParams params = readMethodParams();
+      FunctionType fnType = new FunctionType(false, params, type);
+      if (this.tok.kind == TypeKind.Question) {
+        fnType.optional = true;
+        next();
+      }
+      type = fnType;
     }
     return type;
   }
@@ -1337,7 +1263,7 @@ public boolean isFactoryDecl() {
   }
 
   public void error(String msg) {
-    System.err.println(msg);
+    D3ELogger.error(msg);
   }
 
   public void readFirstToken() {
@@ -1523,16 +1449,11 @@ public boolean isFactoryDecl() {
   public MethodCall callExpr(String name) {
     TypeToken start = this.tok;
     List<DataType> typeArgs = null;
-    String factoryName = null;
     if (isType()) {
       typeArgs = readTypeArgs();
     }
-    if(this.tok.kind == TypeKind.Dot) {
-    	next();
-    	factoryName = checkName();
-    }
     check(TypeKind.Lpar);
-    MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs, factoryName);
+    MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs);
     while (true) {
       List<Comment> comments = eatComments();
       if (this.tok.kind == TypeKind.Rpar
@@ -1648,5 +1569,39 @@ public boolean isFactoryDecl() {
     String lit = this.tok.lit;
     check(TypeKind.Name);
     return lit;
+  }
+
+  public void save() {
+    TokenFrame frame =
+        new TokenFrame(
+            this.peekTok,
+            this.peekTok2,
+            this.peekTok3,
+            null,
+            this.scanner.pos,
+            this.prevTok,
+            this.tok);
+    this.savedFrames.add(frame);
+  }
+
+  public void restore() {
+    if (this.savedFrames.isEmpty()) {
+      error("No saved frames found");
+    }
+    TokenFrame frame = ListExt.removeLast(this.savedFrames);
+    this.scanner.pos = frame.pos;
+    this.tok = frame.tok;
+    this.prevTok = frame.tok;
+    this.peekTok = frame.peekTok;
+    this.peekTok2 = frame.peekTok2;
+    this.peekTok3 = frame.peekTok3;
+    this.peekTok4 = frame.peekTok4;
+  }
+
+  public void drop() {
+    if (this.savedFrames.isEmpty()) {
+      error("No saved frames found");
+    }
+    ListExt.removeLast(this.savedFrames);
   }
 }

@@ -10,6 +10,6 @@ public class Typedef extends TopDecl {
   public String content;
 
   public Typedef(String name) {
-    super(name, TopDeclType.Typedef, null);
+    super(name, TopDeclType.Typedef, "");
   }
 }

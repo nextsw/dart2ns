@@ -1,3 +1,4 @@
-abstract class ClassMember {
+abstract class ClassMember extends TopDecl{
     List<Comment> comments = [];
+    ClassMember(String name, TopDeclType type, String path) : super(name, type, path);
 }

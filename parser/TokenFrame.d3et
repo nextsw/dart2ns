@@ -1,0 +1,18 @@
+server class TokenFrame {
+    TypeToken tok;
+    TypeToken prevTok;
+    TypeToken peekTok;
+    TypeToken peekTok2;
+    TypeToken peekTok3;
+    TypeToken peekTok4;
+    Integer pos;
+    TokenFrame({
+        this.tok,
+        this.prevTok,
+        this.peekTok,
+        this.peekTok2,
+        this.peekTok3,
+        this.peekTok4,
+        this.pos,
+    });
+}

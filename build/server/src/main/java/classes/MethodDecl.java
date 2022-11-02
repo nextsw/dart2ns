@@ -19,14 +19,15 @@ public class MethodDecl extends ClassMember {
   public TypeParams generics;
   public Block body;
   public ASyncType asyncType;
-  public String content;
   public Expression exp;
+  public String content;
 
   public MethodDecl(
       List<Annotation> annotations,
       ASyncType asyncType,
       Block body,
       boolean constValue,
+      Expression exp,
       boolean factory,
       String factoryName,
       boolean finalValue,
@@ -37,13 +38,13 @@ public class MethodDecl extends ClassMember {
       MethodParams params,
       DataType returnType,
       boolean setter,
-      boolean staticValue,
-      Expression exp) {
-	  super(name, TopDeclType.Method, null);
+      boolean staticValue) {
+    super(name, TopDeclType.Method, "");
     this.annotations = annotations;
     this.asyncType = asyncType;
     this.body = body;
     this.constValue = constValue;
+    this.exp = exp;
     this.factory = factory;
     this.factoryName = factoryName;
     this.finalValue = finalValue;
@@ -55,6 +56,5 @@ public class MethodDecl extends ClassMember {
     this.returnType = returnType;
     this.setter = setter;
     this.staticValue = staticValue;
-    this.exp = exp;
   }
 }

@@ -1,0 +1,6 @@
+@Java('classes.Dart2NSContext')
+class Dart2NSContext {
+    String path2Content(String path);
+    void push(String path);
+    void pop();
+}

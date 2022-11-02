@@ -3,4 +3,6 @@ enum TopDeclType {
     Typedef,
     Const,
     Enum,
+    Field,
+    Method,
 }

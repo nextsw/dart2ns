@@ -3,5 +3,5 @@ class Typedef extends TopDecl {
     MethodDecl method;
     List<Annotation> annotations = [];
     String content;
-    Typedef(String name) : super(name, TopDeclType.Typedef);
+    Typedef(String name) : super(name, TopDeclType.Typedef, '');
 }

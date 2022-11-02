@@ -6,5 +6,6 @@ class FieldDecl extends ClassMember {
     Boolean final;
     Boolean const;
     List<Comment> comments = [];
-    FieldDecl({this.name, this.type, this.value, this.static, this.final, this.const, this.comments});
+    List<Annotation> annotations = [];
+    FieldDecl({this.name, this.type, this.value, this.static, this.final, this.const, this.comments, this.annotations}): super(name, TopDeclType.Field, '');
 }

@@ -6,5 +6,5 @@ public enum TopDeclType {
   Const,
   Enum,
   Field,
-  Method,
+  Method;
 }

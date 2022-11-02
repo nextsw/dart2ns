@@ -1,4 +1,4 @@
 class Enum extends TopDecl {
     List<String> values;
-    Enum(String name):super(name, TopDeclType.Enum);
+    Enum(String name):super(name, TopDeclType.Enum, '');
 }
