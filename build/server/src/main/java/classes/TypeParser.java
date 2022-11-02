@@ -183,40 +183,14 @@ public class TypeParser {
   }
 
   public Typedef readTypeDef(List<Annotation> annotations) {
-    TypeToken start = this.tok;
     checkKey("typedef");
-    String name = checkName();
-    TypeParams typeParams = null;
-    if (this.tok.kind == TypeKind.Lt) {
-      typeParams = readTypeParams();
-    }
+    ValueType type = readValueType();
     check(TypeKind.Assign);
-    DataType retType = readType();
-    String fn = checkName();
-    MethodParams params = readMethodParams();
+    FunctionType fnType = (FunctionType) readType();
     check(TypeKind.Semicolon);
-    Typedef data = new Typedef(name);
-    data.generics = typeParams;
-    data.method =
-        new MethodDecl(
-            ListExt.List(),
-            null,
-            null,
-            false,
-            null,
-            false,
-            null,
-            false,
-            null,
-            false,
-            null,
-            "$",
-            params,
-            retType,
-            false,
-            false);
-    data.annotations = annotations;
-    return data;
+    Typedef def = new Typedef(type, fnType);
+    def.annotations = annotations;
+    return def;
   }
 
   public TypeParams readTypeParams() {
@@ -312,8 +286,8 @@ public class TypeParser {
       name = checkName();
     }
     if (this.tok.kind == TypeKind.Assign) {
-      def = expr(0l);
       next();
+      def = expr(0l);
     }
     boolean deprecated =
         ListExt.any(
@@ -425,13 +399,16 @@ public class TypeParser {
       next();
     }
     DataType type = null;
-    if (!isFactory) {
+    boolean isConstructor = this.tok.lit.equals(className) 
+    		&& this.peekTok.kind == TypeKind.Lpar;
+    if (!isFactory && !isConstructor) {
       type = readType();
     }
     String name = checkName();
     if (this.tok.kind == TypeKind.Semicolon || this.tok.kind == TypeKind.Assign) {
       Expression init = null;
       if (this.tok.kind == TypeKind.Assign) {
+    	next();
         init = expr(0l);
       }
       check(TypeKind.Semicolon);
@@ -472,7 +449,7 @@ public class TypeParser {
       next();
       init = new Block();
       do {
-        Statement stmt = readStatement(ListExt.List(), false);
+        Statement stmt = readStatement(ListExt.List(), true);
         init.statements.add(stmt);
       } while (this.tok.kind == TypeKind.Comma);
     } else {
@@ -592,16 +569,16 @@ public class TypeParser {
     } else if (this.tok.kind == TypeKind.Lcbr) {
       smt = readBlock(true);
     } else {
-      /*
-       Declaraton, Assignment, Method Call
-      */
-      boolean isPrefix = TypeToken.isPrefix(this.tok.kind);
-      if (isDeclaration()) {
-        smt = readDecl();
+      save();
+      smt = readDecl();
+      if(smt != null) {
+    	  drop();
       } else {
+    	restore();
         /*
          must be assignment or method call
         */
+    	  boolean isPrefix = TypeToken.isPrefix(this.tok.kind);
         Expression exp = expr(0l);
         if (TypeToken.isAssign(this.tok.kind)) {
           /*
@@ -640,11 +617,14 @@ public class TypeParser {
   public Statement readDecl() {
     TypeToken start = this.tok;
     DataType type = readType();
+    if (this.tok.kind != TypeKind.Name) {
+    	return null;
+    }
     String name = checkName();
     Expression init = null;
     if (this.tok.kind != TypeKind.Semicolon) {
       if (!TypeToken.isAssign(this.tok.kind)) {
-        error("Expecting an assign operator");
+        return null;
       } else {
         next();
         /*
@@ -1025,6 +1005,8 @@ public class TypeParser {
     while (precedence < this.tok.getPrecedence()) {
       if (this.tok.kind == TypeKind.Dot) {
         node = dotExpr(node, false, false);
+      } else if (this.tok.kind == TypeKind.Lpar) {
+        node = fnCallExp(node);
       } else if (this.tok.kind == TypeKind.Lsbr) {
         node = indexExpr(node);
       } else if (isKey(this.tok, "as")) {
@@ -1042,7 +1024,9 @@ public class TypeParser {
         node = new BinaryExpression(node, ttok.lit, right);
       } else if (TypeToken.isInfix(this.tok.kind)) {
         node = infixExpr(node);
-      } else if (this.tok.kind == TypeKind.Inc || this.tok.kind == TypeKind.Dec) {
+      } else if (this.tok.kind == TypeKind.Inc 
+    		  || this.tok.kind == TypeKind.Dec 
+    		  || this.tok.kind == TypeKind.Not) {
         node = new PostfixExpression(node, this.tok.lit);
         next();
       } else if (this.tok.kind == TypeKind.Question) {
@@ -1201,7 +1185,7 @@ public class TypeParser {
 
   public ValueType readValueType() {
     String name = checkName();
-    String packageValue;
+    String packageValue = null;
     if (this.tok.kind == TypeKind.Dot) {
       next();
       packageValue = name;
@@ -1222,7 +1206,7 @@ public class TypeParser {
 
   public DataType readType() {
     DataType type = readValueType();
-    if (isKey(this.peekTok, "Function")) {
+    if (isKey(this.tok, "Function")) {
       next();
       MethodParams params = readMethodParams();
       FunctionType fnType = new FunctionType(false, params, type);
@@ -1411,6 +1395,10 @@ public class TypeParser {
       next();
     }
     String value = this.tok.lit;
+    while(this.peekTok.kind == TypeKind.String) {
+    	next();
+    	value = value + this.tok.lit;
+    }
     Expression node;
     if (this.peekTok.kind != TypeKind.Dollar) {
       next();
@@ -1451,6 +1439,11 @@ public class TypeParser {
     List<DataType> typeArgs = null;
     if (isType()) {
       typeArgs = readTypeArgs();
+    }
+    if(this.tok.kind == TypeKind.Dot) {
+    	// Call on Type
+    	next();
+    	name = checkName();
     }
     check(TypeKind.Lpar);
     MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs);
@@ -1534,6 +1527,11 @@ public class TypeParser {
     check(TypeKind.Rsbr);
     return new ArrayAccess(idx, left);
   }
+  
+  public Expression fnCallExp(Expression left) {
+	 MethodParams params = readMethodParams();
+	 return new FnCallExpression(left, params);
+  }
 
   public Expression dotExpr(Expression left, boolean checkNull, boolean notNull) {
     TypeToken start = this.tok;
@@ -1577,7 +1575,7 @@ public class TypeParser {
             this.peekTok,
             this.peekTok2,
             this.peekTok3,
-            null,
+            this.peekTok4,
             this.scanner.pos,
             this.prevTok,
             this.tok);

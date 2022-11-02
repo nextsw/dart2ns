@@ -4,12 +4,11 @@ import d3e.core.ListExt;
 import java.util.List;
 
 public class Typedef extends TopDecl {
-  public TypeParams generics;
-  public MethodDecl method;
+  public ValueType type;
+  public FunctionType fnType;
   public List<Annotation> annotations = ListExt.asList();
-  public String content;
 
-  public Typedef(String name) {
-    super(name, TopDeclType.Typedef, "");
+  public Typedef(ValueType type, FunctionType fnType) {
+    super(type.name, TopDeclType.Typedef, "");
   }
 }

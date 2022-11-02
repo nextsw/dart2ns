@@ -95,6 +95,7 @@ public class TypeToken {
     MapExt.set(res, TypeKind.Pipe, TypeToken.preSum);
     MapExt.set(res, TypeKind.Inc, TypeToken.prePostfix);
     MapExt.set(res, TypeKind.Dec, TypeToken.prePostfix);
+    MapExt.set(res, TypeKind.Not, TypeToken.prePostfix);
     MapExt.set(res, TypeKind.And, TypeToken.preCond);
     MapExt.set(res, TypeKind.Or, TypeToken.preCond);
     MapExt.set(res, TypeKind.Question, TypeToken.preCond);
@@ -120,7 +121,7 @@ public class TypeToken {
     MapExt.set(res, TypeKind.Ge, TypeToken.preEq);
     MapExt.set(res, TypeKind.Le, TypeToken.preEq);
     MapExt.set(res, TypeKind.Dot, TypeToken.preCall);
-    MapExt.set(res, TypeKind.Map, TypeToken.preCall);
+    MapExt.set(res, TypeKind.Lpar, TypeToken.preCall);
     MapExt.set(res, TypeKind.DotDot, TypeToken.preCall);
     MapExt.set(res, TypeKind.Ellipses, TypeToken.preCall);
     return res;
