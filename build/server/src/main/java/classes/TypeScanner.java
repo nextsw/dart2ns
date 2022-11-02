@@ -152,6 +152,11 @@ public class TypeScanner {
             {
               if (Objects.equals(nextc, "?")) {
                 this.pos++;
+                nextc = lookAhead(1l);
+                if(Objects.equals(nextc, "=")) {
+                	this.pos++;
+                	return newToken(TypeKind.DoubleQuestionAssign, "??=", 3l);
+                }
                 return newToken(TypeKind.DoubleQuestion, "??", 2l);
               }
               return newToken(TypeKind.Question, "?", 1l);
@@ -270,7 +275,8 @@ public class TypeScanner {
             {
               if (Objects.equals(nextc, ".")) {
                 this.pos++;
-                if (Objects.equals(StringExt.get(this.text, this.pos), ".")) {
+                nextc = lookAhead(1l);
+                if (Objects.equals(nextc, ".")) {
                   this.pos++;
                   return newToken(TypeKind.Ellipses, "...", 3l);
                 }

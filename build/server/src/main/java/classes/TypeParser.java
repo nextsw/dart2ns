@@ -272,8 +272,10 @@ public class TypeParser {
     MethodParams fparams = null;
     Expression def = null;
     DataType type = null;
-    if (this.tok.kind == TypeKind.At) {
-      annotations = readAnnotations();
+    boolean required = false;
+    if (isKey(this.tok, "required")) {
+    	next();
+      required = true;
     }
     boolean hasThis = false;
     if (isKey(this.tok, "this")) {
@@ -294,12 +296,6 @@ public class TypeParser {
             annotations,
             (x) -> {
               return Objects.equals(x.name, "deprecated");
-            });
-    boolean required =
-        ListExt.any(
-            annotations,
-            (x) -> {
-              return Objects.equals(x.name, "required");
             });
     return new MethodParam(
         annotations, type, def, deprecated, name, required, hasThis ? "this" : null);
@@ -448,10 +444,13 @@ public class TypeParser {
     if (this.tok.kind == TypeKind.Colon) {
       next();
       init = new Block();
-      do {
-        Statement stmt = readStatement(ListExt.List(), true);
+      Statement stmt = readStatement(ListExt.List(), true);
+      init.statements.add(stmt);
+      while(this.tok.kind == TypeKind.Comma) {
+    	next();
+        stmt = readStatement(ListExt.List(), true);
         init.statements.add(stmt);
-      } while (this.tok.kind == TypeKind.Comma);
+      } 
     } else {
       if (isKey(this.tok, "async")) {
         next();
@@ -558,6 +557,11 @@ public class TypeParser {
       smt = readIf();
     } else if (isKey(this.tok, "try")) {
       smt = readTry();
+    } else if (isKey(this.tok, "final") || isKey(this.tok, "late")) {
+      smt = readDecl();
+      if (!skipSemiColon) {
+        check(TypeKind.Semicolon);
+      }
     } else if (isKey(this.tok, "break")) {
       next();
       check(TypeKind.Semicolon);
@@ -616,8 +620,18 @@ public class TypeParser {
 
   public Statement readDecl() {
     TypeToken start = this.tok;
+    boolean isFinal = false;
+    boolean isLate = false;
+    if(isKey(tok, "final")) {
+    	next();
+    	isFinal = true;
+    }
+    if(isKey(tok, "late")) {
+    	next();
+    	isLate = true;
+    }
     DataType type = readType();
-    if (this.tok.kind != TypeKind.Name) {
+    if (type == null || this.tok.kind != TypeKind.Name) {
     	return null;
     }
     String name = checkName();
@@ -633,7 +647,7 @@ public class TypeParser {
       }
       init = expr(0l);
     }
-    return new Declaration(init, name, type);
+    return new Declaration(init, name, type, isFinal, isLate);
   }
 
   public boolean isDeclaration() {
@@ -1005,6 +1019,8 @@ public class TypeParser {
     while (precedence < this.tok.getPrecedence()) {
       if (this.tok.kind == TypeKind.Dot) {
         node = dotExpr(node, false, false);
+      } else if (this.tok.kind == TypeKind.DotDot) {
+        node = dotDotExpr(node, false, false);
       } else if (this.tok.kind == TypeKind.Lpar) {
         node = fnCallExp(node);
       } else if (this.tok.kind == TypeKind.Lsbr) {
@@ -1063,45 +1079,41 @@ public class TypeParser {
 
   public Expression parOrLambdaExpr() {
     TypeToken start = this.tok;
+    if(tok.kind == TypeKind.Lpar && peekTok.kind == TypeKind.Rpar) {
+    	return lambdaExp();
+    }
+    save();
     check(TypeKind.Lpar);
     Expression exp = null;
     if (this.tok.kind != TypeKind.Rpar) {
       exp = expr(0l);
     }
-    boolean isLambda = this.peekTok.kind == TypeKind.Arrow || this.peekTok.kind == TypeKind.Lcbr;
-    if (this.tok.kind == TypeKind.Rpar && !isLambda) {
+    boolean isLambda = this.tok.kind != TypeKind.Rpar;
+    if (!isLambda) {
+      drop();
       next();
       return new ParExpression(exp);
     } else {
-      if (exp == null) {
-        return lambdaExp(ListExt.asList());
-      }
-      return lambdaExp(ListExt.asList(((FieldOrEnumExpression) exp)));
+      restore();
+      return lambdaExp();
     }
   }
 
-  public Expression lambdaExp(List<FieldOrEnumExpression> exprs) {
+  public Expression lambdaExp() {
     TypeToken start = this.tok;
+    check(TypeKind.Lpar);
+    List<Param> params = ListExt.asList();
     while (this.tok.kind != TypeKind.Rpar) {
+      DataType type = readType();
+      String name = checkName();
+      params.add(new Param(name, type));
       if (this.tok.kind == TypeKind.Comma) {
-        next();
+    	  next();
       } else {
-        break;
+    	  break;
       }
-      exprs.add(((FieldOrEnumExpression) expr(0l)));
     }
     next();
-    /*
-     Remove the rpar
-    */
-    List<Param> params =
-        IterableExt.toList(
-            ListExt.map(
-                exprs,
-                (one) -> {
-                  return new Param(one.name);
-                }),
-            false);
     LambdaExpression exp = new LambdaExpression(params);
     if (this.tok.kind == TypeKind.Arrow) {
       next();
@@ -1123,7 +1135,7 @@ public class TypeParser {
     TypeToken start = this.tok;
     String name = checkName();
     check(TypeKind.Arrow);
-    List<Param> params = ListExt.asList(new Param(name));
+    List<Param> params = ListExt.asList(new Param(name, null));
     LambdaExpression exp = new LambdaExpression(params);
     exp.expression = expr(0l);
     return exp;
@@ -1184,6 +1196,9 @@ public class TypeParser {
   }
 
   public ValueType readValueType() {
+	if(this.tok.kind != TypeKind.Name) {
+		return null;
+	}
     String name = checkName();
     String packageValue = null;
     if (this.tok.kind == TypeKind.Dot) {
@@ -1206,6 +1221,9 @@ public class TypeParser {
 
   public DataType readType() {
     DataType type = readValueType();
+    if(type == null) {
+    	return null;
+    }
     if (isKey(this.tok, "Function")) {
       next();
       MethodParams params = readMethodParams();
@@ -1428,6 +1446,9 @@ public class TypeParser {
       return stringExpr();
     }
     String name = checkName();
+    if(name.equals("await")) {
+    	return new AwaitExpression(expr(0l));
+    }
     if (isType() || this.tok.kind == TypeKind.Lpar) {
       return callExpr(name);
     }
@@ -1547,6 +1568,21 @@ public class TypeParser {
       return new FieldOrEnumExpression(checkNull, name, notNull, left);
     }
   }
+  
+  public Expression dotDotExpr(Expression left, boolean checkNull, boolean notNull) {
+	    TypeToken start = this.tok;
+	    CascadeExp exp = new CascadeExp(left);
+	    while (this.tok.kind == TypeKind.DotDot) {
+	      next();
+	      String name = checkName();
+	      MethodCall call = callExpr(name);
+	      call.on = left;
+	      call.checkNull = checkNull;
+	      call.notNull = notNull;
+	      exp.calls.add(call);
+	    }
+	    return exp;
+	  }
 
   public Argument readArg() {
     Expression exp = expr(0l);

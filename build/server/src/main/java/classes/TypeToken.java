@@ -35,6 +35,7 @@ public class TypeToken {
           TypeKind.MinusAssign,
           TypeKind.MultAssign,
           TypeKind.DivAssign,
+          TypeKind.DoubleQuestionAssign,
           TypeKind.XorAssign,
           TypeKind.ModAssign,
           TypeKind.OrAssign,
@@ -106,6 +107,7 @@ public class TypeToken {
     MapExt.set(res, TypeKind.PlusAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.MinusAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.DivAssign, TypeToken.preAssign);
+    MapExt.set(res, TypeKind.DoubleQuestionAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.MultAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.XorAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.ModAssign, TypeToken.preAssign);
@@ -146,7 +148,8 @@ public class TypeToken {
         TypeKind.Pipe,
         TypeKind.Amp,
         TypeKind.LeftShift,
-        TypeKind.RightShift);
+        TypeKind.RightShift,
+        TypeKind.DoubleQuestion);
   }
 
   public static boolean isAssign(TypeKind kind) {

@@ -37,6 +37,7 @@ public enum TypeKind {
   PlusAssign,
   MinusAssign,
   DivAssign,
+  DoubleQuestionAssign,
   MultAssign,
   XorAssign,
   ModAssign,
