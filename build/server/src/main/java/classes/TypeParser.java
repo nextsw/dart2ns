@@ -423,6 +423,13 @@ private TokenFrame savedFrame;
       isAbstract = true;
       next();
     }
+    save();
+    FieldDecl field = readFieldDecl();
+    if(field != null) {
+    	field.abstract = isAbstract;
+    }
+    restore();
+    
     String fac = null;
     String name = null;
     Expression init = null;
@@ -531,7 +538,32 @@ private TokenFrame savedFrame;
         exp);
   }
 
-  private void restore() {
+  private FieldDecl readFieldDecl() {
+	  boolean isStatic = false;
+	    boolean isFinal = false;
+	    boolean isConst = false;
+	    if (isKey(this.tok, "static")) {
+	      isStatic = true;
+	      next();
+	    }
+	    if (isKey(this.tok, "final")) {
+	      isFinal = true;
+	      next();
+	    }
+	    if (isKey(this.tok, "const")) {
+	      isConst = true;
+	      next();
+	    }
+	    if (isKey(this.tok, "factory")) {
+	      return null;
+	    }
+	    if (isKey(this.tok, "abstract")) {
+	      return null;
+	    }
+	return null;
+}
+
+private void restore() {
 	  if(savedFrame == null) 
 	  {
 		  error("No saved frame found");
