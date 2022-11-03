@@ -10,5 +10,7 @@ public class Typedef extends TopDecl {
 
   public Typedef(ValueType type, FunctionType fnType) {
     super(type.name, TopDeclType.Typedef, "");
+    this.type = type;
+    this.fnType = fnType;
   }
 }

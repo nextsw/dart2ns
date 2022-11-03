@@ -153,9 +153,9 @@ public class TypeScanner {
               if (Objects.equals(nextc, "?")) {
                 this.pos++;
                 nextc = lookAhead(1l);
-                if(Objects.equals(nextc, "=")) {
-                	this.pos++;
-                	return newToken(TypeKind.DoubleQuestionAssign, "??=", 3l);
+                if (Objects.equals(nextc, "=")) {
+                  this.pos++;
+                  return newToken(TypeKind.DoubleQuestionAssign, "??=", 3l);
                 }
                 return newToken(TypeKind.DoubleQuestion, "??", 2l);
               }
@@ -810,10 +810,8 @@ public class TypeScanner {
   public void skipWhiteSpace() {
     while (this.pos < StringExt.length(this.text)
         && ParserUtil.isSpace(StringExt.get(this.text, this.pos))) {
-      System.out.print(' ');
       if (expect("\n", this.pos)) {
         incLineNumber();
-        System.out.print('\n');
       }
       this.pos++;
     }
@@ -837,7 +835,6 @@ public class TypeScanner {
     }
     String name = StringExt.substring(this.text, start, this.pos);
     this.pos--;
-    System.out.print(name);
     return name;
   }
 

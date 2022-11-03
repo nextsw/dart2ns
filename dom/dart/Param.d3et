@@ -1,4 +1,5 @@
 class Param {
     String name;
-    Param({this.name});
+    DataType type;
+    Param({this.name, this.type});
 }

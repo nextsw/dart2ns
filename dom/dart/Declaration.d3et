@@ -2,5 +2,8 @@ class Declaration extends Statement {
     DataType type;
     String name;
     Expression assignment;
-    Declaration({this.type, this.name, this.assignment});
+    Boolean isFinal;
+    Boolean isConst;
+    Boolean isLate;
+    Declaration({this.type, this.name, this.assignment, this.isFinal, this.isLate, this.isConst});
 }

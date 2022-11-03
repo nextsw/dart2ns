@@ -1,7 +1,6 @@
 class Typedef extends TopDecl {
-    TypeParams generics;
-    MethodDecl method;
+    ValueType type;
+    FunctionType fnType;
     List<Annotation> annotations = [];
-    String content;
-    Typedef(String name) : super(name, TopDeclType.Typedef, '');
+    Typedef(this.type, this.fnType) : super(type.name, TopDeclType.Typedef, '');
 }

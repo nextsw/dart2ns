@@ -1,0 +1,4 @@
+class InlineMethodStatement extends Statement {
+    MethodDecl method;
+    InlineMethodStatement(this.method);
+}

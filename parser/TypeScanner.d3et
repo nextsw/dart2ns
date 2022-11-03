@@ -147,6 +147,11 @@ server class TypeScanner {
                     {
                         if (nextc == '?') {
                             pos++;
+                            nextc = lookAhead(1);
+                            if(nextc == '=') {
+                                pos++;
+                                return newToken(TypeKind.DoubleQuestionAssign, '??=', 3);
+                            }
                             return newToken(TypeKind.DoubleQuestion, '??', 2);
                         }
                         return newToken(TypeKind.Question, '?', 1);
@@ -244,7 +249,8 @@ server class TypeScanner {
                     {
                         if (nextc == '.') {
                             pos++;
-                            if (text.get(pos) == '.') {
+                            nextc = lookAhead(1);
+                            if (nextc == '.') {
                                 pos++;
                                 return newToken(TypeKind.Ellipses, '...', 3);
                             }
@@ -268,8 +274,7 @@ server class TypeScanner {
                                 pos += 2;
                                 return newToken(TypeKind.RightShiftAssign, '>>=', 3);
                             }
-                            pos++;
-                            return newToken(TypeKind.RightShift, '>>', 2);
+                            return newToken(TypeKind.Gt, '>', 1);
                         } else {
                             return newToken(TypeKind.Gt, '>', 1);
                         }

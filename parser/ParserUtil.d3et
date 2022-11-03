@@ -21,5 +21,7 @@ server class ParserUtil {
 
     static Boolean isOctDigit(String s);
 
+    static Boolean isUpperCase(String s);
+
     // static Boolean isKeyKind(Kind k);
 }

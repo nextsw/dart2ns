@@ -1,9 +1,9 @@
 package classes;
 
 public class InlineMethodStatement extends Statement {
-	private MethodDecl method;
+  public MethodDecl method;
 
-	InlineMethodStatement(MethodDecl method){
-		this.method = method; 
-	}
+  public InlineMethodStatement(MethodDecl method) {
+    this.method = method;
+  }
 }

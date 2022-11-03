@@ -1,0 +1,7 @@
+class MapItem extends ArrayItem {
+    Expression key;
+    Expression value;
+    MapItem({this.key, this.value, List<Comment> comments}){
+        this.comments = comments;
+    }
+}

@@ -1,0 +1,5 @@
+class FnCallExpression extends Expression {
+    Expression on;
+    MethodParams params; 
+    FnCallExpression({this.on, this.params});
+}

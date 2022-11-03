@@ -1,0 +1,4 @@
+class AwaitExpression extends Expression {
+    Expression exp;
+    AwaitExpression(this.exp);
+}

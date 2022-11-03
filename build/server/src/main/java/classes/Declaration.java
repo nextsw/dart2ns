@@ -4,19 +4,22 @@ public class Declaration extends Statement {
   public DataType type;
   public String name;
   public Expression assignment;
-  public boolean isFinal;
-  public boolean isLate;
-public boolean isConst;
+  public boolean isFinal = false;
+  public boolean isConst = false;
+  public boolean isLate = false;
 
-  public Declaration(Expression assignment, 
-		  String name, DataType type, 
-		  boolean isFinal,
-		  boolean isLate, boolean isConst) {
+  public Declaration(
+      Expression assignment,
+      boolean isConst,
+      boolean isFinal,
+      boolean isLate,
+      String name,
+      DataType type) {
     this.assignment = assignment;
-    this.name = name;
-    this.type = type;
+    this.isConst = isConst;
     this.isFinal = isFinal;
     this.isLate = isLate;
-	this.isConst = isConst;
+    this.name = name;
+    this.type = type;
   }
 }

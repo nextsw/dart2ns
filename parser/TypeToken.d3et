@@ -12,17 +12,22 @@ server class TypeToken {
 
     Integer index = 0;
 
-    static Integer preLowest = 0;
-    static Integer preCond = 1;
-    static Integer preInAs = 2;
-    static Integer preAssign = 3;
-    static Integer preEq = 4;
-    static Integer preSum = 5;
-    static Integer preProduct = 6;
-    static Integer prePrefix = 7;
-    static Integer prePostfix = 8;
-    static Integer preCall = 9;
-    static Integer preIndex = 10;
+    static Integer preAssign = 0;
+    static Integer preCascade = 1;
+    static Integer preCond = 2;
+    static Integer preIfNull = 3;
+    static Integer preLogicOr = 4;
+    static Integer preLogicAnd = 5;
+    static Integer preEqual = 6;
+    static Integer preRational = 7;
+    static Integer preBitOr = 8;
+    static Integer preBitXor = 9;
+    static Integer preBitAnd = 10;
+    static Integer preShift = 11;
+    static Integer preAdd = 12;
+    static Integer preMulti = 13;
+    static Integer preUnPostfix = 14;
+    static Integer preUnPrefix = 15;
     
     static Map<TypeKind,String> tokenStrs = buildTokenStrs();
     static Map<String, TypeKind> keywords = buildKeys();
@@ -35,6 +40,7 @@ server class TypeToken {
         TypeKind.MinusAssign,
         TypeKind.MultAssign,
         TypeKind.DivAssign,
+        TypeKind.DoubleQuestionAssign,
         TypeKind.XorAssign,
         TypeKind.ModAssign,
         TypeKind.OrAssign,
@@ -80,25 +86,26 @@ server class TypeToken {
     }
     static Map<TypeKind, Integer> buildPrecedence() {
         Map<TypeKind, Integer> res = Map<TypeKind, Integer>();
-        res.set(TypeKind.Plus, preSum);
-        res.set(TypeKind.Minus, preSum);
-        res.set(TypeKind.Mul, preProduct);
-        res.set(TypeKind.Div, preProduct);
-        res.set(TypeKind.Mod, preProduct);
-        res.set(TypeKind.Xor, preSum);
-        res.set(TypeKind.Pipe, preSum);
-        res.set(TypeKind.Inc, prePostfix);
-        res.set(TypeKind.Dec, prePostfix);
-        res.set(TypeKind.And, preCond);
-        res.set(TypeKind.Or, preCond);
+        res.set(TypeKind.Plus, preAdd);
+        res.set(TypeKind.Minus, preAdd);
+        res.set(TypeKind.Mul, preMulti);
+        res.set(TypeKind.Div, preMulti);
+        res.set(TypeKind.Mod, preMulti);
+        res.set(TypeKind.Xor, preBitXor);
+        res.set(TypeKind.Pipe, preBitOr);
+        res.set(TypeKind.Inc, preUnPostfix);
+        res.set(TypeKind.Dec, preUnPostfix);
+        res.set(TypeKind.Not, preUnPrefix);
+        res.set(TypeKind.And, preLogicAnd);
+        res.set(TypeKind.Or, preLogicOr);
         res.set(TypeKind.Question, preCond);
-        res.set(TypeKind.DoubleQuestion, preCond);
-        res.set(TypeKind.LeftShift, preProduct);
-        res.set(TypeKind.RightShift, preProduct);
+        res.set(TypeKind.DoubleQuestion, preIfNull);
+        res.set(TypeKind.LeftShift, preShift);
         res.set(TypeKind.Assign, preAssign);
         res.set(TypeKind.PlusAssign, preAssign);
         res.set(TypeKind.MinusAssign, preAssign);
         res.set(TypeKind.DivAssign, preAssign);
+        res.set(TypeKind.DoubleQuestionAssign, preAssign);
         res.set(TypeKind.MultAssign, preAssign);
         res.set(TypeKind.XorAssign, preAssign);
         res.set(TypeKind.ModAssign, preAssign);
@@ -106,23 +113,23 @@ server class TypeToken {
         res.set(TypeKind.AndAssign, preAssign);
         res.set(TypeKind.RightShiftAssign, preAssign);
         res.set(TypeKind.LeftShiftAssign, preAssign);
-        res.set(TypeKind.Lsbr, preIndex);
-        res.set(TypeKind.Eq, preEq);
-        res.set(TypeKind.Ne, preEq);
-        res.set(TypeKind.Gt, preEq);
-        res.set(TypeKind.Lt, preEq);
-        res.set(TypeKind.Ge, preEq);
-        res.set(TypeKind.Le, preEq);
-        res.set(TypeKind.Dot, preCall);
-        res.set(TypeKind.Map, preCall);
-        res.set(TypeKind.DotDot, preCall);
-        res.set(TypeKind.Ellipses, preCall);
+        res.set(TypeKind.Lsbr, preUnPostfix);
+        res.set(TypeKind.Eq, preEqual);
+        res.set(TypeKind.Ne, preEqual);
+        res.set(TypeKind.Gt, preRational);
+        res.set(TypeKind.Lt, preRational);
+        res.set(TypeKind.Ge, preRational);
+        res.set(TypeKind.Le, preRational);
+        res.set(TypeKind.Dot, preUnPostfix);
+        res.set(TypeKind.Lpar, preUnPostfix);
+        res.set(TypeKind.DotDot, preCascade);
+        res.set(TypeKind.Ellipses, preUnPrefix);
         return res;
     }
     static List<TypeKind> buildInfixes(){
         return [TypeKind.Plus, TypeKind.Minus, TypeKind.Mod, TypeKind.Mul, TypeKind.Div, 
         TypeKind.Eq, TypeKind.Ne, TypeKind.Gt, TypeKind.Lt, TypeKind.Ge, TypeKind.Le, TypeKind.Or, TypeKind.Xor, 
-	    TypeKind.And, TypeKind.Pipe, TypeKind.Amp, TypeKind.LeftShift, TypeKind.RightShift];
+	    TypeKind.And, TypeKind.Pipe, TypeKind.Amp, TypeKind.LeftShift, TypeKind.DoubleQuestion];
     }
 
     static Boolean isAssign(TypeKind kind) {
@@ -135,7 +142,7 @@ server class TypeToken {
         } else {
             if(kind == TypeKind.Name) {
                 if(lit =='is' || lit == 'as') {
-                    return preInAs;
+                    return preRational;
                 }
             }
             return 0;

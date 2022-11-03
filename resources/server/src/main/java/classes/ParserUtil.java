@@ -64,4 +64,8 @@ public class ParserUtil {
         char c = str.charAt(0);
         return c >= '0' && c <= '7';
     }
+
+    public static boolean isUpperCase(String str) {
+        return Character.isUpperCase(str.charAt(0));
+    }
 }

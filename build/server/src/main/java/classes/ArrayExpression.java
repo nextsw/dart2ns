@@ -5,9 +5,9 @@ import java.util.List;
 
 public class ArrayExpression extends Expression {
   public DataType enforceType;
+  public DataType valueType;
   public List<ArrayItem> values = ListExt.asList();
   public boolean list = false;
-public DataType valueType;
 
   public ArrayExpression() {}
 }

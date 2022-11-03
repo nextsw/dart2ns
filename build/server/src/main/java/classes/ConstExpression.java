@@ -1,11 +1,9 @@
 package classes;
 
 public class ConstExpression extends Expression {
+  public Expression exp;
 
-	public Expression expr;
-
-	public ConstExpression(Expression expr) {
-		this.expr = expr;
-	}
-
+  public ConstExpression(Expression exp) {
+    this.exp = exp;
+  }
 }
