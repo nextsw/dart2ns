@@ -98,6 +98,7 @@ public class TypeToken {
     MapExt.set(res, TypeKind.Div, TypeToken.preMulti);
     MapExt.set(res, TypeKind.Mod, TypeToken.preMulti);
     MapExt.set(res, TypeKind.Xor, TypeToken.preBitXor);
+    MapExt.set(res, TypeKind.Amp, TypeToken.preBitAnd);
     MapExt.set(res, TypeKind.Pipe, TypeToken.preBitOr);
     MapExt.set(res, TypeKind.Inc, TypeToken.preUnPostfix);
     MapExt.set(res, TypeKind.Dec, TypeToken.preUnPostfix);

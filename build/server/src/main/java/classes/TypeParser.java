@@ -80,13 +80,15 @@ public class TypeParser {
     }
     if (this.tok.kind == TypeKind.At) {
       annotations = readAnnotations();
-    } else if (isKey(this.tok, "typedef")) {
+    }
+    if (isKey(this.tok, "typedef")) {
       obj = readTypeDef(annotations);
     } else if (isKey(this.tok, "enum")) {
       obj = readEnum(annotations);
     } else if (this.tok.kind == TypeKind.Eof) {
       obj = null;
-    } else if (isKey(this.tok, "class") || isKey(this.tok, "abstract")) {
+    } else if (isKey(this.tok, "class") || isKey(this.tok, "abstract") 
+    		|| isKey(this.tok, "mixin")) {
       obj = readClass(annotations, start);
     } else {
       obj = readClassMember("");
@@ -198,11 +200,17 @@ public class TypeParser {
       if (this.tok.kind == TypeKind.Gt) {
         break;
       }
+      if (this.tok.kind != TypeKind.Name) {
+          return null;
+      } 
       String name = checkName();
       DataType type = null;
       if (isKey(this.tok, "extends")) {
         next();
         type = readType();
+        if(type == null) {
+        	return null;
+        }
       }
       params.params.add(new TypeParam(type, name));
       if (this.tok.kind != TypeKind.Comma) {
@@ -211,10 +219,10 @@ public class TypeParser {
         next();
       }
     }
-    /*
-     Need to call next here to move over the ">"
-    */
-    check(TypeKind.Gt);
+    if (this.tok.kind != TypeKind.Gt) {
+        return null;
+    } 
+    next();
     return params;
   }
 
@@ -286,7 +294,9 @@ public class TypeParser {
       next();
       check(TypeKind.Dot);
     }
-    name = checkName();
+    if (this.tok.kind == TypeKind.Name) {
+      name = checkName();
+    }
     if (this.tok.kind == TypeKind.Assign) {
       next();
       def = expr(0l);
@@ -316,9 +326,15 @@ public class TypeParser {
       isServer = true;
       next();
     }
-    checkKey("class");
+    boolean isMixin = false;
+    if (isKey(this.tok, "mixin")) {
+        isMixin = true;
+        next();
+      } else {
+    	  checkKey("class");
+      }
     String name = checkName();
-    ClassDecl cls = new ClassDecl(name);
+    ClassDecl cls = new ClassDecl(isMixin, name);
     cls.isAbstract = isAbstract;
     if (this.tok.kind == TypeKind.Lt) {
       cls.generics = readTypeParams();
@@ -326,17 +342,6 @@ public class TypeParser {
     if (isKey(this.tok, "extends")) {
       next();
       cls.extendType = readType();
-    }
-    cls.impls.clear();
-    if (isKey(this.tok, "implements")) {
-      next();
-      while (true) {
-        cls.impls.add(readType());
-        if (this.tok.kind != TypeKind.Comma) {
-          break;
-        }
-        next();
-      }
     }
     if (isKey(this.tok, "with")) {
       next();
@@ -347,6 +352,17 @@ public class TypeParser {
         }
         next();
       }
+    }
+    cls.impls.clear();
+    if (isKey(this.tok, "implements")) {
+    	next();
+    	while (true) {
+    		cls.impls.add(readType());
+    		if (this.tok.kind != TypeKind.Comma) {
+    			break;
+    		}
+    		next();
+    	}
     }
     check(TypeKind.Lcbr);
     cls.members.clear();
@@ -395,7 +411,8 @@ public class TypeParser {
       next();
     }
     DataType type = null;
-    boolean isConstructor = Objects.equals(this.tok.lit, className);
+    boolean isConstructor = Objects.equals(this.tok.lit, className) 
+    		&& (this.peekTok.kind == TypeKind.Lpar || this.peekTok.kind == TypeKind.Dot);
     if (!isFactory && !isConstructor) {
       type = readType();
     }
@@ -417,12 +434,15 @@ public class TypeParser {
     Block body = null;
     Block init = null;
     Expression exp = null;
+    DataType alternate = null;
     if (isFactory || (isConstructor && this.tok.kind == TypeKind.Dot)) {
       if (!(Objects.equals(name, className))) {
         error("Factory method should have same class name");
       }
-      check(TypeKind.Dot);
-      name = checkName();
+      if(tok.kind == TypeKind.Dot) {
+    	  check(TypeKind.Dot);
+    	  name = checkName();    	  
+      }
     } else {
       if (Objects.equals(name, "set") && this.tok.kind == TypeKind.Name) {
         isSet = true;
@@ -431,6 +451,14 @@ public class TypeParser {
         isGet = true;
         name = checkName();
       }
+    }
+    if(name.equals("operator")) {
+    	name = tok.lit;
+    	next();
+    	while(this.tok.kind != TypeKind.Lpar) {
+    		name += tok.lit;
+    		next();
+    	}
     }
     TypeParams typeParams = null;
     if (this.tok.kind == TypeKind.Lt) {
@@ -450,6 +478,13 @@ public class TypeParser {
         stmt = readStatement(ListExt.List(), true);
         init.statements.add(stmt);
       }
+    } else if (this.tok.kind == TypeKind.Assign) {
+    	next();
+    	alternate = readType();
+    	if(this.tok.kind == TypeKind.Dot) {
+    		next();
+    		String alFac = checkName();
+    	}
     } else {
       if (isKey(this.tok, "async")) {
         next();
@@ -542,6 +577,15 @@ public class TypeParser {
     TypeToken start = this.tok;
     if (isKey(this.tok, "return")) {
       smt = readReturn();
+    } else if (isKey(this.tok, "await")) {
+      smt = new AwaitExpression(expr(0l));
+      if (!skipSemiColon) {
+          check(TypeKind.Semicolon);
+        }
+    } else if (isKey(this.tok, "rethrow")) {
+    	next();
+        smt = new RethrowStatement();
+        check(TypeKind.Semicolon);
     } else if (isKey(this.tok, "throw")) {
       smt = readThrow();
     } else if (isKey(this.tok, "for")) {
@@ -596,6 +640,8 @@ public class TypeParser {
           smt = ((MethodCall) exp);
         } else if (exp instanceof CascadeExp) {
           smt = ((CascadeExp) exp);
+        } else if (exp instanceof TypeCastOrCheckExpression) {
+          smt = ((TypeCastOrCheckExpression) exp);
         } else {
           error("Unknown expression/statement");
         }
@@ -624,6 +670,9 @@ public class TypeParser {
     boolean isFinal = false;
     boolean isLate = false;
     boolean isConst = false;
+    while(isKey(this.tok, "final")
+    		||isKey(this.tok, "late")
+    		||isKey(this.tok, "const")) {
     if (isKey(this.tok, "final")) {
       next();
       isFinal = true;
@@ -636,6 +685,7 @@ public class TypeParser {
       next();
       isConst = true;
     }
+    }
     DataType type = readType();
     if (type == null || this.tok.kind != TypeKind.Name) {
       return null;
@@ -646,8 +696,11 @@ public class TypeParser {
        May be inline function
       */
       TypeParams typeParams = null;
-      if (this.tok.kind == TypeKind.Lt) {
+      if (isType()) {
         typeParams = readTypeParams();
+        if(typeParams == null) {
+        	return null;
+        }
       }
       MethodParams params = readMethodParams(false);
       Block block = null;
@@ -657,6 +710,7 @@ public class TypeParser {
       } else {
         check(TypeKind.Arrow);
         exp = expr(0l);
+        check(TypeKind.Semicolon);
       }
       MethodDecl method =
           new MethodDecl(
@@ -745,6 +799,7 @@ public class TypeParser {
         next();
         catchPart.onType = readType();
       }
+      if (isKey(this.tok, "catch")) {
       checkKey("catch");
       check(TypeKind.Lpar);
       String name = checkName();
@@ -756,6 +811,7 @@ public class TypeParser {
       check(TypeKind.Rpar);
       catchPart.exp = name;
       catchPart.stackTrace = asName;
+      }
       catchPart.body = readBlock(true);
       tcs.catchParts.add(catchPart);
     }
@@ -850,6 +906,31 @@ public class TypeParser {
     Block block = readBlock(true);
     return new WhileLoop(block, test);
   }
+  
+  public ForEachLoop readForEachLoop() {
+	  DataType type = readType();
+	  if(type == null) {
+		  return null;
+	  }
+	  if(tok.kind != TypeKind.Name) {
+		  return null;
+	  }
+      String name = checkName();
+      if(!isKey(tok, "in")) {
+		  return null;
+	  }
+      next();
+      Expression exp = expr(0l);
+      if(tok.kind != TypeKind.Rpar) {
+    	  return null;
+      }
+      next();
+      if(tok.kind != TypeKind.Lcbr) {
+    	  return null;
+      }
+      Block block = readBlock(true);
+      return new ForEachLoop(block, exp, type, name);
+  }
 
   public Statement readFor() {
     TypeToken start = this.tok;
@@ -860,27 +941,13 @@ public class TypeParser {
       next();
       isFinal = true;
     }
-    boolean forEachLoop = false;
-    forEachLoop =
-        (this.tok.kind == TypeKind.Name
-            && this.peekTok.kind == TypeKind.Name
-            && isKey(this.peekTok2, "in"));
-    boolean nextIsType =
-        this.peekTok.kind == TypeKind.Lt
-            && this.peekTok2.kind == TypeKind.Name
-            && (this.peekTok3.kind == TypeKind.Gt
-                || this.peekTok3.kind == TypeKind.Comma
-                || this.peekTok3.kind == TypeKind.Lt);
-    forEachLoop = forEachLoop || (this.tok.kind == TypeKind.Name && nextIsType);
-    if (forEachLoop) {
-      DataType type = readType();
-      String name = checkName();
-      checkKey("in");
-      Expression exp = expr(0l);
-      check(TypeKind.Rpar);
-      Block block = readBlock(true);
-      return new ForEachLoop(block, exp, type, name);
+    save();
+    ForEachLoop loop = readForEachLoop();
+    if (loop != null) {
+      drop();
+      return loop;
     } else {
+      restore();
       /*
        Normal for loop
       */
@@ -1089,7 +1156,7 @@ public class TypeParser {
         node = new TypeCastOrCheckExpression(false, type, node);
       } else if (isKey(this.tok, "is")) {
         next();
-        DataType type = readType();
+        DataType type = readValueType();
         node = new TypeCastOrCheckExpression(true, type, node);
       } else if (this.tok.kind == TypeKind.LeftShift) {
         TypeToken ttok = this.tok;
@@ -1120,6 +1187,9 @@ public class TypeParser {
       } else {
         return node;
       }
+      if(tok.kind == TypeKind.CommentSingle || tok.kind == TypeKind.CommentMulti) {
+    	 node.comments = eatComments();
+      }
     }
     if (node != null) {
       node.comments = comments;
@@ -1128,43 +1198,40 @@ public class TypeParser {
   }
 
   public boolean isType() {
-    return this.tok.kind == TypeKind.Lt
-        && this.peekTok.kind == TypeKind.Name
-        && (TypeParser.primitives.contains(this.peekTok.lit)
-            || ParserUtil.isUpperCase(StringExt.substring(this.peekTok.lit, 0l, 1l)))
-        && (this.peekTok2.kind == TypeKind.Gt
-            || this.peekTok2.kind == TypeKind.Comma
-            || this.peekTok2.kind == TypeKind.Lt);
+    return this.tok.kind == TypeKind.Lt;
   }
 
   public Expression parOrLambdaExpr() {
     TypeToken start = this.tok;
     if (this.tok.kind == TypeKind.Lpar && this.peekTok.kind == TypeKind.Rpar) {
+      next();
       return lambdaExp();
     }
-    save();
     check(TypeKind.Lpar);
+    save();
     Expression exp = null;
     if (this.tok.kind != TypeKind.Rpar) {
-      exp = expr(0l);
+      exp = lambdaExp();
     }
-    boolean isLambda = this.tok.kind != TypeKind.Rpar;
-    if (!isLambda) {
-      drop();
-      next();
+    if (exp == null) {
+      restore();
+      exp = expr(0);
+      check(TypeKind.Rpar);
       return new ParExpression(exp);
     } else {
-      restore();
-      return lambdaExp();
+       drop();
+      return exp;
     }
   }
 
   public Expression lambdaExp() {
     TypeToken start = this.tok;
-    check(TypeKind.Lpar);
     List<Param> params = ListExt.asList();
     while (this.tok.kind != TypeKind.Rpar) {
       DataType type = readType();
+      if(tok.kind != TypeKind.Name) {
+      	return null;
+      }
       String name = checkName();
       params.add(new Param(name, type));
       if (this.tok.kind == TypeKind.Comma) {
@@ -1173,8 +1240,15 @@ public class TypeParser {
         break;
       }
     }
+    if(tok.kind != TypeKind.Rpar) {
+    	return null;
+    }
     next();
     LambdaExpression exp = new LambdaExpression(params);
+    if (isKey(tok, "async")) {
+    	next();
+    	exp.async = true;
+    }
     if (this.tok.kind == TypeKind.Arrow) {
       next();
       Expression val = expr(0l);
@@ -1187,6 +1261,8 @@ public class TypeParser {
       exp.expression = val;
     } else if (this.tok.kind == TypeKind.Lcbr) {
       exp.body = readBlock(true);
+    } else {
+    	return null;
     }
     return exp;
   }
@@ -1203,7 +1279,11 @@ public class TypeParser {
 
   public Expression ternaryExpr(Expression condition) {
     Expression yes = expr(0l);
-    check(TypeKind.Colon);
+    if(tok.kind != TypeKind.Colon) {
+    	return null;
+    } else {
+    	next();
+    }
     Expression no = expr(0l);
     TerinaryExpression exp = new TerinaryExpression(condition, no, yes);
     return exp;
@@ -1246,13 +1326,19 @@ public class TypeParser {
   public Expression infixExpr(Expression left) {
     TypeToken ttok = this.tok;
     TypeKind op = this.tok.kind;
+    String lit = ttok.lit;
     long precedence = this.tok.getPrecedence();
     next();
+    if(prevTok.kind == TypeKind.Gt && tok.kind == TypeKind.Gt) {
+    	next();
+    	precedence = TypeToken.preShift;
+    	lit = ">>";
+    }
     if (isKey(ttok, "as") || isKey(ttok, "is")) {
       this.expectingType = true;
     }
     Expression right = expr(precedence);
-    return new BinaryExpression(left, ttok.lit, right);
+    return new BinaryExpression(left, lit, right);
   }
 
   public ValueType readValueType() {
@@ -1266,11 +1352,14 @@ public class TypeParser {
       packageValue = name;
       name = checkName();
     }
-    boolean nextType = isType();
     ValueType type = new ValueType(name, false);
     type.in = packageValue;
-    if (nextType) {
-      type.args = readTypeArgs();
+    if (this.tok.kind == TypeKind.Lt) {
+      List<DataType> typeArgs = readTypeArgs();
+      if(typeArgs == null) {
+    	  return null;
+      }
+      type.args = typeArgs;
     }
     if (this.tok.kind == TypeKind.Question) {
       type.optional = true;
@@ -1303,6 +1392,9 @@ public class TypeParser {
     List<DataType> args = ListExt.asList();
     while (true) {
       DataType sub = readType();
+      if(sub == null) {
+    	  return null;
+      }
       args.add(sub);
       if (this.tok.kind != TypeKind.Comma) {
         break;
@@ -1310,7 +1402,10 @@ public class TypeParser {
         next();
       }
     }
-    check(TypeKind.Gt);
+    if(tok.kind != TypeKind.Gt) {
+    	return null;
+    }
+    next();
     return args;
   }
 
@@ -1505,18 +1600,25 @@ public class TypeParser {
     if (name.equals("const")) {
       return new ConstExpression(expr(0l));
     }
-    if (isType() || this.tok.kind == TypeKind.Lpar) {
-      return callExpr(name);
+    if(tok.kind == TypeKind.Lt) {
+    	save();
+    	List<DataType> params = readTypeArgs();
+    	if(params == null) {
+    		restore();
+    	} else {
+    		drop();
+    	}
+    	return callExpr(name, params);
+    }
+    if (this.tok.kind == TypeKind.Lpar) {
+      return callExpr(name, null);
     }
     return new FieldOrEnumExpression(false, name, false, null);
   }
 
-  public MethodCall callExpr(String name) {
+  public MethodCall callExpr(String name, List<DataType> typeArgs) {
     TypeToken start = this.tok;
-    List<DataType> typeArgs = null;
-    if (isType()) {
-      typeArgs = readTypeArgs();
-    }
+    
     if (this.tok.kind == TypeKind.Dot) {
       /*
        Call on Type
@@ -1524,7 +1626,11 @@ public class TypeParser {
       next();
       name = checkName();
     }
-    check(TypeKind.Lpar);
+    if(tok.kind != TypeKind.Lpar) {
+    	return null;
+    } else {
+    	next();
+    }
     MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs);
     while (true) {
       List<Comment> comments = eatComments();
@@ -1616,15 +1722,26 @@ public class TypeParser {
     TypeToken start = this.tok;
     next();
     String name = checkName();
-    if (isType() || this.tok.kind == TypeKind.Lpar) {
-      MethodCall call = callExpr(name);
-      call.on = left;
-      call.checkNull = checkNull;
-      call.notNull = notNull;
-      return call;
-    } else {
-      return new FieldOrEnumExpression(checkNull, name, notNull, left);
+    List<DataType> typeArgs = ListExt.asList();
+      if(isType()) {
+    	  save();
+    	  typeArgs = readTypeArgs();
+    	  if(typeArgs != null) {
+    		  drop();
+    	  }else {
+    	   restore();
+    	  }
     }
+      if(tok.kind == TypeKind.Lpar) {
+    	  MethodCall call = callExpr(name, typeArgs);
+		  call.on = left;
+		  call.checkNull = checkNull;
+		  call.notNull = notNull;
+		  return call;
+      }
+    
+
+    return new FieldOrEnumExpression(checkNull, name, notNull, left);
   }
 
   public Expression dotDotExpr(Expression left, boolean checkNull, boolean notNull) {
@@ -1633,7 +1750,7 @@ public class TypeParser {
     while (this.tok.kind == TypeKind.DotDot) {
       next();
       String name = checkName();
-      MethodCall call = callExpr(name);
+      MethodCall call = callExpr(name, ListExt.asList());
       call.on = left;
       call.checkNull = checkNull;
       call.notNull = notNull;

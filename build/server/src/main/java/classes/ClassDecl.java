@@ -10,8 +10,10 @@ public class ClassDecl extends TopDecl {
   public List<DataType> impls = ListExt.asList();
   public List<ClassMember> members = ListExt.asList();
   public List<DataType> mixins = ListExt.asList();
+  public boolean isMixin = false;
 
-  public ClassDecl(String name) {
+  public ClassDecl(boolean isMixin, String name) {
     super(name, TopDeclType.Class, "");
+    this.isMixin = isMixin;
   }
 }

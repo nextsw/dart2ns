@@ -1,6 +1,6 @@
 package classes;
 
-public class TypeCastOrCheckExpression extends Expression {
+public class TypeCastOrCheckExpression extends Statement {
   public boolean check = false;
   public DataType dataType;
   public Expression exp;
