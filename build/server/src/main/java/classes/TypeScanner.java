@@ -303,8 +303,7 @@ public class TypeScanner {
                   this.pos += 2l;
                   return newToken(TypeKind.RightShiftAssign, ">>=", 3l);
                 }
-                this.pos++;
-                return newToken(TypeKind.RightShift, ">>", 2l);
+                return newToken(TypeKind.Gt, ">", 1l);
               } else {
                 return newToken(TypeKind.Gt, ">", 1l);
               }
@@ -811,8 +810,10 @@ public class TypeScanner {
   public void skipWhiteSpace() {
     while (this.pos < StringExt.length(this.text)
         && ParserUtil.isSpace(StringExt.get(this.text, this.pos))) {
+      System.out.print(' ');
       if (expect("\n", this.pos)) {
         incLineNumber();
+        System.out.print('\n');
       }
       this.pos++;
     }
@@ -836,6 +837,7 @@ public class TypeScanner {
     }
     String name = StringExt.substring(this.text, start, this.pos);
     this.pos--;
+    System.out.print(name);
     return name;
   }
 

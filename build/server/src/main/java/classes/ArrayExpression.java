@@ -7,6 +7,7 @@ public class ArrayExpression extends Expression {
   public DataType enforceType;
   public List<ArrayItem> values = ListExt.asList();
   public boolean list = false;
+public DataType valueType;
 
   public ArrayExpression() {}
 }

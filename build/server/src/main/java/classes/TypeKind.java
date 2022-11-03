@@ -31,7 +31,6 @@ public enum TypeKind {
   Amp,
   Hash,
   LeftShift,
-  RightShift,
   At,
   Assign,
   PlusAssign,

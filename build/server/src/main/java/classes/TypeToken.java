@@ -13,17 +13,22 @@ public class TypeToken {
   public long pos = 0l;
   public long len = 0l;
   public long index = 0l;
-  public static long preLowest = 0l;
-  public static long preCond = 1l;
-  public static long preInAs = 2l;
-  public static long preAssign = 3l;
-  public static long preEq = 4l;
-  public static long preSum = 5l;
-  public static long preProduct = 6l;
-  public static long prePrefix = 7l;
-  public static long prePostfix = 8l;
-  public static long preCall = 9l;
-  public static long preIndex = 10l;
+  public static long preAssign = 0l;
+  public static long preCascade = 1l;
+  public static long preCond = 2l;
+  public static long preIfNull = 3l;
+  public static long preLogicOr = 4l;
+  public static long preLogicAnd = 5l;
+  public static long preEqual = 6l;
+  public static long preRational = 7l;
+  public static long preBitOr = 8l;
+  public static long preBitXor = 9l;
+  public static long preBitAnd = 10l;
+  public static long preShift = 11l;
+  public static long preAdd = 12l;
+  public static long preMulti = 13l;
+  public static long preUnPostfix = 14l;
+  public static long preUnPrefix = 15l;
   public static Map<TypeKind, String> tokenStrs = TypeToken.buildTokenStrs();
   public static Map<String, TypeKind> keywords = TypeToken.buildKeys();
   public static Map<TypeKind, Long> precedenceMap = TypeToken.buildPrecedence();
@@ -87,22 +92,21 @@ public class TypeToken {
 
   public static Map<TypeKind, Long> buildPrecedence() {
     Map<TypeKind, Long> res = MapExt.Map();
-    MapExt.set(res, TypeKind.Plus, TypeToken.preSum);
-    MapExt.set(res, TypeKind.Minus, TypeToken.preSum);
-    MapExt.set(res, TypeKind.Mul, TypeToken.preProduct);
-    MapExt.set(res, TypeKind.Div, TypeToken.preProduct);
-    MapExt.set(res, TypeKind.Mod, TypeToken.preProduct);
-    MapExt.set(res, TypeKind.Xor, TypeToken.preSum);
-    MapExt.set(res, TypeKind.Pipe, TypeToken.preSum);
-    MapExt.set(res, TypeKind.Inc, TypeToken.prePostfix);
-    MapExt.set(res, TypeKind.Dec, TypeToken.prePostfix);
-    MapExt.set(res, TypeKind.Not, TypeToken.prePostfix);
-    MapExt.set(res, TypeKind.And, TypeToken.preCond);
-    MapExt.set(res, TypeKind.Or, TypeToken.preCond);
+    MapExt.set(res, TypeKind.Plus, TypeToken.preAdd);
+    MapExt.set(res, TypeKind.Minus, TypeToken.preAdd);
+    MapExt.set(res, TypeKind.Mul, TypeToken.preMulti);
+    MapExt.set(res, TypeKind.Div, TypeToken.preMulti);
+    MapExt.set(res, TypeKind.Mod, TypeToken.preMulti);
+    MapExt.set(res, TypeKind.Xor, TypeToken.preBitXor);
+    MapExt.set(res, TypeKind.Pipe, TypeToken.preBitOr);
+    MapExt.set(res, TypeKind.Inc, TypeToken.preUnPostfix);
+    MapExt.set(res, TypeKind.Dec, TypeToken.preUnPostfix);
+    MapExt.set(res, TypeKind.Not, TypeToken.preUnPrefix);
+    MapExt.set(res, TypeKind.And, TypeToken.preLogicAnd);
+    MapExt.set(res, TypeKind.Or, TypeToken.preLogicOr);
     MapExt.set(res, TypeKind.Question, TypeToken.preCond);
-    MapExt.set(res, TypeKind.DoubleQuestion, TypeToken.preCond);
-    MapExt.set(res, TypeKind.LeftShift, TypeToken.preProduct);
-    MapExt.set(res, TypeKind.RightShift, TypeToken.preProduct);
+    MapExt.set(res, TypeKind.DoubleQuestion, TypeToken.preIfNull);
+    MapExt.set(res, TypeKind.LeftShift, TypeToken.preShift);
     MapExt.set(res, TypeKind.Assign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.PlusAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.MinusAssign, TypeToken.preAssign);
@@ -115,17 +119,17 @@ public class TypeToken {
     MapExt.set(res, TypeKind.AndAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.RightShiftAssign, TypeToken.preAssign);
     MapExt.set(res, TypeKind.LeftShiftAssign, TypeToken.preAssign);
-    MapExt.set(res, TypeKind.Lsbr, TypeToken.preIndex);
-    MapExt.set(res, TypeKind.Eq, TypeToken.preEq);
-    MapExt.set(res, TypeKind.Ne, TypeToken.preEq);
-    MapExt.set(res, TypeKind.Gt, TypeToken.preEq);
-    MapExt.set(res, TypeKind.Lt, TypeToken.preEq);
-    MapExt.set(res, TypeKind.Ge, TypeToken.preEq);
-    MapExt.set(res, TypeKind.Le, TypeToken.preEq);
-    MapExt.set(res, TypeKind.Dot, TypeToken.preCall);
-    MapExt.set(res, TypeKind.Lpar, TypeToken.preCall);
-    MapExt.set(res, TypeKind.DotDot, TypeToken.preCall);
-    MapExt.set(res, TypeKind.Ellipses, TypeToken.preCall);
+    MapExt.set(res, TypeKind.Lsbr, TypeToken.preUnPostfix);
+    MapExt.set(res, TypeKind.Eq, TypeToken.preEqual);
+    MapExt.set(res, TypeKind.Ne, TypeToken.preEqual);
+    MapExt.set(res, TypeKind.Gt, TypeToken.preRational);
+    MapExt.set(res, TypeKind.Lt, TypeToken.preRational);
+    MapExt.set(res, TypeKind.Ge, TypeToken.preRational);
+    MapExt.set(res, TypeKind.Le, TypeToken.preRational);
+    MapExt.set(res, TypeKind.Dot, TypeToken.preUnPostfix);
+    MapExt.set(res, TypeKind.Lpar, TypeToken.preUnPostfix);
+    MapExt.set(res, TypeKind.DotDot, TypeToken.preCascade);
+    MapExt.set(res, TypeKind.Ellipses, TypeToken.preUnPrefix);
     return res;
   }
 
@@ -148,7 +152,6 @@ public class TypeToken {
         TypeKind.Pipe,
         TypeKind.Amp,
         TypeKind.LeftShift,
-        TypeKind.RightShift,
         TypeKind.DoubleQuestion);
   }
 
@@ -162,7 +165,7 @@ public class TypeToken {
     } else {
       if (this.kind == TypeKind.Name) {
         if (Objects.equals(this.lit, "is") || Objects.equals(this.lit, "as")) {
-          return TypeToken.preInAs;
+          return TypeToken.preRational;
         }
       }
       return 0l;
