@@ -64,5 +64,6 @@ public enum TypeKind {
   Dot,
   DotDot,
   Ellipses,
-  End;
+  End,
+  NotDiv;
 }

@@ -1,11 +1,11 @@
 package classes;
 
-public class FnCallExpression extends Expression {
+public class FnCallExpression extends Statement {
   public Expression on;
-  public MethodParams params;
+  public MethodCall call;
 
-  public FnCallExpression(Expression on, MethodParams params) {
+  public FnCallExpression(Expression on, MethodCall call) {
     this.on = on;
-    this.params = params;
+    this.call = call;
   }
 }

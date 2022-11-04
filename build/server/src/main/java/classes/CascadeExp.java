@@ -6,6 +6,7 @@ import java.util.List;
 public class CascadeExp extends Statement {
   public Expression on;
   public List<MethodCall> calls = ListExt.asList();
+public List<Assignment> assigns = ListExt.asList();
 
   public CascadeExp(Expression on) {
     this.on = on;

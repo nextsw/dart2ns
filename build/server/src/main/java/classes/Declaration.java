@@ -1,8 +1,12 @@
 package classes;
 
+import java.util.List;
+
+import d3e.core.ListExt;
+
 public class Declaration extends Statement {
   public DataType type;
-  public String name;
+  public List<String> names = ListExt.asList();
   public Expression assignment;
   public boolean isFinal = false;
   public boolean isConst = false;
@@ -13,13 +17,13 @@ public class Declaration extends Statement {
       boolean isConst,
       boolean isFinal,
       boolean isLate,
-      String name,
+      List<String> names,
       DataType type) {
     this.assignment = assignment;
     this.isConst = isConst;
     this.isFinal = isFinal;
     this.isLate = isLate;
-    this.name = name;
+    this.names = names;
     this.type = type;
   }
 }

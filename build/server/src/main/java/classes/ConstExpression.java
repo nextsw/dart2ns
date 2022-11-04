@@ -1,6 +1,6 @@
 package classes;
 
-public class ConstExpression extends Expression {
+public class ConstExpression extends Statement {
   public Expression exp;
 
   public ConstExpression(Expression exp) {

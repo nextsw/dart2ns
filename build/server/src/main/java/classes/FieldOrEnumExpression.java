@@ -1,6 +1,6 @@
 package classes;
 
-public class FieldOrEnumExpression extends Expression {
+public class FieldOrEnumExpression extends Statement {
   public String name;
   public Expression on;
   public boolean checkNull = false;

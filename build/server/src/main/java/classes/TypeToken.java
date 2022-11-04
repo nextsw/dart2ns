@@ -13,22 +13,22 @@ public class TypeToken {
   public long pos = 0l;
   public long len = 0l;
   public long index = 0l;
-  public static long preAssign = 0l;
-  public static long preCascade = 1l;
-  public static long preCond = 2l;
-  public static long preIfNull = 3l;
-  public static long preLogicOr = 4l;
-  public static long preLogicAnd = 5l;
-  public static long preEqual = 6l;
-  public static long preRational = 7l;
-  public static long preBitOr = 8l;
-  public static long preBitXor = 9l;
-  public static long preBitAnd = 10l;
-  public static long preShift = 11l;
-  public static long preAdd = 12l;
-  public static long preMulti = 13l;
-  public static long preUnPostfix = 14l;
-  public static long preUnPrefix = 15l;
+  public static long preAssign = 1l;
+  public static long preCascade = 2l;
+  public static long preCond = 3l;
+  public static long preIfNull = 4l;
+  public static long preLogicOr = 5l;
+  public static long preLogicAnd = 6l;
+  public static long preEqual = 7l;
+  public static long preRational = 8l;
+  public static long preBitOr = 9l;
+  public static long preBitXor = 10l;
+  public static long preBitAnd = 11l;
+  public static long preShift = 12l;
+  public static long preAdd = 13l;
+  public static long preMulti = 14l;
+  public static long preUnPostfix = 15l;
+  public static long preUnPrefix = 16l;
   public static Map<TypeKind, String> tokenStrs = TypeToken.buildTokenStrs();
   public static Map<String, TypeKind> keywords = TypeToken.buildKeys();
   public static Map<TypeKind, Long> precedenceMap = TypeToken.buildPrecedence();
@@ -96,6 +96,7 @@ public class TypeToken {
     MapExt.set(res, TypeKind.Minus, TypeToken.preAdd);
     MapExt.set(res, TypeKind.Mul, TypeToken.preMulti);
     MapExt.set(res, TypeKind.Div, TypeToken.preMulti);
+    MapExt.set(res, TypeKind.NotDiv, TypeToken.preMulti);
     MapExt.set(res, TypeKind.Mod, TypeToken.preMulti);
     MapExt.set(res, TypeKind.Xor, TypeToken.preBitXor);
     MapExt.set(res, TypeKind.Amp, TypeToken.preBitAnd);
@@ -141,6 +142,7 @@ public class TypeToken {
         TypeKind.Mod,
         TypeKind.Mul,
         TypeKind.Div,
+        TypeKind.NotDiv,
         TypeKind.Eq,
         TypeKind.Ne,
         TypeKind.Gt,
@@ -152,8 +154,19 @@ public class TypeToken {
         TypeKind.And,
         TypeKind.Pipe,
         TypeKind.Amp,
+        TypeKind.Assign,
         TypeKind.LeftShift,
-        TypeKind.DoubleQuestion);
+        TypeKind.DoubleQuestion,
+        TypeKind.PlusAssign,
+        TypeKind.MultAssign,
+        TypeKind.AndAssign,
+        TypeKind.DivAssign,
+        TypeKind.DoubleQuestionAssign,
+        TypeKind.LeftShiftAssign,
+        TypeKind.MinusAssign,
+        TypeKind.ModAssign,
+        TypeKind.OrAssign,
+        TypeKind.RightShiftAssign);
   }
 
   public static boolean isAssign(TypeKind kind) {

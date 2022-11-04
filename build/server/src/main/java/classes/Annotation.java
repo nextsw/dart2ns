@@ -1,11 +1,14 @@
 package classes;
 
-public class Annotation {
-  public String name;
-  public String value;
+import java.util.List;
 
-  public Annotation(String name, String value) {
-    this.name = name;
-    this.value = value;
+import d3e.core.ListExt;
+
+public class Annotation {
+  public MethodCall call;
+public List<Comment> comments = ListExt.asList();
+
+  public Annotation(MethodCall call) {
+    this.call = call;
   }
 }

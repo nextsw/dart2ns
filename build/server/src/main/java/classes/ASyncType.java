@@ -3,5 +3,6 @@ package classes;
 public enum ASyncType {
   NONE,
   ASYNC,
-  SYNC;
+  ASYNCP,
+  SYNCP;
 }
