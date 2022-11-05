@@ -1,9 +1,9 @@
 package classes;
 
 public class Break extends Statement {
-  public String name;
+  public String label;
 
-public Break(String name) {
-	  this.name = name;
+  public Break(String label) {
+    this.label = label;
   }
 }

@@ -196,18 +196,18 @@ public class TypeParser {
     checkKey("typedef");
     DefType type = readDefType();
     FunctionType fnType = null;
-    if(tok.kind != TypeKind.Assign) {
-    	String name = null;
-    	if(tok.kind == TypeKind.Lpar) {
-    		name = type.name;
-    	} else {
-    		name = checkName();    		
-    	}
-    	fnType = readFunctionType(type);
-    	fnType.name = name;
+    if (this.tok.kind != TypeKind.Assign) {
+      String name = null;
+      if (this.tok.kind == TypeKind.Lpar) {
+        name = type.name;
+      } else {
+        name = checkName();
+      }
+      fnType = readFunctionType(type);
+      fnType.name = name;
     } else {
-    	check(TypeKind.Assign);
-    	fnType = ((FunctionType) readType(false));
+      check(TypeKind.Assign);
+      fnType = ((FunctionType) readType(false));
     }
     check(TypeKind.Semicolon);
     Typedef def = new Typedef(type, fnType);
@@ -352,22 +352,22 @@ public class TypeParser {
         required,
         hasThis ? "this" : hasSuper ? "super" : null);
   }
-  
-  public FunctionType readFunctionType (DataType type) {
-	  List<DataType> args = ListExt.asList();
-      if (isType()) {
-        args = readTypeArgs();
-      }
-      MethodParams params = null;
-      if(tok.kind == TypeKind.Lpar) {
-        params = readMethodParams(false);
-      }
-      FunctionType fnType = new FunctionType(false, params, type, args);
-      if (this.tok.kind == TypeKind.Question) {
-        fnType.optional = true;
-        next();
-      }
-      return fnType;
+
+  public FunctionType readFunctionType(DataType type) {
+    List<DataType> args = ListExt.asList();
+    if (isType()) {
+      args = readTypeArgs();
+    }
+    MethodParams params = null;
+    if (this.tok.kind == TypeKind.Lpar) {
+      params = readMethodParams(false);
+    }
+    FunctionType fnType = new FunctionType(false, params, type, args);
+    if (this.tok.kind == TypeKind.Question) {
+      fnType.optional = true;
+      next();
+    }
+    return fnType;
   }
 
   public ClassDecl readClass(List<Annotation> annotations, TypeToken start) {
@@ -500,21 +500,19 @@ public class TypeParser {
     boolean isConstructor =
         (Objects.equals(this.tok.lit, className))
             && (this.peekTok.kind == TypeKind.Lpar || this.peekTok.kind == TypeKind.Dot);
-    if (isKey(tok, "pragma")) {
-		  checkName();
-	} else if (!isFactory && !isConstructor) {
+    if (isKey(this.tok, "pragma")) {
+      checkName();
+    } else if (!isFactory && !isConstructor) {
       if ((isConst || isFinal) && this.peekTok.kind == TypeKind.Assign) {
-    	  
       } else {
-    	  if (isKey(tok, "Function")) {
-    		  type = readType(true); 
-    	  } else if(!isKey(tok, "operator") && (peekTok.kind != TypeKind.Lpar) 
-    			&& (tok.kind == TypeKind.Name && 
-    					(peekTok.kind == TypeKind.Dot 
-    					|| isTypeName(tok.lit)))) {
-    	  
-    		  type = readType(false); 
-    	}
+        if (isKey(this.tok, "Function")) {
+          type = readType(true);
+        } else if (!isKey(this.tok, "operator")
+            && (this.peekTok.kind != TypeKind.Lpar)
+            && (this.tok.kind == TypeKind.Name
+                && (this.peekTok.kind == TypeKind.Dot || isTypeName(this.tok.lit)))) {
+          type = readType(false);
+        }
       }
     }
     eatComments();
@@ -592,10 +590,9 @@ public class TypeParser {
       asyncType = readAsyncType();
     }
     String nativeString = null;
-    if(isKey(tok, "native" )) 
-    {
-    	next();
-    	nativeString = stringExpr().value;
+    if (isKey(this.tok, "native")) {
+      next();
+      nativeString = stringExpr().value;
     }
     if (this.tok.kind == TypeKind.Lcbr) {
       body = readBlock(true);
@@ -606,32 +603,33 @@ public class TypeParser {
     } else {
       check(TypeKind.Semicolon);
     }
-    MethodDecl decl = new MethodDecl(
-        annotations,
-        asyncType,
-        body,
-        isConst,
-        exp,
-        isFactory,
-        null,
-        isFinal,
-        typeParams,
-        isGet,
-        init,
-        name,
-        params,
-        type,
-        isSet,
-        isStatic);
+    MethodDecl decl =
+        new MethodDecl(
+            annotations,
+            asyncType,
+            body,
+            isConst,
+            exp,
+            isFactory,
+            null,
+            isFinal,
+            typeParams,
+            isGet,
+            init,
+            name,
+            params,
+            type,
+            isSet,
+            isStatic);
     decl.nativeString = nativeString;
     return decl;
   }
 
-  private boolean isTypeName(String name) {
-	return name != null && (primitives.contains(name) || ParserUtil.isTypeName(name));
-}
+  public boolean isTypeName(String name) {
+    return name != null && (TypeParser.primitives.contains(name) || ParserUtil.isTypeName(name));
+  }
 
-public boolean isFactoryDecl() {
+  public boolean isFactoryDecl() {
     return (this.tok.kind == TypeKind.Name && this.peekTok.kind == TypeKind.Dot)
         || (this.tok.kind == TypeKind.Name
             && (this.peekTok.kind == TypeKind.Lt || this.peekTok.kind == TypeKind.Lpar));
@@ -688,10 +686,10 @@ public boolean isFactoryDecl() {
     Statement smt = null;
     TypeToken start = this.tok;
     List<Annotation> annotations = readAnnotations();
-    if(tok.kind == TypeKind.Name && peekTok.kind == TypeKind.Colon) {
-    	String name = checkName();
-    	next();
-    	return new LabelStatement(name);
+    if (this.tok.kind == TypeKind.Name && this.peekTok.kind == TypeKind.Colon) {
+      String name = checkName();
+      next();
+      return new LabelStatement(name);
     }
     if (isKey(this.tok, "return")) {
       smt = readReturn();
@@ -728,8 +726,8 @@ public boolean isFactoryDecl() {
     } else if (isKey(this.tok, "break")) {
       next();
       String name = null;
-      if(tok.kind == TypeKind.Name) {
-    	  name = checkName();
+      if (this.tok.kind == TypeKind.Name) {
+        name = checkName();
       }
       check(TypeKind.Semicolon);
       smt = new Break(name);
@@ -791,8 +789,8 @@ public boolean isFactoryDecl() {
     boolean isLate = false;
     boolean isConst = false;
     if (isKey(this.tok, "new")) {
-        return null;
-      }
+      return null;
+    }
     while (isKey(this.tok, "final") || isKey(this.tok, "late") || isKey(this.tok, "const")) {
       if (isKey(this.tok, "final")) {
         next();
@@ -817,8 +815,8 @@ public boolean isFactoryDecl() {
       if (type == null || this.tok.kind != TypeKind.Name) {
         return null;
       }
-      if(!isTypeName(type.name)) {
-    	  return null;
+      if (!isTypeName(type.name)) {
+        return null;
       }
     }
     List<NameAndValue> names = ListExt.asList();
@@ -1053,13 +1051,13 @@ public boolean isFactoryDecl() {
   }
 
   public ForEachLoop readForEachLoop(boolean forCollection) {
-	  DataType type = null;
-	if(!isKey(peekTok, "in")) {
-		type = readType(false);
-		if (type == null) {
-		  return null;
-        }
-	}
+    DataType type = null;
+    if (!isKey(this.peekTok, "in")) {
+      type = readType(false);
+      if (type == null) {
+        return null;
+      }
+    }
     if (this.tok.kind != TypeKind.Name) {
       return null;
     }
@@ -1120,8 +1118,8 @@ public boolean isFactoryDecl() {
         decl = ((Declaration) ListExt.removeAt(inits, 0l));
       }
       Expression exp = null;
-      if(this.tok.kind != TypeKind.Semicolon) {
-    	  exp = expr(0l);    	  
+      if (this.tok.kind != TypeKind.Semicolon) {
+        exp = expr(0l);
       }
       next();
       /*
@@ -1421,9 +1419,9 @@ public boolean isFactoryDecl() {
         /*
          Name without type
         */
-    	if(tok.kind != TypeKind.Name) {
-    		return null;
-    	}
+        if (this.tok.kind != TypeKind.Name) {
+          return null;
+        }
         String name = checkName();
         params.add(new Param(name, null));
       } else {
@@ -1579,11 +1577,11 @@ public boolean isFactoryDecl() {
       type.args = typeArgs;
     }
     DataType result = type;
-    if(acceptFnWithNoRet && !isTypeName(name) && tok.kind == TypeKind.Lpar) {
-    	MethodParams params = readMethodParams(false);
-    	ValueType returnType = new ValueType("void", false);
-    	FunctionType fnType = new FunctionType(false, params, returnType, type.args);
-    	result = fnType;
+    if (acceptFnWithNoRet && !isTypeName(name) && this.tok.kind == TypeKind.Lpar) {
+      MethodParams params = readMethodParams(false);
+      ValueType returnType = new ValueType("void", false);
+      FunctionType fnType = new FunctionType(false, params, returnType, type.args);
+      result = fnType;
     }
     if (this.tok.kind == TypeKind.Question && isBeside(this.prevTok, this.tok)) {
       result.optional = true;
@@ -1624,10 +1622,10 @@ public boolean isFactoryDecl() {
   }
 
   public DataType readType(boolean acceptFnWithNoRet) {
-	  if (isKey(this.tok, "Function")) {
-	      next();
-	      return readFunctionType(null);
-	    }
+    if (isKey(this.tok, "Function")) {
+      next();
+      return readFunctionType(null);
+    }
     DataType type = readValueType(acceptFnWithNoRet);
     if (type == null) {
       return null;
@@ -1751,15 +1749,15 @@ public boolean isFactoryDecl() {
             } else {
               if (arrExp.type == ArrayType.Map) {
                 Expression key = expr(0l);
-                if(tok.kind == TypeKind.Colon) {
-                	next();
-	                Expression value = expr(0l);
-	                return new MapItem(comments, key, value);
+                if (this.tok.kind == TypeKind.Colon) {
+                  next();
+                  Expression value = expr(0l);
+                  return new MapItem(comments, key, value);
                 } else {
-                	arrExp.type = ArrayType.Set;
-                	ExpressionArrayItem item = new ExpressionArrayItem(key);
-                    item.beforeComments = comments;
-                    return item;
+                  arrExp.type = ArrayType.Set;
+                  ExpressionArrayItem item = new ExpressionArrayItem(key);
+                  item.beforeComments = comments;
+                  return item;
                 }
               } else {
                 Expression exp = expr(0l);

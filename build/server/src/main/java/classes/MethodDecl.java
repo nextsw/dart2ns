@@ -20,8 +20,8 @@ public class MethodDecl extends ClassMember {
   public Block body;
   public ASyncType asyncType;
   public Expression exp;
-  public String content;
   public String nativeString;
+  public String content;
 
   public MethodDecl(
       List<Annotation> annotations,

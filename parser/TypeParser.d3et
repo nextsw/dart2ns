@@ -1048,9 +1048,12 @@ server class TypeParser {
     }
 
     ForEachLoop readForEachLoop(Boolean forCollection) {
-        DataType type = readType(false);
-        if(type == null) {
-            return null;
+        DataType type = null;
+        if(!isKey(peekTok, 'in')) {
+            type = readType(false);
+            if (type == null) {
+                return null;
+            }
         }
         if(tok.kind != TypeKind.Name) {
             return null;
@@ -1584,7 +1587,7 @@ server class TypeParser {
         );
     }
     
-    ValueType readValueType(Boolean acceptFnWithNoRet){
+    DataType readValueType(Boolean acceptFnWithNoRet){
         if(this.tok.kind != TypeKind.Name) {
             return null;
         }
@@ -1802,6 +1805,7 @@ server class TypeParser {
                                     comments: comments
                                 );
                             } else {
+                                arrExp.type = ArrayType.Set;
                                 ExpressionArrayItem item =  ExpressionArrayItem(
                                     exp: key,
                                 );

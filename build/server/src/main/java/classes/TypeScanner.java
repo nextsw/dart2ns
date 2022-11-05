@@ -460,9 +460,9 @@ public class TypeScanner {
 
   public String identString() {
     String q = StringExt.get(this.text, this.pos);
-    String q1 = StringExt.get(this.text, this.pos + 1);
-    String q2 = StringExt.get(this.text, this.pos + 2);
-    boolean isMultiLine = q.equals(q1) && q1.equals(q2);
+    String q1 = StringExt.get(this.text, this.pos + 1l);
+    String q2 = StringExt.get(this.text, this.pos + 2l);
+    boolean isMultiLine = Objects.equals(q, q1) && Objects.equals(q1, q2);
     boolean isQuote =
         Objects.equals(q, TypeScanner.singleQuote) || Objects.equals(q, TypeScanner.doubleQuote);
     boolean isRaw =
@@ -480,10 +480,10 @@ public class TypeScanner {
     boolean escape = false;
     boolean insideDollar = false;
     long insideExp = 0l;
-    long totalClose = isMultiLine? 3 : 1;
+    long totalClose = isMultiLine ? 3l : 1l;
     long closeCount = totalClose;
-    if(isMultiLine) {
-    	this.pos += 2;
+    if (isMultiLine) {
+      this.pos += 2l;
     }
     while (true) {
       this.pos++;
@@ -493,16 +493,16 @@ public class TypeScanner {
       String c = StringExt.get(this.text, this.pos);
       String prevc = StringExt.get(this.text, this.pos - 1l);
       if (insideExp == 0l && !escape) {
-    	  if(Objects.equals(c, this.quote)) {
-    		  closeCount--;
-    		  if(closeCount == 0) {
-    			  break;
-    		  } else {
-    			  continue;
-    		  }
-    	  } else {
-    		  closeCount = totalClose;
-    	  }
+        if (Objects.equals(c, this.quote)) {
+          closeCount--;
+          if (closeCount == 0l) {
+            break;
+          } else {
+            continue;
+          }
+        } else {
+          closeCount = totalClose;
+        }
       }
       if (!isRaw && Objects.equals(c, slash)) {
         escape = !escape;

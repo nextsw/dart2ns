@@ -1,6 +1,6 @@
 package classes;
 
-public class DataType {
-	String name;
-	boolean optional;
+public abstract class DataType {
+  public String name;
+  public boolean optional = false;
 }

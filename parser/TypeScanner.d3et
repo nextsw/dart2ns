@@ -460,7 +460,6 @@ server class TypeScanner {
                 }else {
                     closeCount = totalClose;
                 }
-                break;
             }
             if (!isRaw && c == slash) {
                 escape = !escape;
