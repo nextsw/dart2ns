@@ -24,7 +24,7 @@ server class TypeParser {
 
     List<TokenFrame> savedFrames = [];
 
-    static List<String> primitives = ['void', 'bool', 'int', 'double', 'dynamic', 'num'];
+    static List<String> primitives = ['void', 'bool', 'int', 'double', 'dynamic', 'num', 'var'];
 
     TypeParser(this.context, this.scanner);
 
@@ -129,7 +129,7 @@ server class TypeParser {
     String readLibrary(){
         next();
         String lib  = checkName();
-        if(tok.kind == TypeKind.Dot) {
+        while (tok.kind == TypeKind.Dot) {
             next();
             lib += '.' + checkName();
         }
@@ -191,8 +191,20 @@ server class TypeParser {
     Typedef readTypeDef(List<Annotation> annotations) {
         checkKey('typedef');
         DefType type = readDefType();
-        check(TypeKind.Assign);
-        FunctionType fnType = readType() as FunctionType;
+        FunctionType fnType = null;
+        if(tok.kind != TypeKind.Assign) {
+            String name = null;
+            if(tok.kind == TypeKind.Lpar) {
+                name = type.name;
+            } else {
+                name = checkName();    		
+            }
+            fnType = readFunctionType(type);
+            fnType.name = name;
+        } else {
+            check(TypeKind.Assign);
+            fnType = readType(false) as FunctionType;
+        }
         check(TypeKind.Semicolon);
         Typedef def = Typedef(type, fnType);
         def.annotations = annotations;
@@ -215,7 +227,7 @@ server class TypeParser {
             DataType type = null;
             if (isKey(tok, 'extends')) {
                 next();
-                type = readType();
+                type = readType(false);
                 if (type == null) {
                     return null;
                 }
@@ -289,6 +301,7 @@ server class TypeParser {
         DataType type = null;
         Boolean required = false;
         Boolean covariant = false;
+        Boolean isFinal = false;
         if (isKey(this.tok, 'required')) {
             next();
             required = true;
@@ -297,8 +310,12 @@ server class TypeParser {
             next();
             covariant = true;
         }
+        if (isKey(this.tok, 'final')) {
+            next();
+            isFinal = true;
+        }
         if(!constructor || !(isKey(this.tok, 'this') || isKey(this.tok, 'super'))) {
-            type = readType();
+            type = readType(true);
         }
         Boolean hasThis = false;
         if (constructor && isKey(this.tok, 'this')) {
@@ -316,21 +333,7 @@ server class TypeParser {
         if (tok.kind == TypeKind.Name) {   
             name = checkName();
             if(this.tok.kind == TypeKind.Lpar || isType()) {
-                List<DataType> args = [];
-                if (isType()) {
-                    args = readTypeArgs();
-                }
-                MethodParams params = readMethodParams(false);
-                FunctionType fnType = FunctionType(
-                    returnType: type,
-                    params: params,
-                    typeArgs: args,
-                );
-                if (this.tok.kind == TypeKind.Question) {
-                    fnType.optional = true;
-                    next();
-                }
-                type = fnType;
+                type = readFunctionType(type);
             }
         }
         
@@ -346,6 +349,26 @@ server class TypeParser {
             annotations: annotations,
             defaultValue: def,
         );
+    }
+    FunctionType readFunctionType (DataType type) {
+        List<DataType> args = [];
+        if (isType()) {
+            args = readTypeArgs();
+        }
+        MethodParams params = null;
+        if(tok.kind == TypeKind.Lpar) {
+            params = readMethodParams(false);
+        }
+        FunctionType fnType = FunctionType(
+            params: params,
+            typeArgs: args,
+            returnType: type
+        );
+        if (this.tok.kind == TypeKind.Question) {
+            fnType.optional = true;
+            next();
+        }
+        return fnType;
     }
 
     ClassDecl readClass(List<Annotation> annotations, TypeToken start) {
@@ -375,16 +398,16 @@ server class TypeParser {
         if(!isMixin && tok.kind == TypeKind.Assign) {
             isMixinApplication = true;
             next();
-            cls.mixinApplicationType = readType();
+            cls.mixinApplicationType = readType(false);
         } else {
             if (!isExtension && !isMixin && isKey(tok, 'extends')) {
                 next();
-                cls.extendType = readType();
+                cls.extendType = readType(false);
             }
             if ((isExtension || isMixin)  && isKey(this.tok, 'on')) {
                 next();
                 while (true) {
-                    cls.ons.add(readType());
+                    cls.ons.add(readType(false));
                     if (this.tok.kind != TypeKind.Comma) {
                         break;
                     }
@@ -395,7 +418,7 @@ server class TypeParser {
         if (!isExtension && isKey(this.tok, 'with')) {
             next();
             while (true) {
-                cls.mixins.add(readType());
+                cls.mixins.add(readType(false));
                 if (this.tok.kind != TypeKind.Comma) {
                     break;
                 }
@@ -406,7 +429,7 @@ server class TypeParser {
         if (!isExtension && isKey(tok, 'implements')) {
             next();
             while (true) {
-                cls.impls.add(readType());
+                cls.impls.add(readType(false));
                 if (tok.kind != TypeKind.Comma) {
                     break;
                 }
@@ -478,12 +501,21 @@ server class TypeParser {
         Boolean isConstructor = (tok.lit == className)
             && (peekTok.kind == TypeKind.Lpar
                 || peekTok.kind == TypeKind.Dot);
-        if(!isFactory && !isConstructor) {
+        if (isKey(tok, 'pragma')) {
+		  checkName();
+        } else if(!isFactory && !isConstructor) {
             if((isConst || isFinal) && peekTok.kind == TypeKind.Assign) {
             } else {
-                type = readType();
+                if (isKey(tok, 'Function')) {
+                    type = readType(true); 
+                } else if(!isKey(tok, 'operator') && (peekTok.kind != TypeKind.Lpar) 
+                    && (tok.kind == TypeKind.Name && 
+                        (peekTok.kind == TypeKind.Dot || isTypeName(tok.lit)))) {
+                    type = readType(false);
+                }
             }
         }
+        eatComments();
         String name = checkName();
 
         if(tok.kind == TypeKind.Semicolon || tok.kind == TypeKind.Assign) {
@@ -544,6 +576,7 @@ server class TypeParser {
         if (!isGet) {
             params = readMethodParams(isConstructor);
         }
+        eatComments();
         if (tok.kind == TypeKind.Colon) {
             next();
             init = Block();
@@ -560,13 +593,19 @@ server class TypeParser {
             } 
         } else if (this.tok.kind == TypeKind.Assign) {
             next();
-            alternate = readType();
+            alternate = readType(false);
             if(this.tok.kind == TypeKind.Dot) {
                 next();
                 String alFac = checkName();
             }
         } else {
             asyncType = readAsyncType();
+        }
+        String nativeString = null;
+        if(isKey(tok, 'native' )) 
+        {
+            next();
+            nativeString = stringExpr().value;
         }
         if (tok.kind == TypeKind.Lcbr) {
             body = readBlock(true);
@@ -577,7 +616,7 @@ server class TypeParser {
         } else {
             check(TypeKind.Semicolon);
         }
-        return MethodDecl(
+        MethodDecl decl = MethodDecl(
             name: name,
             final: isFinal,
             static: isStatic,
@@ -594,6 +633,11 @@ server class TypeParser {
             asyncType: asyncType,
             exp: exp,
         );
+        decl.nativeString = nativeString;
+        return decl;
+    }
+    Boolean isTypeName(String name) {
+	    return name != null && (primitives.contains(name) || ParserUtil.isTypeName(name));
     }
 
     Boolean isFactoryDecl() {
@@ -651,6 +695,11 @@ server class TypeParser {
         Statement smt = null;
         TypeToken start = tok;
         List<Annotation> annotations = readAnnotations();
+        if(tok.kind == TypeKind.Name && peekTok.kind == TypeKind.Colon) {
+            String name = checkName();
+            next();
+            return LabelStatement(name);
+        }
         if (isKey(tok, 'return')) {
             smt = readReturn();
         } else if (isKey(this.tok, 'yield')) {
@@ -686,8 +735,12 @@ server class TypeParser {
             }
         } else if (isKey(tok, 'break')) {
             next();
+            String name = null;
+            if(tok.kind == TypeKind.Name) {
+                name = checkName();
+            }
             check(TypeKind.Semicolon);
-            smt = Break();
+            smt = Break(name);
         } else if (isKey(tok, 'continue')) {
             next();
             String label = null;
@@ -743,6 +796,9 @@ server class TypeParser {
         Boolean isFinal = false;
         Boolean isLate = false;
         Boolean isConst = false;
+        if (isKey(this.tok, 'new')) {
+            return null;
+        }
         while(isKey(this.tok, 'final')
     		||isKey(this.tok, 'late')
     		||isKey(this.tok, 'const')) {
@@ -763,14 +819,16 @@ server class TypeParser {
         if(isFinal && this.peekTok.kind == TypeKind.Assign) {
             // No type
         } else {
-            type = readType();
+            type = readType(false);
             if (type == null || this.tok.kind != TypeKind.Name) {
                 return null;
             }
+            if(!isTypeName(type.name)) {
+                return null;
+            }
         }
-        List<String> names = [];
+        List<NameAndValue> names = [];
         String name = checkName();
-        names.add(name);
         if(isType() || this.tok.kind == TypeKind.Lpar) {
             // May be inline function
             TypeParams typeParams = null;
@@ -800,26 +858,21 @@ server class TypeParser {
             );
             return InlineMethodStatement(method);
         }
-        while(this.tok.kind == TypeKind.Comma) {
-            next();
-            String nextName = checkName();
-            names.add(nextName);
-        }
-        Expression init = null;
-        if (tok.kind != TypeKind.Semicolon) {
-            if (!TypeToken.isAssign(tok.kind)) {
-                return null;
+        Expression value = null;
+        while(this.tok.kind == TypeKind.Comma || tok.kind == TypeKind.Assign) {
+            if(tok.kind == TypeKind.Comma) {
+                next();
+                names.add(NameAndValue(name, value));
+                name = checkName();
             } else {
                 next();
-                // Skip over the assign op
-                
+                value = expr(0);
             }
-            init = expr(0);
         }
+        names.add(NameAndValue(name, value));
         return Declaration(
             type: type,
             names: names,
-            assignment: init,
             isFinal: isFinal,
             isLate: isLate,
             isConst: isConst,
@@ -862,7 +915,7 @@ server class TypeParser {
             CatchPart catchPart = CatchPart();
             if (isKey(tok, 'on')) {
                 next();
-                catchPart.onType = readType();
+                catchPart.onType = readType(false);
             }
             if(isKey(tok, 'catch')) {
                 checkKey('catch');
@@ -894,6 +947,7 @@ server class TypeParser {
         Expression test = expr(0);
         check(TypeKind.Rpar);
         Statement thenVal = readStatement();
+        eatComments();
         Statement elseS = null;
         if (isKey(tok, 'else')) {
             next();
@@ -994,7 +1048,7 @@ server class TypeParser {
     }
 
     ForEachLoop readForEachLoop(Boolean forCollection) {
-        DataType type = readType();
+        DataType type = readType(false);
         if(type == null) {
             return null;
         }
@@ -1011,12 +1065,9 @@ server class TypeParser {
             return null;
         }
         next();
-        Block block = null;
+        Expression block = null;
         if(!forCollection) {
-            if(tok.kind != TypeKind.Lcbr) {
-                return null;
-            }
-            block = readBlock(true);
+            block = readStatement();
         }
         return ForEachLoop(
             body: block,
@@ -1048,6 +1099,7 @@ server class TypeParser {
             // TODO: Check if this also happens for EOF
             while (true) {
                 if (tok.kind == TypeKind.Semicolon || tok.kind == TypeKind.Eof) {
+                    next();
                     break;
                 }
                 inits.add(readStatement());
@@ -1060,7 +1112,10 @@ server class TypeParser {
             if ((inits.length > 0) && (inits.get(0) is Declaration)) {
                 decl = inits.removeAt(0) as Declaration;
             }
-            Expression exp = expr(0);
+            Expression exp = null;
+            if(this.tok.kind != TypeKind.Semicolon) {
+                exp = expr(0);    	  
+            }
             next();
             // Skip over the semi-colon
             List<Statement> resets = [];
@@ -1077,9 +1132,9 @@ server class TypeParser {
                 next();
             }
             check(TypeKind.Rpar);
-            Block block = null;
-            if(!forCollection) {
-                block = readBlock(true);
+            Expression block = null;
+            if (!forCollection) {
+                block = readStatement();
             }
             return ForLoop(
                 body: block,
@@ -1191,7 +1246,7 @@ server class TypeParser {
             case TypeKind.Lt:
                 {
                     check(TypeKind.Lt);
-                    DataType type = readType();
+                    DataType type = readType(false);
                     if(tok.kind == TypeKind.Gt) {
                         check(TypeKind.Gt);
                         Boolean isSet = tok.kind == TypeKind.Lcbr;
@@ -1200,7 +1255,7 @@ server class TypeParser {
                         node = arr;
                     } else {
                         check(TypeKind.Comma);
-                        DataType valueType = readType();
+                        DataType valueType = readType(false);
                         check(TypeKind.Gt);
                         ArrayExpression arr = arrayInit(ArrayType.Map);
                         arr.enforceType = type;
@@ -1239,7 +1294,7 @@ server class TypeParser {
                 node = indexExpr(node);
             } else if (isKey(tok, 'as')) {
                 next();
-                DataType type = readType();
+                DataType type = readType(false);
                 node = TypeCastOrCheckExpression(
                     check: false,
                     dataType: type,
@@ -1252,7 +1307,7 @@ server class TypeParser {
                     isNot = true;
                     next();
                 }
-                DataType type = readValueType();
+                DataType type = readType(false);
                 node = TypeCastOrCheckExpression(
                     check: true,
                     dataType: type,
@@ -1365,16 +1420,17 @@ server class TypeParser {
                 continue;
             }
             if((peekTok.kind == TypeKind.Rpar ||
-    		  peekTok.kind == TypeKind.Comma)
-    		  && (peekTok2.kind == TypeKind.Arrow 
-    		  || peekTok2.kind == TypeKind.Lcbr)) {
+    		  peekTok.kind == TypeKind.Comma)) {
                 // Name without type
+                if(tok.kind != TypeKind.Name) {
+                    return null;
+                }
                 String name = checkName();
                 params.add(Param(
                     name: name,
                 ));
             } else {
-                DataType type = readType();
+                DataType type = readType(false);
                 if(tok.kind != TypeKind.Name) {
                     return null;
                 }
@@ -1528,7 +1584,7 @@ server class TypeParser {
         );
     }
     
-    ValueType readValueType(){
+    ValueType readValueType(Boolean acceptFnWithNoRet){
         if(this.tok.kind != TypeKind.Name) {
             return null;
         }
@@ -1548,9 +1604,20 @@ server class TypeParser {
             }
             type.args = typeArgs;
         }
+        DataType result = type;
+        if(acceptFnWithNoRet && !isTypeName(name) && tok.kind == TypeKind.Lpar) {
+            MethodParams params = readMethodParams(false);
+            ValueType returnType = ValueType('void');
+            FunctionType fnType = FunctionType(
+                params: params, 
+                returnType: returnType,
+                typeArgs: type.args
+            );
+            result = fnType;
+        }
         if (this.tok.kind == TypeKind.Question
                 && isBeside(prevTok, tok)) {
-            type.optional = true;
+            result.optional = true;
             next();
         }
         return type;
@@ -1587,28 +1654,18 @@ server class TypeParser {
 	    return first.pos + first.len == next.pos;
     }
 
-    DataType readType() {
-        DataType type = readValueType();
+    DataType readType(Boolean acceptFnWithNoRet) {
+        if (isKey(this.tok, 'Function')) {
+	      next();
+	      return readFunctionType(null);
+	    }
+        DataType type = readValueType(acceptFnWithNoRet);
         if(type == null) {
             return null;
         }
         if(isKey(tok, 'Function')) {
             next();
-            List<DataType> args = [];
-            if(isType()) {
-                args = readTypeArgs();
-            }
-            MethodParams params = readMethodParams(false);
-            FunctionType fnType = FunctionType(
-                returnType: type,
-                params: params,
-                typeArgs: args,
-            );
-            if(tok.kind == TypeKind.Question){
-                fnType.optional = true;
-                next();
-            }
-            type = fnType;
+            type = readFunctionType(type);
         }
         return type;
     }
@@ -1618,7 +1675,7 @@ server class TypeParser {
         check(TypeKind.Lt);
         List<DataType> args = [];
         while (true) {
-            DataType sub = readType();
+            DataType sub = readType(false);
             if(sub == null) {
                 return null;
             }
@@ -1660,6 +1717,7 @@ server class TypeParser {
 
     ArrayExpression arrayInit(ArrayType type) {
         ArrayExpression arrExp = ArrayExpression();
+        arrExp.type = type;
         TypeKind start = type == List ? TypeKind.Lsbr : TypeKind.Lcbr;
         TypeKind end = type == List ? TypeKind.Rsbr : TypeKind.Rcbr;
         check(start);
@@ -1668,7 +1726,7 @@ server class TypeParser {
             if (tok.kind == end || tok.kind == TypeKind.Eof) {
                 break;
             }
-            ArrayItem item = arrayItem(type, 
+            ArrayItem item = arrayItem(arrExp, 
                 comments: comments,
             );
             arrExp.values.add(item);
@@ -1681,11 +1739,10 @@ server class TypeParser {
             }
         }
         check(end);
-        arrExp.type = type;
         return arrExp;
     }
 
-    ArrayItem arrayItem(ArrayType type, {List<Comment> comments}) {
+    ArrayItem arrayItem(ArrayExpression arrExp, {List<Comment> comments}) {
         comments.addAll(eatComments());
         TypeToken start = this.tok;
         switch (tok.kind) {
@@ -1711,11 +1768,11 @@ server class TypeParser {
                         check(TypeKind.Lpar);
                         Expression test = expr(0);
                         check(TypeKind.Rpar);
-                        ArrayItem exp = arrayItem(type);
+                        ArrayItem exp = arrayItem(arrExp);
                         ArrayItem elseS = null;
                         if (isKey(tok, 'else')) {
                             next();
-                            elseS = arrayItem(type);
+                            elseS = arrayItem(arrExp);
                         }
                         CollectionIf cif = CollectionIf(
                             test: test,
@@ -1726,7 +1783,7 @@ server class TypeParser {
                         return cif;
                     } else if (isKey(tok, 'for')) {
                         Statement stmt = readFor(true);
-                        ArrayItem value = arrayItem(type);
+                        ArrayItem value = arrayItem(arrExp);
                         CollectionFor cFor =  CollectionFor(
                             value: value,
                             stmt: stmt,
@@ -1734,15 +1791,23 @@ server class TypeParser {
                         cFor.beforeComments  = comments;
                         return cFor;
                     } else {
-                        if(type == Map) {
+                        if(arrExp.type == ArrayType.Map) {
                             Expression key = expr(0);
-                            check(TypeKind.Colon);
-                            Expression value = expr(0);
-                            return MapItem(
-                                key:key,
-                                value: value,
-                                comments: comments
-                            );
+                            if(tok.kind == TypeKind.Colon) {
+                	            next();
+                                Expression value = expr(0);
+                                return MapItem(
+                                    key:key,
+                                    value: value,
+                                    comments: comments
+                                );
+                            } else {
+                                ExpressionArrayItem item =  ExpressionArrayItem(
+                                    exp: key,
+                                );
+                                item.beforeComments = comments;
+                                return item;
+                            }
                         } else {
                             Expression exp = expr(0);
                             ExpressionArrayItem item =  ExpressionArrayItem(
@@ -1807,13 +1872,15 @@ server class TypeParser {
             next();
         }
         String value = tok.lit;
-        while(this.peekTok.kind == TypeKind.String) {
-            next();
+        next();
+        eatComments();
+        while (this.tok.kind == TypeKind.String) {
             value = value + this.tok.lit;
+            next();
+            eatComments();
         }
         LiteralExpression node;
-        if (peekTok.kind != TypeKind.Dollar) {
-            next();
+        if (tok.kind != TypeKind.Dollar) {
             node = LiteralExpression(
                 type: LiteralType.TypeString,
                 value: isRaw ? value: value,
@@ -1828,7 +1895,7 @@ server class TypeParser {
     Expression nameExpr() {
         if (expectingType) {
             expectingType = false;
-            DataType type = readType();
+            DataType type = readType(false);
             //TODO
             
         }

@@ -23,5 +23,5 @@ server class ParserUtil {
 
     static Boolean isUpperCase(String s);
 
-    // static Boolean isKeyKind(Kind k);
+    static Boolean isTypeName(String lit);
 }

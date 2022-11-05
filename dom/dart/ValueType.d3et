@@ -1,7 +1,5 @@
 class ValueType extends DataType {
     String in;
-    String name;
-    Boolean optional;
     List<DataType> args = [];
     ValueType(this.name, [this.optional = false]);
 }

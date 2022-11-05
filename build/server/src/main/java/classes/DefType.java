@@ -1,8 +1,7 @@
 package classes;
 
-public class DefType implements DataType {
+public class DefType extends DataType {
   public String in;
-  public String name;
   public boolean optional = false;
   public TypeParams params;
 

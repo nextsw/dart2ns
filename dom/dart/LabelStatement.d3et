@@ -1,0 +1,4 @@
+class LabelStatement extends Statement {
+    String name;
+    LabelStatement(this.name);
+}

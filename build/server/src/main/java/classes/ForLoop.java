@@ -4,14 +4,14 @@ import d3e.core.ListExt;
 import java.util.List;
 
 public class ForLoop extends Statement {
-  public Block body;
+  public Expression body;
   public Declaration decl;
   public Expression test;
   public List<Statement> inits = ListExt.asList();
   public List<Statement> resets = ListExt.asList();
 
   public ForLoop(
-      Block body,
+      Expression body,
       Declaration decl,
       List<Statement> inits,
       List<Statement> resets,

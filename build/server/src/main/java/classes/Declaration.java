@@ -5,20 +5,13 @@ import java.util.List;
 
 public class Declaration extends Statement {
   public DataType type;
-  public List<String> names = ListExt.asList();
-  public Expression assignment;
+  public List<NameAndValue> names = ListExt.asList();
   public boolean isFinal = false;
   public boolean isConst = false;
   public boolean isLate = false;
 
   public Declaration(
-      Expression assignment,
-      boolean isConst,
-      boolean isFinal,
-      boolean isLate,
-      List<String> names,
-      DataType type) {
-    this.assignment = assignment;
+      boolean isConst, boolean isFinal, boolean isLate, List<NameAndValue> names, DataType type) {
     this.isConst = isConst;
     this.isFinal = isFinal;
     this.isLate = isLate;

@@ -1,3 +1,4 @@
 class Break extends Statement {
-    
+    String label;
+    Break(this.label);    
 }

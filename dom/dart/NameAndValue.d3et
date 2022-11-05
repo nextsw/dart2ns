@@ -1,0 +1,5 @@
+class NameAndValue {
+    String name;
+    Expression value;
+    NameAndValue(this.name, this.value);
+}

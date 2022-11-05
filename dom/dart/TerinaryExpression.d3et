@@ -1,4 +1,4 @@
-class TerinaryExpression extends Expression {
+class TerinaryExpression extends Statement {
     Expression condition;
     Expression ifTrue;
     Expression ifFalse;

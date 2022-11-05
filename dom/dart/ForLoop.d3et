@@ -1,5 +1,5 @@
 class ForLoop extends Statement {
-    Block body;
+    Expression body;
     Declaration decl;
     Expression test;
     List<Statement> inits = [];

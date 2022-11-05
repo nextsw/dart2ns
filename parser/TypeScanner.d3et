@@ -421,6 +421,9 @@ server class TypeScanner {
 
     String identString() {
         String q = text.get(pos);
+        String q1 = text.get(pos + 1);
+        String q2 = text.get(pos + 2);
+        Boolean isMultiLine = q == q1 && q1 == q2;
         Boolean isQuote = q == singleQuote || q == doubleQuote;
         Boolean isRaw = isQuote && (pos > 0) && (text.get(pos - 1) == 'r');
         if (isQuote && !isInsideString) {
@@ -434,6 +437,11 @@ server class TypeScanner {
         Boolean escape = false;
         Boolean insideDollar = false;
         Integer insideExp = 0;
+        Integer totalClose = isMultiLine ? 3 : 1;
+        Integer closeCount = totalClose;
+        if(isMultiLine) {
+            this.pos += 2;
+        }
         while (true) {
             pos++;
             if (pos >= text.length) {
@@ -441,10 +449,20 @@ server class TypeScanner {
             }
             String c = text.get(pos);
             String prevc = text.get(pos - 1);
-            if (insideExp == 0 && !escape && c == quote) {
+            if (insideExp == 0 && !escape){
+                if (c == quote) {
+                    closeCount --;
+                    if(closeCount == 0) {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }else {
+                    closeCount = totalClose;
+                }
                 break;
             }
-            if (c == slash) {
+            if (!isRaw && c == slash) {
                 escape = !escape;
             } else {
                 escape = false;
@@ -464,7 +482,7 @@ server class TypeScanner {
             if (c == '\r') {
                 nCrChars++;
             }
-            if (insideExp == 0 && c == '\n') {
+            if (!isMultiLine && insideExp == 0 && c == '\n') {
                 break;
             }
         }

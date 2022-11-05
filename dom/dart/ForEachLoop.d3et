@@ -1,5 +1,5 @@
 class ForEachLoop extends Statement {
-    Block body;
+    Expression body;
     DataType dataType;
     String name;
     Expression collection;

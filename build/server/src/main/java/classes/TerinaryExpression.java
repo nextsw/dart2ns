@@ -1,6 +1,6 @@
 package classes;
 
-public class TerinaryExpression extends Expression {
+public class TerinaryExpression extends Statement {
   public Expression condition;
   public Expression ifTrue;
   public Expression ifFalse;

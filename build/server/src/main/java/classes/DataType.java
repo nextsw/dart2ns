@@ -1,3 +1,6 @@
 package classes;
 
-public interface DataType {}
+public class DataType {
+	String name;
+	boolean optional;
+}

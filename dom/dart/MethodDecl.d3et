@@ -15,6 +15,7 @@ class MethodDecl extends ClassMember{
     Block body;
     ASyncType asyncType;
     Expression exp;
+    String nativeString;
     MethodDecl({
         this.name, 
         this.params, 

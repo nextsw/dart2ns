@@ -21,6 +21,7 @@ public class MethodDecl extends ClassMember {
   public ASyncType asyncType;
   public Expression exp;
   public String content;
+  public String nativeString;
 
   public MethodDecl(
       List<Annotation> annotations,

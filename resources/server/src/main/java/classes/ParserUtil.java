@@ -66,6 +66,14 @@ public class ParserUtil {
     }
 
     public static boolean isUpperCase(String str) {
-        return Character.isUpperCase(str.charAt(0));
+        return str.charAt(0) == '_' || Character.isUpperCase(str.charAt(0));
     }
+
+	public static boolean isTypeName(String lit) {
+		if(lit.charAt(0) == '_') {
+			return Character.isUpperCase(lit.charAt(1));
+		} else {
+			return Character.isUpperCase(lit.charAt(0));
+		}
+	}
 }
