@@ -92,10 +92,6 @@ server class TypeParser {
             list.addAll(objs);
             return true;
         }
-        
-        if (tok.kind == TypeKind.At) {
-            annotations = readAnnotations();
-        }
         if (isKey(tok, 'typedef')) {
             obj = readTypeDef(annotations);
         } else if (isKey(tok, 'enum')) {
@@ -137,6 +133,7 @@ server class TypeParser {
             next();
             lib += '.' + checkName();
         }
+        check(TypeKind.Semicolon);
         return lib;
     }
 
@@ -380,7 +377,7 @@ server class TypeParser {
             next();
             cls.mixinApplicationType = readType();
         } else {
-            if (!!isExtension && isMixin && isKey(tok, 'extends')) {
+            if (!isExtension && !isMixin && isKey(tok, 'extends')) {
                 next();
                 cls.extendType = readType();
             }
