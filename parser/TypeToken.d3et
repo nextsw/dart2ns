@@ -12,22 +12,22 @@ server class TypeToken {
 
     Integer index = 0;
 
-    static Integer preAssign = 0;
-    static Integer preCascade = 1;
-    static Integer preCond = 2;
-    static Integer preIfNull = 3;
-    static Integer preLogicOr = 4;
-    static Integer preLogicAnd = 5;
-    static Integer preEqual = 6;
-    static Integer preRational = 7;
-    static Integer preBitOr = 8;
-    static Integer preBitXor = 9;
-    static Integer preBitAnd = 10;
-    static Integer preShift = 11;
-    static Integer preAdd = 12;
-    static Integer preMulti = 13;
-    static Integer preUnPostfix = 14;
-    static Integer preUnPrefix = 15;
+    static Integer preAssign = 1;
+    static Integer preCascade = 2;
+    static Integer preCond = 3;
+    static Integer preIfNull = 4;
+    static Integer preLogicOr = 5;
+    static Integer preLogicAnd = 6;
+    static Integer preEqual = 7;
+    static Integer preRational = 8;
+    static Integer preBitOr = 9;
+    static Integer preBitXor = 10;
+    static Integer preBitAnd = 11;
+    static Integer preShift = 12;
+    static Integer preAdd = 13;
+    static Integer preMulti = 14;
+    static Integer preUnPostfix = 15;
+    static Integer preUnPrefix = 16;
     
     static Map<TypeKind,String> tokenStrs = buildTokenStrs();
     static Map<String, TypeKind> keywords = buildKeys();
@@ -90,8 +90,10 @@ server class TypeToken {
         res.set(TypeKind.Minus, preAdd);
         res.set(TypeKind.Mul, preMulti);
         res.set(TypeKind.Div, preMulti);
+        res.set(TypeKind.NotDiv, preMulti);
         res.set(TypeKind.Mod, preMulti);
         res.set(TypeKind.Xor, preBitXor);
+        res.set(TypeKind.Amp, preBitAnd);
         res.set(TypeKind.Pipe, preBitOr);
         res.set(TypeKind.Inc, preUnPostfix);
         res.set(TypeKind.Dec, preUnPostfix);
@@ -127,9 +129,38 @@ server class TypeToken {
         return res;
     }
     static List<TypeKind> buildInfixes(){
-        return [TypeKind.Plus, TypeKind.Minus, TypeKind.Mod, TypeKind.Mul, TypeKind.Div, 
-        TypeKind.Eq, TypeKind.Ne, TypeKind.Gt, TypeKind.Lt, TypeKind.Ge, TypeKind.Le, TypeKind.Or, TypeKind.Xor, 
-	    TypeKind.And, TypeKind.Pipe, TypeKind.Amp, TypeKind.LeftShift, TypeKind.DoubleQuestion];
+        return [
+            TypeKind.Plus, 
+            TypeKind.Minus, 
+            TypeKind.Mod, 
+            TypeKind.Mul, 
+            TypeKind.Div, 
+            TypeKind.NotDiv,
+            TypeKind.Eq, 
+            TypeKind.Ne, 
+            TypeKind.Gt, 
+            TypeKind.Lt, 
+            TypeKind.Ge, 
+            TypeKind.Le, 
+            TypeKind.Or, 
+            TypeKind.Xor, 
+            TypeKind.And, 
+            TypeKind.Pipe, 
+            TypeKind.Amp, 
+            TypeKind.Assign, 
+            TypeKind.LeftShift, 
+            TypeKind.DoubleQuestion,
+            TypeKind.PlusAssign,
+            TypeKind.MultAssign,
+            TypeKind.AndAssign,
+            TypeKind.DivAssign,
+            TypeKind.DoubleQuestionAssign,
+            TypeKind.LeftShiftAssign,
+            TypeKind.MinusAssign,
+            TypeKind.ModAssign,
+            TypeKind.OrAssign,
+            TypeKind.RightShiftAssign
+        ];
     }
 
     static Boolean isAssign(TypeKind kind) {

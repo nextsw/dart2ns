@@ -5,5 +5,8 @@ class ClassDecl extends TopDecl {
     List<DataType> impls = [];
     List<ClassMember> members = [];
     List<DataType> mixins = [];
-    ClassDecl(String name) : super(name, TopDeclType.Class, '');
+    List<DataType> ons = [];
+    Boolean isMixin;
+    DataType mixinApplicationType;
+    ClassDecl(this.isMixin, String name) : super(name, TopDeclType.Class, '');
 } 

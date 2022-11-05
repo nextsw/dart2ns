@@ -1,5 +1,6 @@
 enum ASyncType {
     NONE,
     ASYNC,
-    SYNC,
+    ASYNCP,
+    SYNCP,
 }

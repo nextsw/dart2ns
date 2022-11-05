@@ -1,4 +1,4 @@
-class FieldOrEnumExpression extends Expression {
+class FieldOrEnumExpression extends Statement {
     String name;
     Expression on;
     Boolean checkNull;

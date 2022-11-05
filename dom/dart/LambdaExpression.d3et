@@ -1,6 +1,7 @@
 class LambdaExpression extends Expression {
     List<Param> params = [];
-    LambdaExpression({this.params});
     Expression expression;
     Block body;
+    ASyncType asyncType = ASyncType.NONE;
+    LambdaExpression({this.params});
 }

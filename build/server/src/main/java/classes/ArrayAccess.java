@@ -3,13 +3,13 @@ package classes;
 public class ArrayAccess extends Expression {
   public Expression on;
   public Expression index;
-public boolean checkNull;
-public boolean notNull;
+  public boolean checkNull = false;
+  public boolean notNull = false;
 
-  public ArrayAccess(Expression index, Expression on, boolean checkNull, boolean notNull) {
+  public ArrayAccess(boolean checkNull, Expression index, boolean notNull, Expression on) {
+    this.checkNull = checkNull;
     this.index = index;
+    this.notNull = notNull;
     this.on = on;
-	this.checkNull = checkNull;
-	this.notNull = notNull;
   }
 }

@@ -43,9 +43,10 @@ public class SchemaConstants {
   public static final int ImageFrom = 39;
   public static final int DBResultStatus = 40;
   public static final int ASyncType = 41;
-  public static final int CommentType = 42;
-  public static final int LiteralType = 43;
-  public static final int TopDeclType = 44;
-  public static final int TypeKind = 45;
-  public static final int _TOTAL_COUNT = 46;
+  public static final int ArrayType = 42;
+  public static final int CommentType = 43;
+  public static final int LiteralType = 44;
+  public static final int TopDeclType = 45;
+  public static final int TypeKind = 46;
+  public static final int _TOTAL_COUNT = 47;
 }

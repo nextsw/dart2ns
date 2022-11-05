@@ -1,7 +1,5 @@
 class CollectionFor extends ArrayItem {
-    String name;
-    DataType dataType;
-    Expression collection;
+    Statement stmt;
     ArrayItem value;
-    CollectionFor({this.name, this.dataType, this.collection, this.value});
+    CollectionFor({this.stmt, this.value});
 }

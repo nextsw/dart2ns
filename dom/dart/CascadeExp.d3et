@@ -1,5 +1,5 @@
 class CascadeExp extends Statement {
     Expression on;
-	List<MethodCall> calls = [];
+	List<Statement> calls = [];
     CascadeExp(this.on);
 }

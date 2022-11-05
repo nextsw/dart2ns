@@ -2,5 +2,6 @@ class FunctionType extends DataType{
     DataType returnType;
     MethodParams params;
     Boolean optional;
-    FunctionType({this.returnType, this.params, this.optional});
+    List<DataType> typeArgs = [];
+    FunctionType({this.returnType, this.params, this.optional, this.typeArgs});
 }

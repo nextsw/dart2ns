@@ -1,6 +1,7 @@
 package rest;
 
 import classes.ASyncType;
+import classes.ArrayType;
 import classes.ChangeEventType;
 import classes.ColumnWidthType;
 import classes.CommentType;
@@ -56,6 +57,7 @@ public class ModelSchema extends AbstractModelSchema {
     addEnum(ImageFrom.class, SchemaConstants.ImageFrom);
     addEnum(DBResultStatus.class, SchemaConstants.DBResultStatus);
     addEnum(ASyncType.class, SchemaConstants.ASyncType);
+    addEnum(ArrayType.class, SchemaConstants.ArrayType);
     addEnum(CommentType.class, SchemaConstants.CommentType);
     addEnum(LiteralType.class, SchemaConstants.LiteralType);
     addEnum(TopDeclType.class, SchemaConstants.TopDeclType);

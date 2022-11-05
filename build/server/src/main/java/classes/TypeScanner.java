@@ -67,8 +67,7 @@ public class TypeScanner {
           }
         }
         return newToken(TypeKind.Name, name, StringExt.length(name));
-      } else if (ParserUtil.isDigit(c)
-          || ((Objects.equals(c, ".") && ParserUtil.isDigit(nextc)))) {
+      } else if (ParserUtil.isDigit(c) || ((Objects.equals(c, ".") && ParserUtil.isDigit(nextc)))) {
         if (!this.isInsideString) {
           long startPos = this.pos;
           while (startPos < StringExt.length(this.text)
@@ -368,8 +367,8 @@ public class TypeScanner {
           {
             {
               if (Objects.equals(nextc, "/")) {
-                 this.pos++;
-                 return newToken(TypeKind.NotDiv, "~/", 2l);
+                this.pos++;
+                return newToken(TypeKind.NotDiv, "~/", 2l);
               }
               return newToken(TypeKind.BitNot, "~", 1l);
             }
@@ -474,10 +473,10 @@ public class TypeScanner {
     long start = this.pos;
     this.isInsideString = false;
     String slash = "\\";
-    String dollor = "$";
+    String dollar = "$";
     boolean escape = false;
-    boolean insideDollor = false;
-    long insideExp = 0;
+    boolean insideDollar = false;
+    long insideExp = 0l;
     while (true) {
       this.pos++;
       if (this.pos >= StringExt.length(this.text)) {
@@ -485,7 +484,7 @@ public class TypeScanner {
       }
       String c = StringExt.get(this.text, this.pos);
       String prevc = StringExt.get(this.text, this.pos - 1l);
-      if (insideExp == 0 && !escape && Objects.equals(c, this.quote)) {
+      if (insideExp == 0l && !escape && Objects.equals(c, this.quote)) {
         break;
       }
       if (Objects.equals(c, slash)) {
@@ -493,22 +492,22 @@ public class TypeScanner {
       } else {
         escape = false;
       }
-      if(Objects.equals(c, dollor)) {
-    	  insideDollor = true;
+      if (Objects.equals(c, dollar)) {
+        insideDollar = true;
       }
-      if (insideDollor && !ParserUtil.isFuncChar(c)) {
-          insideDollor = false;
+      if (insideDollar && !ParserUtil.isFuncChar(c)) {
+        insideDollar = false;
       }
-      if(Objects.equals(prevc, dollor) && Objects.equals(c, "{")) {
-    	  insideExp++;
+      if (Objects.equals(prevc, dollar) && Objects.equals(c, "{")) {
+        insideExp++;
       }
-      if (insideExp > 0 && Objects.equals(c, "}")) {
-    	  insideExp--;
+      if (insideExp > 0l && Objects.equals(c, "}")) {
+        insideExp--;
       }
       if (Objects.equals(c, "\r")) {
         nCrChars++;
       }
-      if (insideExp == 0 && Objects.equals(c, "\n")) {
+      if (insideExp == 0l && Objects.equals(c, "\n")) {
         break;
       }
     }
@@ -829,10 +828,8 @@ public class TypeScanner {
   public void skipWhiteSpace() {
     while (this.pos < StringExt.length(this.text)
         && ParserUtil.isSpace(StringExt.get(this.text, this.pos))) {
-    	//System.out.print(' ');
       if (expect("\n", this.pos)) {
         incLineNumber();
-        //System.out.print('\n');
       }
       this.pos++;
     }
@@ -856,7 +853,6 @@ public class TypeScanner {
     }
     String name = StringExt.substring(this.text, start, this.pos);
     this.pos--;
-    //System.out.print(name);
     return name;
   }
 

@@ -1,3 +1,4 @@
 class Continue extends Statement {
-    
+    String label;
+    Continue(this.label);
 }

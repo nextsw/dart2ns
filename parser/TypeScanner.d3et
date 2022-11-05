@@ -73,7 +73,7 @@ server class TypeScanner {
                     }
                 }
                 return newToken(TypeKind.Name, name, name.length);
-            } else if (ParserUtil.isDigit(c) || ((c == '.' && ParserUtil.isDigit(nextc)) || c == '-' && ParserUtil.isDigit(nextc))) {
+            } else if (ParserUtil.isDigit(c) || ((c == '.' && ParserUtil.isDigit(nextc)))) {
                 if (!isInsideString) {
                     Integer startPos = pos;
                     while (startPos < text.length && text.get(startPos) == '0') {
@@ -205,6 +205,7 @@ server class TypeScanner {
                         }
                     }
                 case '\'':
+                case '"':
                     {
                         String identStr = identString();
                         return newToken(TypeKind.String, identStr, identStr.length + 2);
@@ -331,6 +332,10 @@ server class TypeScanner {
 
                 case '~':
                     {
+                        if(nextc == '/') {
+                            pos++;
+                            return newToken(TypeKind.NotDiv, '~/', 2);
+                        }
                         return newToken(TypeKind.BitNot, '~', 1);
                     }
                 case '/':
@@ -364,7 +369,7 @@ server class TypeScanner {
                                 }
                             }
                             String comment = text.substring(start, pos);
-                            this.pos += 2;
+                            this.pos += 1;
                             return newToken(TypeKind.CommentMulti, comment, comment.length + 4);
                         }
                         return newToken(TypeKind.Div, '/', 1);
@@ -425,7 +430,10 @@ server class TypeScanner {
         Integer start = pos;
         isInsideString = false;
         String slash = '\\';
+        String dollar = '$';
         Boolean escape = false;
+        Boolean insideDollar = false;
+        Integer insideExp = 0;
         while (true) {
             pos++;
             if (pos >= text.length) {
@@ -433,7 +441,7 @@ server class TypeScanner {
             }
             String c = text.get(pos);
             String prevc = text.get(pos - 1);
-            if (!escape && c == quote) {
+            if (insideExp == 0 && !escape && c == quote) {
                 break;
             }
             if (c == slash) {
@@ -441,10 +449,22 @@ server class TypeScanner {
             } else {
                 escape = false;
             }
+            if(c == dollar) {
+                insideDollar = true;
+            }
+            if(insideDollar && !ParserUtil.isFuncChar(c)){
+                insideDollar = false;
+            }
+            if(prevc == dollar && c == '{') {
+                insideExp++;
+            }
+            if(insideExp > 0 && c == '}') {
+                insideExp --;
+            }
             if (c == '\r') {
                 nCrChars++;
             }
-            if (c == '\n') {
+            if (insideExp == 0 && c == '\n') {
                 break;
             }
         }

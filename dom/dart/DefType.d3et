@@ -1,0 +1,7 @@
+class DefType extends DataType {
+    String in;
+    String name;
+    Boolean optional = false;
+    TypeParams params;
+    DefType(this.name, this.optional);
+}

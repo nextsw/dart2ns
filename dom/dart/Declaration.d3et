@@ -1,9 +1,9 @@
 class Declaration extends Statement {
     DataType type;
-    String name;
+    List<String> names = [];
     Expression assignment;
     Boolean isFinal;
     Boolean isConst;
     Boolean isLate;
-    Declaration({this.type, this.name, this.assignment, this.isFinal, this.isLate, this.isConst});
+    Declaration({this.type, this.names, this.assignment, this.isFinal, this.isLate, this.isConst});
 }

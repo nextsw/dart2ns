@@ -1,6 +1,7 @@
-class TypeCastOrCheckExpression extends Expression {
+class TypeCastOrCheckExpression extends Statement {
     Boolean check;
     DataType dataType;
     Expression exp;
-    TypeCastOrCheckExpression({this.check, this.dataType, this.exp});
+    Boolean isNot;
+    TypeCastOrCheckExpression({this.check, this.dataType, this.exp, this.isNot});
 }

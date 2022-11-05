@@ -1,4 +1,4 @@
-class AwaitExpression extends Expression {
+class AwaitExpression extends Statement {
     Expression exp;
     AwaitExpression(this.exp);
 }

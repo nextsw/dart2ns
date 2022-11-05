@@ -12,7 +12,7 @@ public class ClassDecl extends TopDecl {
   public List<DataType> mixins = ListExt.asList();
   public List<DataType> ons = ListExt.asList();
   public boolean isMixin = false;
-public DataType mixinApplicationType;
+  public DataType mixinApplicationType;
 
   public ClassDecl(boolean isMixin, String name) {
     super(name, TopDeclType.Class, "");

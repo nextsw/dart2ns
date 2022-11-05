@@ -1,5 +1,5 @@
 class Annotation {
-    String name;
-    String value;
-    Annotation({this.name, this.value});
+    MethodCall call;
+    List<Comment> comments = [];
+    Annotation(this.call);
 }

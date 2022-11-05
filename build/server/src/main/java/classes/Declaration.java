@@ -1,8 +1,7 @@
 package classes;
 
-import java.util.List;
-
 import d3e.core.ListExt;
+import java.util.List;
 
 public class Declaration extends Statement {
   public DataType type;

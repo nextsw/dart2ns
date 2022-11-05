@@ -57,9 +57,9 @@ public class Dart2NSContext {
 		HashMap<String,String> pkgs = new HashMap<>();
 		pkgs.put("characters", "1.2.1");
 		pkgs.put("collection", "1.16.0");
-		  pkgs.put("material_color_utilities", "0.1.5");
-		  pkgs.put("meta", "1.8.0");
-		  pkgs.put("vector_math", "2.1.2");
+		pkgs.put("material_color_utilities", "0.1.5");
+		pkgs.put("meta", "1.8.0");
+		pkgs.put("vector_math", "2.1.2");
 		return pkgs;
 	}
 	public void push(String path) {

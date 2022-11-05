@@ -1,5 +1,7 @@
 class ArrayAccess extends Expression {
     Expression on;
     Expression index;
-    ArrayAccess({this.on, this.index});
+    Boolean checkNull = false;
+    Boolean notNull = false;
+    ArrayAccess({this.on, this.index, this.checkNull, this.notNull});
 }

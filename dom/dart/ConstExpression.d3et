@@ -1,4 +1,4 @@
-class ConstExpression extends Expression {
+class ConstExpression extends Statement {
     Expression exp;
     ConstExpression(this.exp);
 } 

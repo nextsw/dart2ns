@@ -1,4 +1,5 @@
 class SwitchCaseBlock {
     List<Expression> tests = [];
     List<Statement> statements = [];
+    String label;
 }
