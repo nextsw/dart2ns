@@ -41,7 +41,7 @@ server class TypeParser {
             p.eatComments();
             p.check(TypeKind.Eof);
         } catch(e) {
-
+            D3ELogger.error(e.message);
         }
         context.pop();
         return res;
@@ -66,7 +66,7 @@ server class TypeParser {
         TypeToken start = tok;
         eatComments();
         TopDecl obj = null;
-        List<Annotation> annotations = [];
+        List<Annotation> annotations = readAnnotations();
         if (isKey(tok, 'library')) {
             String lib = readLibrary();
             return true;
@@ -75,6 +75,19 @@ server class TypeParser {
             list.addAll(objs);
             return true;
         } else if(isKey(tok, 'import')) {
+            List<TopDecl> objs = readImportOrExport();
+            list.addAll(objs);
+            return true;
+        } else if (isKey(this.tok, 'part')) {
+            if(isKey(this.peekTok, 'of')) {
+                next();
+                next();
+                while(tok.kind != TypeKind.Semicolon) {
+                    next();
+                }
+                next();
+                return true;
+            }
             List<TopDecl> objs = readImportOrExport();
             list.addAll(objs);
             return true;
@@ -91,7 +104,8 @@ server class TypeParser {
             obj = null;
         } else if (isKey(tok, 'class') 
             || isKey(tok, 'abstract')
-            || isKey(tok, 'mixin')) {
+            || isKey(tok, 'mixin')
+            || isKey(tok, 'extension')) {
             obj = readClass(annotations, start);
         } else {
             obj = readClassMember('');
@@ -119,7 +133,10 @@ server class TypeParser {
     String readLibrary(){
         next();
         String lib  = checkName();
-        check(TypeKind.Semicolon);
+        if(tok.kind == TypeKind.Dot) {
+            next();
+            lib += '.' + checkName();
+        }
         return lib;
     }
 
@@ -298,8 +315,26 @@ server class TypeParser {
             next();
             check(TypeKind.Dot);
         }
+        eatComments();
         if (tok.kind == TypeKind.Name) {   
             name = checkName();
+            if(this.tok.kind == TypeKind.Lpar || isType()) {
+                List<DataType> args = [];
+                if (isType()) {
+                    args = readTypeArgs();
+                }
+                MethodParams params = readMethodParams(false);
+                FunctionType fnType = FunctionType(
+                    returnType: type,
+                    params: params,
+                    typeArgs: args,
+                );
+                if (this.tok.kind == TypeKind.Question) {
+                    fnType.optional = true;
+                    next();
+                }
+                type = fnType;
+            }
         }
         
         if (this.tok.kind == TypeKind.Assign) {
@@ -323,8 +358,12 @@ server class TypeParser {
             next();
         }
         Boolean isMixin = false;
+        Boolean isExtension = false;
         if (isKey(tok, 'mixin')) {
             isMixin = true;
+            next();
+        } else if (isKey(this.tok, 'extension')) {
+            isExtension = true;
             next();
         } else {
             checkKey('class');
@@ -341,11 +380,11 @@ server class TypeParser {
             next();
             cls.mixinApplicationType = readType();
         } else {
-            if (!isMixin && isKey(tok, 'extends')) {
+            if (!!isExtension && isMixin && isKey(tok, 'extends')) {
                 next();
                 cls.extendType = readType();
             }
-            if (isMixin  && isKey(this.tok, 'on')) {
+            if ((isExtension || isMixin)  && isKey(this.tok, 'on')) {
                 next();
                 while (true) {
                     cls.ons.add(readType());
@@ -356,7 +395,7 @@ server class TypeParser {
                 }
             }
         }
-        if (isKey(this.tok, 'with')) {
+        if (!isExtension && isKey(this.tok, 'with')) {
             next();
             while (true) {
                 cls.mixins.add(readType());
@@ -367,7 +406,7 @@ server class TypeParser {
             }
         }
         cls.impls.clear();
-        if (isKey(tok, 'implements')) {
+        if (!isExtension && isKey(tok, 'implements')) {
             next();
             while (true) {
                 cls.impls.add(readType());
@@ -408,7 +447,12 @@ server class TypeParser {
         Boolean isFactory = false;
         Boolean isAbstract = false;
         Boolean isLate = false;
+        Boolean isExternal = false;
         ASyncType asyncType = ASyncType.NONE;
+        if (isKey(this.tok, 'external')) {
+            isExternal = true;
+            next();
+        }
         if (isKey(tok, 'static')) {
             isStatic = true;
             next();
@@ -438,7 +482,10 @@ server class TypeParser {
             && (peekTok.kind == TypeKind.Lpar
                 || peekTok.kind == TypeKind.Dot);
         if(!isFactory && !isConstructor) {
-            type = readType();
+            if((isConst || isFinal) && peekTok.kind == TypeKind.Assign) {
+            } else {
+                type = readType();
+            }
         }
         String name = checkName();
 
@@ -609,6 +656,8 @@ server class TypeParser {
         List<Annotation> annotations = readAnnotations();
         if (isKey(tok, 'return')) {
             smt = readReturn();
+        } else if (isKey(this.tok, 'yield')) {
+          smt = YieldExpression(expr(0));
         } else if (isKey(this.tok, 'await')) {
             smt = AwaitExpression(expr(0));
             if (!skipSemiColon) {
@@ -713,9 +762,14 @@ server class TypeParser {
                 isConst = true;
             }
         }
-        DataType type = readType();
-        if (type == null || this.tok.kind != TypeKind.Name) {
-            return null;
+        DataType type = null;
+        if(isFinal && this.peekTok.kind == TypeKind.Assign) {
+            // No type
+        } else {
+            type = readType();
+            if (type == null || this.tok.kind != TypeKind.Name) {
+                return null;
+            }
         }
         List<String> names = [];
         String name = checkName();
@@ -842,7 +896,7 @@ server class TypeParser {
         check(TypeKind.Lpar);
         Expression test = expr(0);
         check(TypeKind.Rpar);
-        Block block = readBlock(true);
+        Statement thenVal = readStatement();
         Statement elseS = null;
         if (isKey(tok, 'else')) {
             next();
@@ -850,7 +904,7 @@ server class TypeParser {
         }
         return IfStatement(
             test: test,
-            thenStatement: block,
+            thenStatement: thenVal,
             elseStatement: elseS,
         );
     }
@@ -1082,6 +1136,9 @@ server class TypeParser {
                         return singleParamLambda();
                     } else if (isKey(tok, 'throw')) {
                         return readThrow(true);
+                    } else if (isKey(tok, 'new')) {
+                        next();
+                        return expr(precedence);
                     } else {
                         node = nameExpr();
                     }
@@ -1209,11 +1266,19 @@ server class TypeParser {
                 TypeToken ttok = tok;
                 next();
                 Expression right = expr(precedence - 1);
-                node = BinaryExpression(
-                    op: ttok.lit,
-                    left: node,
-                    right: right,
-                );
+                if(ttok.kind == TypeKind.Assign) {
+                    node = Assignment(
+                        left: node,
+                        right: right,
+                        op: ttok.lit,
+                    );
+                } else {
+                    node = BinaryExpression(
+                        op: ttok.lit,
+                        left: node,
+                        right: right,
+                    );
+                }
             } else if (TypeToken.isInfix(tok.kind)) {
                 node = infixExpr(node);
             } else if (this.tok.kind == TypeKind.Inc 
@@ -1302,15 +1367,26 @@ server class TypeParser {
                 next();
                 continue;
             }
-            DataType type = readType();
-            if(tok.kind != TypeKind.Name) {
-                return null;
+            if((peekTok.kind == TypeKind.Rpar ||
+    		  peekTok.kind == TypeKind.Comma)
+    		  && (peekTok2.kind == TypeKind.Arrow 
+    		  || peekTok2.kind == TypeKind.Lcbr)) {
+                // Name without type
+                String name = checkName();
+                params.add(Param(
+                    name: name,
+                ));
+            } else {
+                DataType type = readType();
+                if(tok.kind != TypeKind.Name) {
+                    return null;
+                }
+                String name = checkName();
+                params.add(Param(
+                    name: name,
+                    type: type
+                ));
             }
-            String name = checkName();
-            params.add(Param(
-                name: name,
-                type: type
-            ));
             if (tok.kind == TypeKind.Comma) {
                 next();
             } else {
@@ -1441,6 +1517,13 @@ server class TypeParser {
             expectingType = true;
         }
         Expression right = expr(precedence);
+        if(ttok.kind == TypeKind.Assign) {
+            return Assignment(
+                left: left,
+                right: right,
+                op: ttok.lit,
+            );
+        }
         return BinaryExpression(
             op: lit,
             left: left,

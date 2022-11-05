@@ -1,0 +1,4 @@
+class YieldExpression extends Statement {
+    Expression exp;
+    YieldExpression(this.exp);
+}
