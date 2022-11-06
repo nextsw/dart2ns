@@ -5,4 +5,5 @@ class Import {
     List<String> hide = [];
     Boolean differed;
     String name; //as
+    Import(this.lib, this.path);
 }

@@ -29,9 +29,8 @@ public class TypeParser {
     this.scanner = scanner;
   }
 
-  public static List<TopDecl> parse(Dart2NSContext context, String path) {
+  public static List<TopDecl> parse(Dart2NSContext context, String content) {
     List<TopDecl> res = ListExt.asList();
-    String content = context.path2Content(path);
     if (content.isEmpty()) {
       return res;
     }
@@ -44,7 +43,6 @@ public class TypeParser {
     } catch (RuntimeException e) {
       D3ELogger.error(e.getMessage());
     }
-    context.pop();
     return res;
   }
 
@@ -73,12 +71,18 @@ public class TypeParser {
       String lib = readLibrary();
       return true;
     } else if (isKey(this.tok, "export")) {
-      List<TopDecl> objs = readImportOrExport();
-      ListExt.addAll(list, objs);
+      next();
+      String path = this.tok.lit;
+      next();
+      Export export = this.context.loadExport(path);
+      readExport(export);
       return true;
     } else if (isKey(this.tok, "import")) {
-      List<TopDecl> objs = readImportOrExport();
-      ListExt.addAll(list, objs);
+      next();
+      String path = this.tok.lit;
+      next();
+      Import importValue = this.context.loadImport(path);
+      readImport(importValue);
       return true;
     } else if (isKey(this.tok, "part")) {
       if (isKey(this.peekTok, "of")) {
@@ -90,8 +94,10 @@ public class TypeParser {
         next();
         return true;
       }
-      List<TopDecl> objs = readImportOrExport();
-      ListExt.addAll(list, objs);
+      next();
+      this.context.loadPart(this.tok.lit);
+      next();
+      check(TypeKind.Semicolon);
       return true;
     }
     if (isKey(this.tok, "typedef")) {
@@ -115,19 +121,48 @@ public class TypeParser {
     return false;
   }
 
-  public List<TopDecl> readImportOrExport() {
-    next();
-    String path = this.tok.lit;
-    List<TopDecl> objs = TypeParser.parse(this.context, path);
-    next();
-    while (this.tok.kind != TypeKind.Semicolon) {
-      /*
-       Ignoring the Show spec
-      */
+  public void readExport(Export ex) {
+    if (isKey(this.tok, "show")) {
       next();
+      while (this.tok.kind != TypeKind.Semicolon) {
+        ex.show.add(this.tok.lit);
+        next();
+      }
+    }
+    if (isKey(this.tok, "hide")) {
+      next();
+      while (this.tok.kind != TypeKind.Semicolon) {
+        ex.show.add(this.tok.lit);
+        next();
+      }
     }
     check(TypeKind.Semicolon);
-    return objs;
+  }
+
+  public void readImport(Import imp) {
+    if (isKey(this.tok, "differred")) {
+      next();
+      imp.differed = true;
+    }
+    if (isKey(this.tok, "as")) {
+      next();
+      imp.name = checkName();
+    }
+    if (isKey(this.tok, "show")) {
+      next();
+      while (this.tok.kind != TypeKind.Semicolon) {
+        imp.show.add(this.tok.lit);
+        next();
+      }
+    }
+    if (isKey(this.tok, "hide")) {
+      next();
+      while (this.tok.kind != TypeKind.Semicolon) {
+        imp.show.add(this.tok.lit);
+        next();
+      }
+    }
+    check(TypeKind.Semicolon);
   }
 
   public String readLibrary() {

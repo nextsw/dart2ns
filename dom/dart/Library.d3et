@@ -5,7 +5,7 @@ class Library {
     String packagePath;
     String id;
     List<Import> imports = [];
-    List<Export> exprots = [];
+    List<Export> exports = [];
     List<TopDecl> objects = [];
     List<Part> parts = [];
 

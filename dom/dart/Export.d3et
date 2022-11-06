@@ -3,5 +3,6 @@ class Export {
     Library lib;
     List<String> show = [];
     List<String> hide = [];
+    Export(this.lib, this.path);
 
 }

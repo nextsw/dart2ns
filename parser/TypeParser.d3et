@@ -70,12 +70,18 @@ server class TypeParser {
             String lib = readLibrary();
             return true;
         } else if (isKey(tok, 'export')) {
-            List<TopDecl> objs = readImportOrExport();
-            list.addAll(objs);
+            next();
+            String path = tok.lit;
+            next();
+            Export export = context.loadExport(path);
+            readExport(export);
             return true;
         } else if(isKey(tok, 'import')) {
-            List<TopDecl> objs = readImportOrExport();
-            list.addAll(objs);
+            next();
+            String path = tok.lit;
+            next();
+            Import import = context.loadImport(path);
+            readImport(import);
             return true;
         } else if (isKey(this.tok, 'part')) {
             if(isKey(this.peekTok, 'of')) {
@@ -87,8 +93,10 @@ server class TypeParser {
                 next();
                 return true;
             }
-            List<TopDecl> objs = readImportOrExport();
-            list.addAll(objs);
+            next();
+            context.loadPart(tok.lit);
+            next();
+            check(TypeKind.Semicolon);
             return true;
         }
         if (isKey(tok, 'typedef')) {
@@ -112,17 +120,48 @@ server class TypeParser {
         return false;
     }
 
-    List<TopDecl> readImportOrExport() {
-        next();
-        String path = tok.lit;
-        List<TopDecl> objs = TypeParser.parse(context, path);
-        next();
-        while(tok.kind != TypeKind.Semicolon) {
-            // Ignoring the Show spec
+    void readExport(Export ex) {
+        if(isKey(tok, 'show')) {
             next();
+            while(tok.kind != TypeKind.Semicolon) {
+                ex.show.add(tok.lit);
+                next();
+            }
+        }
+        if(isKey(tok, 'hide')) {
+            next();
+            while(tok.kind != TypeKind.Semicolon) {
+                ex.show.add(tok.lit);
+                next();
+            }
         }
         check(TypeKind.Semicolon);
-        return objs;
+    }
+
+    void readImport(Import imp) {
+        if(isKey(tok, 'differred')) {
+            next();
+            imp.differed = true;
+        }
+        if(isKey(tok, 'as')) {
+            next();
+            imp.name = checkName();
+        }
+        if(isKey(tok, 'show')) {
+            next();
+            while(tok.kind != TypeKind.Semicolon) {
+                imp.show.add(tok.lit);
+                next();
+            }
+        }
+        if(isKey(tok, 'hide')) {
+            next();
+            while(tok.kind != TypeKind.Semicolon) {
+                imp.show.add(tok.lit);
+                next();
+            }
+        }
+        check(TypeKind.Semicolon);
     }
 
     String readLibrary(){

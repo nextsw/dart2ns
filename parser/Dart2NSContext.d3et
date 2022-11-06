@@ -47,6 +47,7 @@ server class Dart2NSContext {
             _push(lib);
             _parse(lib.fullPath);
             _pop();
+            D3ELogger.info('Resuming : ' + current.fullPath);
         }
         return true;
     }
@@ -67,8 +68,22 @@ server class Dart2NSContext {
         _parse(fullPath);
         return false;
     }
+    Export loadExport(String path) {
+        Export exp = Export(current, path);
+        current.exports.add(exp);
+        loadLibrary(path);
+        return exp;
+    }
+
+    Import loadImport(String path) {
+        Import imp = Import(current, path);
+        current.imports.add(imp);
+        loadLibrary(path);
+        return imp;
+    }
 
     void _parse(String path) {
+        D3ELogger.info('Parsing : ' + path);
         String content = FileUtils.readContent(path);
         List<TopDecl> list = TypeParser.parse(this, content);
         current.objects.addAll(list);
@@ -96,6 +111,7 @@ server class Dart2NSContext {
             path: pathItems.join('/'),
         );
     }
+
     Library dartLibrary(String path) {
         List<String> split = path.split(':');
         String base = '/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/';
