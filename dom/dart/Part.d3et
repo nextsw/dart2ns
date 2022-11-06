@@ -1,0 +1,5 @@
+class Part {
+    String path;
+    Library lib;
+    Part(this.path, this.lib);
+}

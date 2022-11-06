@@ -25,12 +25,12 @@ server class TypeParser {
     List<TokenFrame> savedFrames = [];
 
     static List<String> primitives = ['void', 'bool', 'int', 'double', 'dynamic', 'num', 'var'];
+    
 
     TypeParser(this.context, this.scanner);
 
-    static List<TopDecl> parse(Dart2NSContext context, String path) {
+    static List<TopDecl> parse(Dart2NSContext context, String content) {
         List<TopDecl> res = [];
-        String content = context.path2Content(path);
         if(content.isEmpty) {
             return res;
         }
@@ -43,7 +43,6 @@ server class TypeParser {
         } catch(e) {
             D3ELogger.error(e.message);
         }
-        context.pop();
         return res;
     }
 

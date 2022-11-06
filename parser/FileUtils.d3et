@@ -1,0 +1,4 @@
+@Java('classes.FileUtils')
+class FileUtils {
+    static String readContent(String path);
+}

@@ -1,0 +1,8 @@
+class Import {
+    String path;
+    Library lib;
+    List<String> show = [];
+    List<String> hide = [];
+    Boolean differed;
+    String name; //as
+}

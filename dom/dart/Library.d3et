@@ -1,0 +1,19 @@
+class Library {
+    String base;
+    String path;
+    String fullPath;
+    String packagePath;
+    String id;
+    List<Import> imports = [];
+    List<Export> exprots = [];
+    List<TopDecl> objects = [];
+    List<Part> parts = [];
+
+    Library({this.base, this.path, this.fullPath, this.packagePath});
+    
+
+    TopDecl get(String name) {
+        return objects.firstWhere(o => o.name == name);
+    }
+
+}

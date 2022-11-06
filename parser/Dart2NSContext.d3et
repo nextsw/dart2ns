@@ -1,6 +1,121 @@
-@Java('classes.Dart2NSContext')
-class Dart2NSContext {
-    String path2Content(String path);
-    void push(String path);
-    void pop();
+server class Dart2NSContext {
+    List<Library> libs = [];
+
+    List<Library> stack = [];
+    Library current;
+
+    static final String pkgBase = '/Users/rajesh/Downloads/flutter/.pub-cache/hosted/pub.dartlang.org/';
+
+    static Map<String, String> packages = preparePackages();
+
+    static Map<String, String> preparePackages() {
+		Map<String,String> pkgs = Map();
+		pkgs.set('characters', '1.2.1');
+		pkgs.set('collection', '1.16.0');
+		pkgs.set('material_color_utilities', '0.1.5');
+		pkgs.set('meta', '1.8.0');
+		pkgs.set('vector_math', '2.1.2');
+		return pkgs;
+	}
+
+    void start(String base, String path) {
+        String fullPath = base + path;
+        List<String> parts = fullPath.split('/');
+        String last = parts.removeLast();
+        Library lib = Library(
+            fullPath: fullPath,
+            packagePath: path,
+            base: parts.join('/') + '/',
+            path: last,
+        );
+        this.current = lib;
+        _parse(lib.fullPath);
+    }
+
+    Boolean loadLibrary(String path) {
+        Library lib = null;
+        if(path.startsWith('package:')) {
+            lib = packageLibrary(path);
+        } else if(path.startsWith('dart:')) {
+            lib = dartLibrary(path);
+        } else {
+            lib = relativeLibrary(path);
+        }
+        Boolean loaded = libs.any(l => l.fullPath == lib.fullPath);
+        if(!loaded) {
+            libs.add(lib);
+            _push(lib);
+            _parse(lib.fullPath);
+            _pop();
+        }
+        return true;
+    }
+
+    void _push(Library lib) {
+        stack.add(current);
+        current = lib;
+    }
+
+    void _pop() {
+        current = stack.removeLast();
+    }
+
+    Boolean loadPart(String part) {
+        String fullPath = join(current.base, part);
+        Part p = Part(part, current);
+        current.parts.add(p);
+        _parse(fullPath);
+        return false;
+    }
+
+    void _parse(String path) {
+        String content = FileUtils.readContent(path);
+        List<TopDecl> list = TypeParser.parse(this, content);
+        current.objects.addAll(list);
+    }
+
+    static String join(String base, String sub) {
+        return base + '/' + sub;
+    }
+
+    Library packageLibrary(String path) {
+        List<String> split = path.split(':');
+	    List<String> pathItems = split[1].split('/');
+        String first = pathItems.first;
+	    pathItems.removeLast();
+        String version = packages.get(first);
+        String newBase = pkgBase + first + '-' + version + '/lib/';
+        if(pathItems[0] == 'flutter') {
+            newBase = '/Users/rajesh/Downloads/flutter/packages/flutter/lib/';
+        }
+        String fullPath = newBase + pathItems.join('/');
+        return Library(
+            fullPath: fullPath,
+            packagePath: path,
+            base: newBase,
+            path: pathItems.join('/'),
+        );
+    }
+    Library dartLibrary(String path) {
+        List<String> split = path.split(':');
+        String base = '/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/';
+        String fullPath = base +'/' + split[1] + '/' + split[1] + '.dart';
+        return Library(
+            fullPath: fullPath,
+            packagePath: path,
+            base: base +'/' + split[1] + '/',
+            path: split[1] + '.dart',
+        );
+    }
+    Library relativeLibrary(String path) {
+        String fullPath = current.base + path;
+        List<String> parts = fullPath.split('/');
+        String last = parts.removeLast();
+        return Library(
+            fullPath: fullPath,
+            packagePath: path,
+            base: parts.join('/') + '/',
+            path: last,
+        );
+    }
 }
