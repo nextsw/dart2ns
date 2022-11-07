@@ -1,4 +1,5 @@
 @Java('classes.FileUtils')
 class FileUtils {
     static String readContent(String path);
+    static String writeFile(String path, String content);
 }

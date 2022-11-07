@@ -1,9 +1,10 @@
 class Import {
     String path;
     Library lib;
+    Library parent;
     List<String> show = [];
     List<String> hide = [];
     Boolean differed;
     String name; //as
-    Import(this.lib, this.path);
+    Import(this.parent, this.path, this.lib);
 }

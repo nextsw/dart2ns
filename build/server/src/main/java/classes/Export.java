@@ -5,12 +5,14 @@ import java.util.List;
 
 public class Export {
   public String path;
+  public Library parent;
   public Library lib;
   public List<String> show = ListExt.asList();
   public List<String> hide = ListExt.asList();
 
-  public Export(Library lib, String path) {
-    this.lib = lib;
+  public Export(Library parent, String path, Library lib) {
+    this.parent = parent;
     this.path = path;
+    this.lib = lib;
   }
 }

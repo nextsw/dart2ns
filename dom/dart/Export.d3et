@@ -1,8 +1,9 @@
 class Export {
     String path;
+    Library parent;
     Library lib;
     List<String> show = [];
     List<String> hide = [];
-    Export(this.lib, this.path);
+    Export(this.parent, this.path, this.lib);
 
 }

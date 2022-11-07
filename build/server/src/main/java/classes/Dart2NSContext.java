@@ -33,11 +33,12 @@ public class Dart2NSContext {
     List<String> parts = StringExt.split(fullPath, "/");
     String last = ListExt.removeLast(parts);
     Library lib = new Library(ListExt.join(parts, "/") + "/", fullPath, path, last);
+    this.libs.add(lib);
     this.current = lib;
     _parse(lib.fullPath);
   }
 
-  public boolean loadLibrary(String path) {
+  public Library loadLibrary(String path) {
     Library lib = null;
     if (StringExt.startsWith(path, "package:", 0l)) {
       lib = packageLibrary(path);
@@ -47,20 +48,22 @@ public class Dart2NSContext {
       lib = relativeLibrary(path);
     }
     Library lib$final = lib;
-    boolean loaded =
-        ListExt.any(
+    Library loadedLib =
+        ListExt.firstWhere(
             this.libs,
             (l) -> {
               return Objects.equals(l.fullPath, lib$final.fullPath);
-            });
-    if (!loaded) {
+            },
+            null);
+    if (loadedLib == null) {
       this.libs.add(lib);
       _push(lib);
       _parse(lib.fullPath);
       _pop();
       D3ELogger.info("Resuming : " + this.current.fullPath);
+      loadedLib = lib;
     }
-    return true;
+    return loadedLib;
   }
 
   public void _push(Library lib) {
@@ -81,16 +84,16 @@ public class Dart2NSContext {
   }
 
   public Export loadExport(String path) {
-    Export exp = new Export(this.current, path);
+    Library lib = loadLibrary(path);
+    Export exp = new Export(this.current, path, lib);
     this.current.exports.add(exp);
-    loadLibrary(path);
     return exp;
   }
 
   public Import loadImport(String path) {
-    Import imp = new Import(this.current, path);
+    Library lib = loadLibrary(path);
+    Import imp = new Import(this.current, path, lib);
     this.current.imports.add(imp);
-    loadLibrary(path);
     return imp;
   }
 

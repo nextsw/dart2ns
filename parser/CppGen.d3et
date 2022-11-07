@@ -1,0 +1,156 @@
+server class CppGen implements Gen{
+    Dart2NSContext context;
+    String base;
+    List<String> cppLines = [];
+    List<String> hppLines = [];
+    List<String> cpLines = [];
+    List<String> hpLines = [];
+    void gen(Dart2NSContext context, String base) {
+        this.context = context;
+        this.base = base;
+        generate();
+    }
+
+    void generate() {
+        context.libs.forEach(lib => genLibrary(lib));
+    }
+
+    void genLibrary(Library lib) {
+        String fileName = lib.path.replaceAll('.dart', '');
+        String upper = fileName.toUpperCase();
+        hpp('#ifndef ' + upper + '_H');
+        hpp('#define ' + upper + '_H');
+        cpp('#include "' + fileName + '.h"');
+        hpp('#include <memory>');
+
+        lib.exports.forEach((e){
+            String path = e.path.replaceAll('.dart', '');
+            hpp('#include "' + path +'.h"');
+        });
+        hpp('');
+        lib.imports.forEach((i){
+            String path = i.path.replaceAll('.dart', '');
+            hpp('#include "' + path +'.h"');
+        });
+        hpp('');
+        lib.objects.forEach((obj) {
+            if(obj is ClassDecl) {
+                genClassDecl(obj as ClassDecl);
+            } else if(obj is Enum) {
+                genEnum(obj as Enum);
+            } else if(obj is Typedef) {
+                genTypeDef(obj as Typedef);
+            } else if(obj is MethodDecl) {
+                genMethodDecl(obj as MethodDecl);
+            } else if(obj is FieldDecl) {
+                genFieldDecl(obj as FieldDecl);
+            } else {
+                D3ELogger.error('Unknown object type');
+            }
+        });
+        hpp('');
+        hpp('#endif');
+        String outFolder = libOutFolder(lib);
+        FileUtils.writeFile(outFolder + fileName + '.hpp', hppLines.join('\n'));
+        FileUtils.writeFile(outFolder + fileName + '.cpp', cppLines.join('\n'));
+        cppLines.clear();
+        hppLines.clear();
+    }
+
+    String libOutFolder(Library lib) {
+        if(lib.packagePath.startsWith('package:')) {
+            List<String> split = lib.packagePath.split(':');
+            split = split.last.split('/');
+            return base + 'packages/' + split.first + '/';
+        } else if(lib.packagePath.startsWith('dart:')) {
+            List<String> split = lib.packagePath.split(':');
+            return base + 'dart/' + split.last + '/';
+        } else {
+            return base + 'packages/flutter/';
+        }
+    }
+    
+
+    void cpp(String line) {
+        if(cpLines.isNotEmpty) {
+            cppLines.add(cpLines.join(''));
+            cpLines.clear();
+        }
+        cppLines.add(line);
+    }
+    void hpp(String line) {
+        if(hpLines.isNotEmpty) {
+            hppLines.add(hpLines.join(''));
+            hpLines.clear();
+        }
+        hppLines.add(line);
+    }
+    void cp(String word) {
+        cpLines.add(word);
+    }
+    void hp(String word) {
+        hpLines.add(word);
+    }
+
+    void genClassDecl(ClassDecl c) {
+        hpp('');
+        if(c.isAbstract){
+
+        }
+        hpp((c.isAbstract? 'abstract ': '') + 'class ' + c.name +' {');
+        hpp('    public:');
+        declareFields(c, true);
+        hpp('    private:');
+        declareFields(c, false);
+        c.members.where(o => o is MethodDecl).forEach((o) {
+            MethodDecl m = o as MethodDecl;
+            
+        });
+        hpp('} // end ' + c.name);
+    }
+    void declareFields(ClassDecl c, Boolean public) {
+        c.members.where(m => public != m.name.startsWith('_') && (m is FieldDecl)).forEach((m) {
+            FieldDecl f = m as FieldDecl; 
+            if(f.static) {
+                hp('static ');
+            }
+            // if(f.final) {
+            //     s += 'final ';
+            // }
+            if(f.const) {
+                hp('const ');
+            }
+            if(f.type == null) {
+                hp('auto ');
+            } else {
+                hp(f.type.name);
+            }
+            hp(' ');
+            hp(f.name);
+            hp(';');
+            hpp('');
+        });
+    }
+
+    void genEnum(Enum e) {
+        hpp('');
+        hpp('enum '+ e.name + '{');
+        e.values.forEach((v) {
+            hpp('    ' + v + ',');
+        });
+        hpp('} // end ' + e.name);
+    }
+
+    void genMethodDecl(MethodDecl m) {
+
+    }
+
+    void genTypeDef(Typedef t) {
+
+    }
+
+    void genFieldDecl(FieldDecl f) {
+
+    }
+
+}
