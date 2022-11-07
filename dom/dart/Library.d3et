@@ -4,12 +4,13 @@ class Library {
     String fullPath;
     String packagePath;
     String id;
+    Library parent;
     List<Import> imports = [];
     List<Export> exports = [];
     List<TopDecl> objects = [];
     List<Part> parts = [];
 
-    Library({this.base, this.path, this.fullPath, this.packagePath});
+    Library({this.parent, this.base, this.path, this.fullPath, this.packagePath});
     
 
     TopDecl get(String name) {

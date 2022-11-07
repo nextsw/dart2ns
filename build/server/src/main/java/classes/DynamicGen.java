@@ -92,6 +92,7 @@ public class DynamicGen implements Gen{
 				}
 			});
 			genImpl = (Class<Gen>) urlClassLoader.loadClass("classes.CppGen");
+			System.out.println("loaded Class again");
 		} catch (MalformedURLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

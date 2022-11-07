@@ -99,12 +99,12 @@ server class Dart2NSContext {
         List<String> split = path.split(':');
 	    List<String> pathItems = split[1].split('/');
         String first = pathItems.first;
-	    pathItems.removeLast();
         String version = packages.get(first);
         String newBase = pkgBase + first + '-' + version + '/lib/';
         if(pathItems[0] == 'flutter') {
             newBase = '/Users/rajesh/Downloads/flutter/packages/flutter/lib/';
         }
+        pathItems.removeAt(0);
         String fullPath = newBase + pathItems.join('/');
         return Library(
             fullPath: fullPath,
@@ -117,7 +117,7 @@ server class Dart2NSContext {
     Library dartLibrary(String path) {
         List<String> split = path.split(':');
         String base = '/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/';
-        String fullPath = base +'/' + split[1] + '/' + split[1] + '.dart';
+        String fullPath = base + split[1] + '/' + split[1] + '.dart';
         return Library(
             fullPath: fullPath,
             packagePath: path,
@@ -130,6 +130,7 @@ server class Dart2NSContext {
         List<String> parts = fullPath.split('/');
         String last = parts.removeLast();
         return Library(
+            parent: current,
             fullPath: fullPath,
             packagePath: path,
             base: parts.join('/') + '/',

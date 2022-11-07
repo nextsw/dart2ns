@@ -5,6 +5,7 @@ server class CppGen implements Gen{
     List<String> hppLines = [];
     List<String> cpLines = [];
     List<String> hpLines = [];
+
     void gen(Dart2NSContext context, String base) {
         this.context = context;
         this.base = base;
@@ -16,21 +17,34 @@ server class CppGen implements Gen{
     }
 
     void genLibrary(Library lib) {
-        String fileName = lib.path.replaceAll('.dart', '');
-        String upper = fileName.toUpperCase();
+        String outPath = lib.path;
+        outPath = outPath.replaceAll('.dart', '');
+        List<String> split = outPath.split('/');
+        String nameOnly = split.last;
+        String upper = nameOnly.toUpperCase();
         hpp('#ifndef ' + upper + '_H');
         hpp('#define ' + upper + '_H');
-        cpp('#include "' + fileName + '.h"');
+        cpp('#include "' + nameOnly + '.hpp"');
         hpp('#include <memory>');
 
         lib.exports.forEach((e){
             String path = e.path.replaceAll('.dart', '');
-            hpp('#include "' + path +'.h"');
+            if(path.startsWith('package:') || path.startsWith('dart:')) {
+                path = path.split(':')[1];
+                hpp('#include <' + path +'.hpp>');
+            } else {
+                hpp('#include "' + path +'.hpp"');
+            }
         });
         hpp('');
         lib.imports.forEach((i){
             String path = i.path.replaceAll('.dart', '');
-            hpp('#include "' + path +'.h"');
+            if(path.startsWith('package:') || path.startsWith('dart:')) {
+                path = path.split(':')[1];
+                hpp('#include <' + path +'.hpp>');
+            } else {
+                hpp('#include "' + path +'.hpp"');
+            }
         });
         hpp('');
         lib.objects.forEach((obj) {
@@ -51,13 +65,23 @@ server class CppGen implements Gen{
         hpp('');
         hpp('#endif');
         String outFolder = libOutFolder(lib);
-        FileUtils.writeFile(outFolder + fileName + '.hpp', hppLines.join('\n'));
-        FileUtils.writeFile(outFolder + fileName + '.cpp', cppLines.join('\n'));
+        FileUtils.writeFile(outFolder + outPath + '.hpp', hppLines.join('\n'));
+        FileUtils.writeFile(outFolder + outPath + '.cpp', cppLines.join('\n'));
         cppLines.clear();
         hppLines.clear();
     }
 
     String libOutFolder(Library lib) {
+        if(lib.parent != null) {
+            Library top = lib.parent;
+            while(top.parent != null) {
+                top = top.parent;
+            }
+            String out = libOutFolder(top);
+            String extra = lib.base.replaceAll(top.base, '');
+            out += extra;
+            return out;
+        }
         if(lib.packagePath.startsWith('package:')) {
             List<String> split = lib.packagePath.split(':');
             split = split.last.split('/');
@@ -92,16 +116,78 @@ server class CppGen implements Gen{
         hpLines.add(word);
     }
 
+    String generics(TypeParams params){
+        if(params == null || params.params.isEmpty) {
+            return '';
+        }
+
+        return '<' + params.params.map(p => typeParamToString(p)).join(', ') +'>';
+    }
+    String typeArgsToList(List<DataType> args){
+        if(args.isEmpty) {
+            return '';
+        }
+
+        return '<' + args.map(p => dataTypeToString(p)).join(', ') +'>';
+    }
+
+    String typeParamToString(TypeParam p){
+        String res = p.name;
+        if(p.extendType != null) {
+            res += ' extends ' + dataTypeToString(p.extendType);
+        }
+        return res;
+    }
+
+    String valueTypeToString(ValueType v) {
+        String res = v.name;
+        if(v.args.isNotEmpty) {
+            res += typeArgsToList(v.args);
+        }
+        return res;
+    }
+
+    String functionTypeToString(FunctionType f) {
+        return 'FunctionType';
+    }
+
+    String defTypeToString(DefType d) {
+        return 'DefType';
+    }
+    
+
+    String dataTypeToString(DataType d) {
+        if(d is ValueType){
+            return valueTypeToString(d as ValueType);
+        } else if(d is FunctionType) {
+            return functionTypeToString(d as FunctionType);
+        } else if(d is DefType) {
+            return defTypeToString(d as DefType);
+        }
+        return 'Unknown';
+    }
+
     void genClassDecl(ClassDecl c) {
         hpp('');
         if(c.isAbstract){
 
         }
-        hpp((c.isAbstract? 'abstract ': '') + 'class ' + c.name +' {');
-        hpp('    public:');
+        hp('class ');
+        hp(c.name);
+        hp(generics(c.generics));
+        if(c.extendType != null) {
+            hp(' : ');
+            hp(dataTypeToString(c.extendType));
+        }
+        hp(' {');
+        hpp('public:');
         declareFields(c, true);
-        hpp('    private:');
+        hpp('');
+        declareMethods(c, true);
+        hpp('private:');
         declareFields(c, false);
+        hpp('');
+        declareMethods(c, false);
         c.members.where(o => o is MethodDecl).forEach((o) {
             MethodDecl m = o as MethodDecl;
             
@@ -111,6 +197,7 @@ server class CppGen implements Gen{
     void declareFields(ClassDecl c, Boolean public) {
         c.members.where(m => public != m.name.startsWith('_') && (m is FieldDecl)).forEach((m) {
             FieldDecl f = m as FieldDecl; 
+            hp('    ');
             if(f.static) {
                 hp('static ');
             }
@@ -123,13 +210,70 @@ server class CppGen implements Gen{
             if(f.type == null) {
                 hp('auto ');
             } else {
-                hp(f.type.name);
+                hp(dataTypeToString(f.type));
             }
             hp(' ');
             hp(f.name);
             hp(';');
             hpp('');
         });
+    }
+    void declareMethods(ClassDecl c, Boolean public) {
+        c.members.where(x => public != x.name.startsWith('_') && (x is MethodDecl)).forEach((i) {
+            MethodDecl m = i as MethodDecl; 
+            hp('    ');
+            if(m.static) {
+                hp('static ');
+            }
+            // if(f.final) {
+            //     s += 'final ';
+            // }
+            if(m.const) {
+                hp('const ');
+            }
+            if(m.type == null) {
+                hp('void ');
+            } else {
+                hp(dataTypeToString(m.returnType));
+            }
+            hp(' ');
+            hp(m.name);
+            if(m.generics != null){
+                hp(generics(m.generics));
+            }
+            hp('(');
+            if(m.params != null) {
+                List<MethodParam> params = sortMethodParams(m.params);
+                hp(params.map(p => paramToString(p)).join(', '));
+            }
+            hp(');');
+            hpp('');
+        });
+    }
+
+    String paramToString(MethodParam p) {
+        String out = '';
+        if(p.dataType != null) {
+            out+= dataTypeToString(p.dataType);
+        } else {
+            out += 'Unknown';
+        }
+        out += ' ' + p.name;
+        return out;
+    }
+
+    List<MethodParam> sortMethodParams(MethodParams params) {
+        List<MethodParam> out = [];
+        out.addAll(params.positionalParams);
+        out.addAll(params.optionalParams);
+        out.addAll(params.namedParams);
+        out.forEach((i){
+            if(i.name == null){
+                i.name = '';
+            }
+        });
+        out.sort((a,b) => a.name.compareTo(b.name));
+        return out;
     }
 
     void genEnum(Enum e) {

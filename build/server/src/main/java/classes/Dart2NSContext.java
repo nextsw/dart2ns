@@ -32,7 +32,7 @@ public class Dart2NSContext {
     String fullPath = base + path;
     List<String> parts = StringExt.split(fullPath, "/");
     String last = ListExt.removeLast(parts);
-    Library lib = new Library(ListExt.join(parts, "/") + "/", fullPath, path, last);
+    Library lib = new Library(ListExt.join(parts, "/") + "/", fullPath, path, null, last);
     this.libs.add(lib);
     this.current = lib;
     _parse(lib.fullPath);
@@ -112,24 +112,25 @@ public class Dart2NSContext {
     List<String> split = StringExt.split(path, ":");
     List<String> pathItems = StringExt.split(ListExt.get(split, 1l), "/");
     String first = ListExt.first(pathItems);
-    ListExt.removeLast(pathItems);
     String version = Dart2NSContext.packages.get(first);
     String newBase = Dart2NSContext.pkgBase + first + "-" + version + "/lib/";
     if (Objects.equals(ListExt.get(pathItems, 0l), "flutter")) {
       newBase = "/Users/rajesh/Downloads/flutter/packages/flutter/lib/";
     }
+    ListExt.removeAt(pathItems, 0l);
     String fullPath = newBase + ListExt.join(pathItems, "/");
-    return new Library(newBase, fullPath, path, ListExt.join(pathItems, "/"));
+    return new Library(newBase, fullPath, path, null, ListExt.join(pathItems, "/"));
   }
 
   public Library dartLibrary(String path) {
     List<String> split = StringExt.split(path, ":");
     String base = "/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/";
-    String fullPath = base + "/" + ListExt.get(split, 1l) + "/" + ListExt.get(split, 1l) + ".dart";
+    String fullPath = base + ListExt.get(split, 1l) + "/" + ListExt.get(split, 1l) + ".dart";
     return new Library(
         base + "/" + ListExt.get(split, 1l) + "/",
         fullPath,
         path,
+        null,
         ListExt.get(split, 1l) + ".dart");
   }
 
@@ -137,6 +138,6 @@ public class Dart2NSContext {
     String fullPath = this.current.base + path;
     List<String> parts = StringExt.split(fullPath, "/");
     String last = ListExt.removeLast(parts);
-    return new Library(ListExt.join(parts, "/") + "/", fullPath, path, last);
+    return new Library(ListExt.join(parts, "/") + "/", fullPath, path, this.current, last);
   }
 }
