@@ -10,6 +10,7 @@ public class FieldDecl extends ClassMember {
   public boolean staticValue = false;
   public boolean finalValue = false;
   public boolean constValue = false;
+  public boolean external = false;
   public List<Comment> comments = ListExt.asList();
   public List<Annotation> annotations = ListExt.asList();
 
@@ -17,6 +18,7 @@ public class FieldDecl extends ClassMember {
       List<Annotation> annotations,
       List<Comment> comments,
       boolean constValue,
+      boolean external,
       boolean finalValue,
       String name,
       boolean staticValue,
@@ -26,6 +28,7 @@ public class FieldDecl extends ClassMember {
     this.annotations = annotations;
     this.comments = comments;
     this.constValue = constValue;
+    this.external = external;
     this.finalValue = finalValue;
     this.name = name;
     this.staticValue = staticValue;

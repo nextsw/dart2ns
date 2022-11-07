@@ -11,6 +11,7 @@ public class MethodDecl extends ClassMember {
   public boolean finalValue = false;
   public boolean staticValue = false;
   public boolean constValue = false;
+  public boolean external = false;
   public boolean setter = false;
   public boolean getter = false;
   public boolean factory = false;
@@ -29,6 +30,7 @@ public class MethodDecl extends ClassMember {
       Block body,
       boolean constValue,
       Expression exp,
+      boolean external,
       boolean factory,
       String factoryName,
       boolean finalValue,
@@ -46,6 +48,7 @@ public class MethodDecl extends ClassMember {
     this.body = body;
     this.constValue = constValue;
     this.exp = exp;
+    this.external = external;
     this.factory = factory;
     this.factoryName = factoryName;
     this.finalValue = finalValue;

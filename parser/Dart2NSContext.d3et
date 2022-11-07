@@ -64,10 +64,9 @@ server class Dart2NSContext {
     }
 
     Boolean loadPart(String part) {
-        String fullPath = join(current.base, part);
-        Part p = Part(part, current);
+        Library lib = loadLibrary(part);
+        Part p = Part(current, part, lib);
         current.parts.add(p);
-        _parse(fullPath);
         return false;
     }
     Export loadExport(String path) {
@@ -117,12 +116,16 @@ server class Dart2NSContext {
     Library dartLibrary(String path) {
         List<String> split = path.split(':');
         String base = '/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/';
-        String fullPath = base + split[1] + '/' + split[1] + '.dart';
+        String sub = split[1];
+        if(sub.startsWith('_')){
+            sub = sub.substring(1);
+        }
+        String fullPath = base + sub + '/' + sub + '.dart';
         return Library(
             fullPath: fullPath,
             packagePath: path,
-            base: base +'/' + split[1] + '/',
-            path: split[1] + '.dart',
+            base: base +'/' + sub + '/',
+            path: sub + '.dart',
         );
     }
     Library relativeLibrary(String path) {

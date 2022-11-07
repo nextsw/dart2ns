@@ -32,6 +32,9 @@ server class CppGen implements Gen{
             if(path.startsWith('package:') || path.startsWith('dart:')) {
                 path = path.split(':')[1];
                 hpp('#include <' + path +'.hpp>');
+            } else if(path.startsWith('dart:')) {
+                path = path.split(':')[1];
+                hpp('#include <' + path + '/' + path +'.hpp>');
             } else {
                 hpp('#include "' + path +'.hpp"');
             }
@@ -39,12 +42,23 @@ server class CppGen implements Gen{
         hpp('');
         lib.imports.forEach((i){
             String path = i.path.replaceAll('.dart', '');
-            if(path.startsWith('package:') || path.startsWith('dart:')) {
+            if(path.startsWith('package:')) {
                 path = path.split(':')[1];
                 hpp('#include <' + path +'.hpp>');
+            } else if(path.startsWith('dart:')) {
+                path = path.split(':')[1];
+                hpp('#include <' + path + '/' + path +'.hpp>');
             } else {
                 hpp('#include "' + path +'.hpp"');
             }
+        });
+        hpp('');
+        if(lib.parts.isNotEmpty) {
+            hpp('// Parts');
+        }
+        lib.parts.forEach((i){
+            String path = i.path.replaceAll('.dart', '');
+            hpp('#include "' + path +'.hpp"');
         });
         hpp('');
         lib.objects.forEach((obj) {
@@ -55,9 +69,9 @@ server class CppGen implements Gen{
             } else if(obj is Typedef) {
                 genTypeDef(obj as Typedef);
             } else if(obj is MethodDecl) {
-                genMethodDecl(obj as MethodDecl);
+                genMethodDecl(null, obj as MethodDecl, 0);
             } else if(obj is FieldDecl) {
-                genFieldDecl(obj as FieldDecl);
+                genFieldDecl(obj as FieldDecl, 0);
             } else {
                 D3ELogger.error('Unknown object type');
             }
@@ -88,7 +102,11 @@ server class CppGen implements Gen{
             return base + 'packages/' + split.first + '/';
         } else if(lib.packagePath.startsWith('dart:')) {
             List<String> split = lib.packagePath.split(':');
-            return base + 'dart/' + split.last + '/';
+            String sub = split.last;
+            if(sub.startsWith('_')){
+                sub = sub.substring(1);
+            }
+            return base + 'dart/' + sub + '/';
         } else {
             return base + 'packages/flutter/';
         }
@@ -115,6 +133,16 @@ server class CppGen implements Gen{
     void hp(String word) {
         hpLines.add(word);
     }
+    void cl(String word) {
+        cpLines.add(word);
+        cppLines.add(cpLines.join(''));
+        cpLines.clear();
+    }
+    void hn(String word) {
+        hpLines.add(word);
+        hppLines.add(hpLines.join(''));
+        hpLines.clear();
+    }
 
     String generics(TypeParams params){
         if(params == null || params.params.isEmpty) {
@@ -123,7 +151,7 @@ server class CppGen implements Gen{
 
         return '<' + params.params.map(p => typeParamToString(p)).join(', ') +'>';
     }
-    String typeArgsToList(List<DataType> args){
+    String typeArgsToString(List<DataType> args){
         if(args.isEmpty) {
             return '';
         }
@@ -141,8 +169,11 @@ server class CppGen implements Gen{
 
     String valueTypeToString(ValueType v) {
         String res = v.name;
+        if(res == 'var') {
+            res = 'auto';
+        }
         if(v.args.isNotEmpty) {
-            res += typeArgsToList(v.args);
+            res += typeArgsToString(v.args);
         }
         return res;
     }
@@ -192,62 +223,17 @@ server class CppGen implements Gen{
             MethodDecl m = o as MethodDecl;
             
         });
-        hpp('} // end ' + c.name);
+        hpp('};');
     }
     void declareFields(ClassDecl c, Boolean public) {
         c.members.where(m => public != m.name.startsWith('_') && (m is FieldDecl)).forEach((m) {
-            FieldDecl f = m as FieldDecl; 
-            hp('    ');
-            if(f.static) {
-                hp('static ');
-            }
-            // if(f.final) {
-            //     s += 'final ';
-            // }
-            if(f.const) {
-                hp('const ');
-            }
-            if(f.type == null) {
-                hp('auto ');
-            } else {
-                hp(dataTypeToString(f.type));
-            }
-            hp(' ');
-            hp(f.name);
-            hp(';');
-            hpp('');
+            genFieldDecl(m as FieldDecl, 1);
         });
     }
     void declareMethods(ClassDecl c, Boolean public) {
         c.members.where(x => public != x.name.startsWith('_') && (x is MethodDecl)).forEach((i) {
-            MethodDecl m = i as MethodDecl; 
-            hp('    ');
-            if(m.static) {
-                hp('static ');
-            }
-            // if(f.final) {
-            //     s += 'final ';
-            // }
-            if(m.const) {
-                hp('const ');
-            }
-            if(m.type == null) {
-                hp('void ');
-            } else {
-                hp(dataTypeToString(m.returnType));
-            }
-            hp(' ');
-            hp(m.name);
-            if(m.generics != null){
-                hp(generics(m.generics));
-            }
-            hp('(');
-            if(m.params != null) {
-                List<MethodParam> params = sortMethodParams(m.params);
-                hp(params.map(p => paramToString(p)).join(', '));
-            }
-            hp(');');
-            hpp('');
+            MethodDecl m = i as MethodDecl;
+            genMethodDecl(c, m, 1);
         });
     }
 
@@ -285,16 +271,532 @@ server class CppGen implements Gen{
         hpp('} // end ' + e.name);
     }
 
-    void genMethodDecl(MethodDecl m) {
+    void genMethodDecl(ClassDecl c, MethodDecl m, Integer depth) {
+        while(depth > 0) {
+            hp('    ');
+            depth--;
+        }
 
+        if(m.external) {
+            hp('external ');
+        }
+        if(m.static) {
+            hp('static ');
+        }
+        // if(f.final) {
+        //     s += 'final ';
+        // }
+        // if(m.const) {
+        //     hp('const');
+        // }
+        if(m.returnType == null) {
+            if(c != null && c.name == m.name) {
+
+            } else {
+                hp('void ');
+            }
+        } else {
+            hp(dataTypeToString(m.returnType));
+        }
+        hp(' ');
+        hp(m.name);
+        if(m.generics != null){
+            hp(generics(m.generics));
+        }
+        hp('(');
+        if(m.params != null) {
+            List<MethodParam> params = sortMethodParams(m.params);
+            hp(params.map((p) {
+                if(p.dataType == null) {
+                    if(p.thisToken == 'this' && c != null){
+                        DataType type = getFieldType(c, p.name);
+                        return dataTypeToString(type) + ' ' + p.name;
+                    }
+                    return 'Unknown';
+                } else {
+                    return paramToString(p);
+                }
+            }).join(', '));
+        }
+        hp(');');
+        hpp('');
+
+        if(m.body == null && m.init == null && m.exp == null){
+            return;
+        }
+
+        if(m.returnType == null) {
+            if(c != null && c.name == m.name) {
+
+            } else {
+                cp('void');
+                cp(' ');
+            }
+        } else {
+            cp(dataTypeToString(m.returnType));
+            cp(' ');
+        }
+        if(c == null) {
+            cp(m.name);
+        } else {
+            cp(c.name);
+            cp('::');
+            cp(m.name);
+        }
+        if(m.generics != null){
+            cp(generics(m.generics));
+        }
+        cp('(');
+        List<MethodParam> thisParams = [];
+        if(m.params != null) {
+            List<MethodParam> params = sortMethodParams(m.params);
+            cp(params.map((p) {
+                if(p.dataType == null) {
+                    if(p.thisToken == 'this' && c != null){
+                        thisParams.add(p);
+                        DataType type = getFieldType(c, p.name);
+                        return dataTypeToString(type) + ' ' + p.name;
+                    }
+                    return 'Unknown';
+                } else {
+                    return paramToString(p);
+                }
+            }).join(', '));
+        }
+        cp(')');
+        Boolean isConstuctor = c != null && c.name == m.name;
+        if(isConstuctor) {
+            cl(' {');
+            if(m.init != null) {
+                cp(tab(1));
+                genExp(m.init, 1);
+                cl('');
+            }
+            if(m.body != null) {
+                cp(tab(1));
+                genBlock(m.body, 1);
+                cl('');
+            }
+            cl('}');
+        } else if(m.body != null) {
+            cp(' ');
+            genBlock(m.body, 0);
+        } else if(m.exp != null){
+            cl(' {');
+            cp('    return ');
+            genExp(m.exp, 1);
+            cl(';');
+            cl('}');
+        }
+        cpp('');
+    }
+
+    void genExp(Expression exp, Integer depth) {
+        if(exp is ArrayAccess) {
+            genArrayAccess(exp as ArrayAccess, depth);
+        } else if(exp is ArrayExpression) {
+            genArrayExpression(exp as ArrayExpression, depth);
+        } else if(exp is ArrayItem) {
+            genArrayItem(exp as ArrayItem, depth);
+        } else if(exp is Assignment) {
+            genAssignment(exp as Assignment, depth);
+        } else if(exp is AwaitExpression) {
+            genAwaitExpression(exp as AwaitExpression, depth);
+        } else if(exp is BinaryExpression) {
+            genBinaryExpression(exp as BinaryExpression, depth);
+        } else if(exp is Block) {
+            genBlock(exp as Block, depth);
+        } else if(exp is Break) {
+            genBreak(exp as Break, depth);
+        } else if(exp is CascadeExp) {
+            genCascadeExp(exp as CascadeExp, depth);
+        } else if(exp is ConstExpression) {
+            genConstExpression(exp as ConstExpression, depth);
+        } else if(exp is Continue) {
+            genContinue(exp as Continue, depth);
+        } else if(exp is Declaration) {
+            genDeclaration(exp as Declaration, depth);
+        } else if(exp is DoWhileLoop) {
+            genDoWhileLoop(exp as DoWhileLoop, depth);
+        } else if(exp is DynamicTypeExpression) {
+            genDynamicTypeExpression(exp as DynamicTypeExpression, depth);
+        } else if(exp is FieldOrEnumExpression) {
+            genFieldOrEnumExpression(exp as FieldOrEnumExpression, depth);
+        } else if(exp is FnCallExpression) {
+            genFnCallExpression(exp as FnCallExpression, depth);
+        } else if(exp is ForEachLoop) {
+            genForEachLoop(exp as ForEachLoop, depth);
+        } else if(exp is ForLoop) {
+            genForLoop(exp as ForLoop, depth);
+        } else if(exp is IfStatement) {
+            genIfStatement(exp as IfStatement, depth);
+        } else if(exp is InlineMethodStatement) {
+            genInlineMethodStatement(exp as InlineMethodStatement, depth);
+        } else if(exp is LabelStatement) {
+            genLabelStatement(exp as LabelStatement, depth);
+        } else if(exp is LambdaExpression) {
+            genLambdaExpression(exp as LambdaExpression, depth);
+        } else if(exp is LiteralExpression) {
+            genLiteralExpression(exp as LiteralExpression, depth);
+        } else if(exp is MethodCall) {
+            genMethodCall(exp as MethodCall, depth);
+        } else if(exp is NullExpression) {
+            genNullExpression(exp as NullExpression, depth);
+        } else if(exp is ParExpression) {
+            genParExpression(exp as ParExpression, depth);
+        } else if(exp is PostfixExpression) {
+            genPostfixExpression(exp as PostfixExpression, depth);
+        } else if(exp is PrefixExpression) {
+            genPrefixExpression(exp as PrefixExpression, depth);
+        } else if(exp is RethrowStatement) {
+            genRethrowStatement(exp as RethrowStatement, depth);
+        } else if(exp is Return) {
+            genReturn(exp as Return, depth);
+        } else if(exp is SwitchExpression) {
+            genSwitchExpression(exp as SwitchExpression, depth);
+        } else if(exp is TerinaryExpression) {
+            genTerinaryExpression(exp as TerinaryExpression, depth);
+        } else if(exp is TypeCastOrCheckExpression) {
+            genTypeCastOrCheckExpression(exp as TypeCastOrCheckExpression, depth);
+        } else if(exp is WhileLoop) {
+            genWhileLoop(exp as WhileLoop, depth);
+        } else if(exp is YieldExpression) {
+            genYieldExpression(exp as YieldExpression, depth);
+        } else if(exp is ArrayAccess) {
+            genArrayAccess(exp as ArrayAccess, depth);
+        } else {
+
+        }
+    }
+    String tab(Integer depth) {
+        String s = '';
+        while(depth > 0){
+            s += '    ';
+            depth--;
+        }
+        return s;
+    }
+    void genArrayAccess(ArrayAccess exp, Integer depth) {
+        genExp(exp.on, depth);
+        if(exp.checkNull) {
+            cp('?');
+        } else if(exp.notNull) {
+            cp('!');
+        }
+        cp('[');
+        genExp(exp.index, depth);
+        cp(']');
+    }
+    void genArrayExpression(ArrayExpression exp, Integer depth) {}
+    void genArrayItem(ArrayItem exp, Integer depth) {}
+    void genAssignment(Assignment exp, Integer depth) {
+        genExp(exp.left, depth);
+        cp(' = ');
+        genExp(exp.right, depth);
+    }
+    void genAwaitExpression(AwaitExpression exp, Integer depth) {
+        cp('await ');
+        genExp(exp.exp, depth);
+    }
+    void genBinaryExpression(BinaryExpression exp, Integer depth) {
+        genExp(exp.left, depth);
+        cp(' ');
+        cp(exp.op);
+        cp(' ');
+        genExp(exp.right, depth);
+    }
+    void genBlock(Block exp, Integer depth) {
+        if(exp == null){
+            return;
+        }
+        cl('{');
+        exp.statements.forEach((s){
+            cp(tab(depth + 1));
+            genExp(s, depth + 1);
+            if((s is WhileLoop)
+             || (s is ForLoop)
+             || (s is ForEachLoop)
+             || (s is Block)
+             || (s is IfStatement)){
+                // No need for semicolon
+            } else {
+                cl(';');
+            }
+        });
+        cp(tab(depth));
+        cp('}');
+    }
+    void genBreak(Break exp, Integer depth) {
+        cp(tab(depth));
+        cp('break');
+        if(exp.label != null){
+            cp(' ');
+            cp(exp.label);
+        }
+    }
+    void genCascadeExp(CascadeExp exp, Integer depth) {}
+    void genConstExpression(ConstExpression exp, Integer depth) {
+        cp('const ');
+        genExp(exp.exp, depth);
+    }
+    void genContinue(Continue exp, Integer depth) {
+        cp('continue');
+        if(exp.label != null){
+            cp(' ');
+            cp(exp.label);
+        }
+    }
+    void genDeclaration(Declaration exp, Integer depth) {
+        if(exp.type != null) {
+            cp(dataTypeToString(exp.type));
+        } else {
+            cp('Unknown');
+        }
+        cp(' ');
+        exp.names.forEach((n){
+            cp(n.name);
+            if(n.value != null) {
+                cp(' = ');
+                genExp(n.value, 0);
+            }
+            if(exp.names.last != n) {
+                cp(', ');
+            }
+        });
+    }
+    void genDoWhileLoop(DoWhileLoop exp, Integer depth) {
+        cp('do ');
+        genBlock(exp.body, depth);
+        cp(' while (');
+        genExp(exp.test, depth);
+        cp(')');
+    }
+    void genDynamicTypeExpression(DynamicTypeExpression exp, Integer depth) {}
+    void genFieldOrEnumExpression(FieldOrEnumExpression exp, Integer depth) {
+        if(exp.on != null){
+            genExp(exp.on, depth);
+            if(exp.checkNull) {
+                cp('?.');
+            } else if(exp.notNull) {
+                cp('!.');
+            } else {
+                cp('.');
+            }
+        }
+        cp(exp.name);
+    }
+    void genFnCallExpression(FnCallExpression exp, Integer depth) {
+        genExp(exp.on, depth);
+        genMethodCall(exp.call, depth);
+    }
+    void genForEachLoop(ForEachLoop exp, Integer depth) {
+        cp('for (');
+        if(exp.dataType != null) {
+            cp(dataTypeToString(exp.dataType));
+        } else {
+            cp('auto');
+        }
+        cp(' ');
+        cp(exp.name);
+        cp(' : ');
+        genExp(exp.collection, depth);
+        cp(') ');
+        genAsBlock(exp.body, depth);
+        cl('');
+    }
+    void genForLoop(ForLoop exp, Integer depth) {
+        cp('for (');
+        exp.inits.forEach((i){
+            genExp(i, depth);
+            if(i != exp.inits.last) {
+                cp(', ');
+            }
+        });
+        cp('; ');
+        genExp(exp.test, depth);
+        cp('; ');
+        exp.resets.forEach((i){
+            genExp(i, depth);
+            if(i != exp.resets.last) {
+                cp(', ');
+            }
+        });
+        cp(') ');
+        genAsBlock(exp.body, depth);
+        cl('');
+    }
+    void genAsBlock(Expression exp, Integer depth) {
+        if(exp is Block) {
+            genExp(exp, depth);
+        } else {
+            cp(tab(depth));
+            cl('{');
+            cp(tab(depth + 1));
+            genExp(exp, depth);
+            cl(';');
+            cp(tab(depth));
+            cp('}');
+        }
+    }
+    void genIfStatement(IfStatement exp, Integer depth) {
+        cp('if (');
+        genExp(exp.test, depth);
+        cp(') ');
+        genAsBlock(exp.thenStatement, depth);
+        if(exp.elseStatement != null) {
+            cp(' else ');
+            genAsBlock(exp.elseStatement, depth);
+            if(exp.elseStatement is IfStatement) {
+
+            } else {
+                cl('');
+            }
+        } else {
+            cl('');
+        }
+    }
+    void genInlineMethodStatement(InlineMethodStatement exp, Integer depth) {}
+    void genLabelStatement(LabelStatement exp, Integer depth) {}
+    void genLambdaExpression(LambdaExpression exp, Integer depth) {}
+    void genLiteralExpression(LiteralExpression exp, Integer depth) {
+        switch(exp.type) {
+            case TypeBoolean: {
+                cp(exp.value);
+            }
+            case TypeString: {
+                cp('"');
+                cp(exp.value);
+                cp('"');
+            }
+            case TypeDouble: {
+                cp(exp.value);
+            }
+            case TypeInteger: {
+                cp(exp.value);
+            }
+        }
+    }
+    void genMethodCall(MethodCall exp, Integer depth) {
+        if(exp.on != null){
+            genExp(exp.on, depth);
+            if(exp.checkNull) {
+                cp('?.');
+            } else if(exp.notNull) {
+                cp('!.');
+            } else {
+                cp('.');
+            }
+        }
+        if(exp.typeArgs.isNotEmpty) {
+            cp(typeArgsToString(exp.typeArgs));
+        }
+        if(exp.name != null) {
+            cp(exp.name);
+        }
+        cp('(');
+        exp.positionArgs.forEach((a){
+            genExp(a.arg, depth);
+            if(a != exp.positionArgs.last) {
+                cp(', ');
+            }
+        });
+        exp.namedArgs.forEach((a){
+            genExp(a.value, depth);
+            if(a != exp.namedArgs.last) {
+                cp(', ');
+            }
+        });
+        cp(')');
+    }
+    void genNullExpression(NullExpression exp, Integer depth) {
+        cp('nullptr');
+    }
+    void genParExpression(ParExpression exp, Integer depth) {
+        cp('(');
+        genExp(exp.exp, depth);
+        cp(')');
+    }
+    void genPostfixExpression(PostfixExpression exp, Integer depth) {
+        genExp(exp.on, depth);
+        cp(exp.postfix);
+    }
+    void genPrefixExpression(PrefixExpression exp, Integer depth) {
+        cp(exp.prefix);
+        genExp(exp.on, depth);
+    }
+    void genRethrowStatement(RethrowStatement exp, Integer depth) {}
+    void genReturn(Return exp, Integer depth) {
+        cp('return');
+        if(exp.expression != null) {
+            cp(' ');
+            genExp(exp.expression, depth);
+        }
+    }
+    void genSwitchExpression(SwitchExpression exp, Integer depth) {}
+    void genTerinaryExpression(TerinaryExpression exp, Integer depth) {
+        genExp(exp.condition, depth);
+        cp('? ');
+        genExp(exp.ifTrue, depth);
+        cp(' : ');
+        genExp(exp.ifFalse, depth);
+    }
+    void genTypeCastOrCheckExpression(TypeCastOrCheckExpression exp, Integer depth) {
+        if(exp.check) {
+            genExp(exp.exp, depth);
+            if(exp.isNot) {
+                cp(' is! ');
+            } else {
+                cp(' is ');
+            }
+            cp(dataTypeToString(exp.dataType));
+        } else {
+            cp('(');
+        }
+    }
+    void genWhileLoop(WhileLoop exp, Integer depth) {
+        cp('while (');
+        genExp(exp.test, depth);
+        cp(') ');
+        genAsBlock(exp.body, depth);
+        cl('');
+    }
+    void genYieldExpression(YieldExpression exp, Integer depth) {
+        cp('yield ');
+        genExp(exp.exp, depth);
+    }
+
+
+    DataType getFieldType(ClassDecl c, String name){
+        return (c.members.firstWhere(m => (m is FieldDecl) && m.name == name) as FieldDecl).type;
     }
 
     void genTypeDef(Typedef t) {
 
     }
 
-    void genFieldDecl(FieldDecl f) {
-
+    void genFieldDecl(FieldDecl f, Integer depth) {
+        while(depth > 0) {
+            hp('    ');
+            depth--;
+        }
+        if(f.static) {
+            hp('static ');
+        }
+        // if(f.final) {
+        //     s += 'final ';
+        // }
+        if(f.const) {
+            hp('const ');
+        }
+        if(f.type == null) {
+            hp('auto ');
+        } else {
+            hp(dataTypeToString(f.type));
+        }
+        hp(' ');
+        hp(f.name);
+        hp(';');
+        hpp('');
     }
 
 }

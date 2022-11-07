@@ -55,10 +55,10 @@ public class DynamicGen implements Gen{
 			        }
 			        WatchEvent<Path> ev = (WatchEvent<Path>)event;
 			        Path filename = ev.context();
-			        if(filename.endsWith("CppGen.class")) {
+			        //if(filename.endsWith("CppGen.class")) {
 			        	loadClass(dir.getParent());
 			        	generate();
-			        }
+			        //}
 			    }
 			    key.reset();
 			}
@@ -104,7 +104,8 @@ public class DynamicGen implements Gen{
 
 	private void generate() {
 		System.out.println("Generating again");
-		FileUtils.deleteFolder("/Users/rajesh/dev/ns/");
+		FileUtils.deleteFolder("/Users/rajesh/dev/ns/dart");
+		FileUtils.deleteFolder("/Users/rajesh/dev/ns/packages");
 		try {
 			Gen ins = genImpl.getConstructor().newInstance();
 			ins.gen(context, path);

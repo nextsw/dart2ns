@@ -314,6 +314,7 @@ public class TypeParser {
   public List<MethodParam> readParams(TypeKind start, TypeKind end, boolean constructor) {
     List<MethodParam> params = ListExt.asList();
     check(start);
+    TypeToken first = tok;
     while (true) {
       List<Comment> comments = eatComments();
       if (this.tok.kind == end || this.tok.kind == TypeKind.Eof) {
@@ -324,6 +325,8 @@ public class TypeParser {
       params.add(param);
       if (this.tok.kind == TypeKind.Comma) {
         next();
+      } else {
+    	  break;
       }
     }
     check(end);
@@ -559,7 +562,8 @@ public class TypeParser {
         init = expr(0l);
       }
       check(TypeKind.Semicolon);
-      return new FieldDecl(annotations, comments, isConst, isFinal, name, isStatic, type, init);
+      return new FieldDecl(
+          annotations, comments, isConst, isExternal, isFinal, name, isStatic, type, init);
     }
     /*
      Method Decal
@@ -645,6 +649,7 @@ public class TypeParser {
             body,
             isConst,
             exp,
+            isExternal,
             isFactory,
             null,
             isFinal,
@@ -884,6 +889,7 @@ public class TypeParser {
               block,
               false,
               exp,
+              false,
               false,
               null,
               false,

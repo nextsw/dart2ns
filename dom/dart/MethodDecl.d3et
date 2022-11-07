@@ -6,6 +6,7 @@ class MethodDecl extends ClassMember{
     Boolean final;
     Boolean static;
     Boolean const;
+    Boolean external;
     Boolean setter;
     Boolean getter;
     Boolean factory;
@@ -33,6 +34,7 @@ class MethodDecl extends ClassMember{
         this.body,
         this.asyncType,
         this.exp,
+        this.external,
     }) : super(name, TopDeclType.Method, '');
     String content;
 

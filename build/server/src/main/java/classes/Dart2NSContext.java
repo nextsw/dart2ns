@@ -76,10 +76,9 @@ public class Dart2NSContext {
   }
 
   public boolean loadPart(String part) {
-    String fullPath = Dart2NSContext.join(this.current.base, part);
-    Part p = new Part(part, this.current);
+    Library lib = loadLibrary(part);
+    Part p = new Part(this.current, part, lib);
     this.current.parts.add(p);
-    _parse(fullPath);
     return false;
   }
 
@@ -125,13 +124,12 @@ public class Dart2NSContext {
   public Library dartLibrary(String path) {
     List<String> split = StringExt.split(path, ":");
     String base = "/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/";
-    String fullPath = base + ListExt.get(split, 1l) + "/" + ListExt.get(split, 1l) + ".dart";
-    return new Library(
-        base + "/" + ListExt.get(split, 1l) + "/",
-        fullPath,
-        path,
-        null,
-        ListExt.get(split, 1l) + ".dart");
+    String sub = ListExt.get(split, 1l);
+    if (StringExt.startsWith(sub, "_", 0l)) {
+      sub = StringExt.substring(sub, 1l, 0l);
+    }
+    String fullPath = base + sub + "/" + sub + ".dart";
+    return new Library(base + "/" + sub + "/", fullPath, path, null, sub + ".dart");
   }
 
   public Library relativeLibrary(String path) {
