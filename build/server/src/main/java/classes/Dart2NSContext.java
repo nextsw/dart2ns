@@ -147,7 +147,6 @@ public class Dart2NSContext {
     List<String> subs = StringExt.split(path, "/");
     ListExt.addAll(parts, subs);
     String fp = ListExt.join(parts, "/");
-    
     path = StringExt.replaceAll(path, ".dart", "");
     subs = StringExt.split(path, "/");
     String packagePath = this.current.packagePath;

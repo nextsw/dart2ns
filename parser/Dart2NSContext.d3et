@@ -140,9 +140,12 @@ server class Dart2NSContext {
         List<String> subs = path.split('/');
         parts.addAll(subs);
         String fp = parts.join('/');
-        String last = parts.removeLast();
-        last = last.replaceAll('.dart', '');
-        parts.add(last);
+        path = path.replaceAll('.dart', '');
+        subs = path.split('/');
+        String packagePath = current.packagePath;
+        parts = packagePath.split('/');
+        parts.removeLast();
+        parts.addAll(subs);
         String pp = parts.join('/');
         return Library(
             parent: current,

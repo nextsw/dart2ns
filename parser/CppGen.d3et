@@ -28,8 +28,8 @@ server class CppGen implements Gen{
 
         lib.exports.forEach((e){
             String path = e.path;
-            if(e.path.startsWith('packages/') || e.path.startsWith('dart/')) {
-                hpp('#include <' + path +'>');
+            if(e.path.startsWith('packages:') || e.path.startsWith('dart:')) {
+                hpp('#include <' + e.lib.packagePath +'.hpp>');
             } else {
                 hpp('#include "' + path +'.hpp"');
             }
@@ -37,8 +37,8 @@ server class CppGen implements Gen{
         hpp('');
         lib.imports.forEach((i){
             String path = i.path;
-            if(i.path.startsWith('packages/') || i.path.startsWith('dart/')) {
-                hpp('#include <' + path +'>');
+            if(i.path.startsWith('packages:') || i.path.startsWith('dart:')) {
+                hpp('#include <' + i.lib.packagePath +'.hpp>');
             } else {
                 hpp('#include "' + path +'.hpp"');
             }
