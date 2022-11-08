@@ -17,37 +17,28 @@ server class CppGen implements Gen{
     }
 
     void genLibrary(Library lib) {
-        String outPath = lib.path;
-        outPath = outPath.replaceAll('.dart', '');
+        String outPath = lib.packagePath;
         List<String> split = outPath.split('/');
         String nameOnly = split.last;
-        String upper = nameOnly.toUpperCase();
-        hpp('#ifndef ' + upper + '_H');
-        hpp('#define ' + upper + '_H');
+        String upper = outPath.replaceAll('/', '_').toUpperCase();
+        hpp('#ifndef ' + upper);
+        hpp('#define ' + upper);
         cpp('#include "' + nameOnly + '.hpp"');
         hpp('#include <memory>');
 
         lib.exports.forEach((e){
-            String path = e.path.replaceAll('.dart', '');
-            if(path.startsWith('package:') || path.startsWith('dart:')) {
-                path = path.split(':')[1];
-                hpp('#include <' + path +'.hpp>');
-            } else if(path.startsWith('dart:')) {
-                path = path.split(':')[1];
-                hpp('#include <' + path + '/' + path +'.hpp>');
+            String path = e.path;
+            if(e.path.startsWith('packages/') || e.path.startsWith('dart/')) {
+                hpp('#include <' + path +'>');
             } else {
                 hpp('#include "' + path +'.hpp"');
             }
         });
         hpp('');
         lib.imports.forEach((i){
-            String path = i.path.replaceAll('.dart', '');
-            if(path.startsWith('package:')) {
-                path = path.split(':')[1];
-                hpp('#include <' + path +'.hpp>');
-            } else if(path.startsWith('dart:')) {
-                path = path.split(':')[1];
-                hpp('#include <' + path + '/' + path +'.hpp>');
+            String path = i.path;
+            if(i.path.startsWith('packages/') || i.path.startsWith('dart/')) {
+                hpp('#include <' + path +'>');
             } else {
                 hpp('#include "' + path +'.hpp"');
             }
@@ -57,8 +48,7 @@ server class CppGen implements Gen{
             hpp('// Parts');
         }
         lib.parts.forEach((i){
-            String path = i.path.replaceAll('.dart', '');
-            hpp('#include "' + path +'.hpp"');
+            hpp('#include "' + i.path +'.hpp"');
         });
         hpp('');
         lib.objects.forEach((obj) {
@@ -78,39 +68,38 @@ server class CppGen implements Gen{
         });
         hpp('');
         hpp('#endif');
-        String outFolder = libOutFolder(lib);
-        FileUtils.writeFile(outFolder + outPath + '.hpp', hppLines.join('\n'));
-        FileUtils.writeFile(outFolder + outPath + '.cpp', cppLines.join('\n'));
+        FileUtils.writeFile(base + lib.packagePath + '.hpp', hppLines.join('\n'));
+        FileUtils.writeFile(base + lib.packagePath + '.cpp', cppLines.join('\n'));
         cppLines.clear();
         hppLines.clear();
     }
 
-    String libOutFolder(Library lib) {
-        if(lib.parent != null) {
-            Library top = lib.parent;
-            while(top.parent != null) {
-                top = top.parent;
-            }
-            String out = libOutFolder(top);
-            String extra = lib.base.replaceAll(top.base, '');
-            out += extra;
-            return out;
-        }
-        if(lib.packagePath.startsWith('package:')) {
-            List<String> split = lib.packagePath.split(':');
-            split = split.last.split('/');
-            return base + 'packages/' + split.first + '/';
-        } else if(lib.packagePath.startsWith('dart:')) {
-            List<String> split = lib.packagePath.split(':');
-            String sub = split.last;
-            if(sub.startsWith('_')){
-                sub = sub.substring(1);
-            }
-            return base + 'dart/' + sub + '/';
-        } else {
-            return base + 'packages/flutter/';
-        }
-    }
+    // String libOutFolder(Library lib) {
+    //     if(lib.parent != null) {
+    //         Library top = lib.parent;
+    //         while(top.parent != null) {
+    //             top = top.parent;
+    //         }
+    //         String out = libOutFolder(top);
+    //         String extra = lib.base.replaceAll(top.base, '');
+    //         out += extra;
+    //         return out;
+    //     }
+    //     if(lib.packagePath.startsWith('package:')) {
+    //         List<String> split = lib.packagePath.split(':');
+    //         split = split.last.split('/');
+    //         return base + 'packages/' + split.first + '/';
+    //     } else if(lib.packagePath.startsWith('dart:')) {
+    //         List<String> split = lib.packagePath.split(':');
+    //         String sub = split.last;
+    //         if(sub.startsWith('_')){
+    //             sub = sub.substring(1);
+    //         }
+    //         return base + 'dart/' + sub + '/';
+    //     } else {
+    //         return base + 'packages/flutter/';
+    //     }
+    // }
     
 
     void cpp(String line) {

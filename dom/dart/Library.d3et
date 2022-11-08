@@ -1,6 +1,4 @@
 class Library {
-    String base;
-    String path;
     String fullPath;
     String packagePath;
     String id;
@@ -10,7 +8,7 @@ class Library {
     List<TopDecl> objects = [];
     List<Part> parts = [];
 
-    Library({this.parent, this.base, this.path, this.fullPath, this.packagePath});
+    Library({this.parent, this.fullPath, this.packagePath});
     
 
     TopDecl get(String name) {

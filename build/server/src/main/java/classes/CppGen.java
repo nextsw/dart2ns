@@ -31,25 +31,20 @@ public class CppGen implements Gen {
   }
 
   public void genLibrary(Library lib) {
-    String outPath = lib.path;
-    outPath = StringExt.replaceAll(outPath, ".dart", "");
+    String outPath = lib.packagePath;
     List<String> split = StringExt.split(outPath, "/");
     String nameOnly = ListExt.last(split);
-    String upper = nameOnly.toUpperCase();
-    hpp("#ifndef " + upper + "_H");
-    hpp("#define " + upper + "_H");
+    String upper = StringExt.replaceAll(outPath, "/", "_").toUpperCase();
+    hpp("#ifndef " + upper);
+    hpp("#define " + upper);
     cpp("#include \"" + nameOnly + ".hpp\"");
     hpp("#include <memory>");
     lib.exports.forEach(
         (e) -> {
-          String path = StringExt.replaceAll(e.path, ".dart", "");
-          if (StringExt.startsWith(path, "package:", 0l)
-              || StringExt.startsWith(path, "dart:", 0l)) {
-            path = ListExt.get(StringExt.split(path, ":"), 1l);
-            hpp("#include <" + path + ".hpp>");
-          } else if (StringExt.startsWith(path, "dart:", 0l)) {
-            path = ListExt.get(StringExt.split(path, ":"), 1l);
-            hpp("#include <" + path + "/" + path + ".hpp>");
+          String path = e.path;
+          if (StringExt.startsWith(e.path, "packages:", 0l)
+              || StringExt.startsWith(e.path, "dart:", 0l)) {
+            hpp("#include <" + e.lib.packagePath + ".hpp>");
           } else {
             hpp("#include \"" + path + ".hpp\"");
           }
@@ -57,13 +52,10 @@ public class CppGen implements Gen {
     hpp("");
     lib.imports.forEach(
         (i) -> {
-          String path = StringExt.replaceAll(i.path, ".dart", "");
-          if (StringExt.startsWith(path, "package:", 0l)) {
-            path = ListExt.get(StringExt.split(path, ":"), 1l);
-            hpp("#include <" + path + ".hpp>");
-          } else if (StringExt.startsWith(path, "dart:", 0l)) {
-            path = ListExt.get(StringExt.split(path, ":"), 1l);
-            hpp("#include <" + path + "/" + path + ".hpp>");
+          String path = i.path;
+          if (StringExt.startsWith(i.path, "packages:", 0l)
+              || StringExt.startsWith(i.path, "dart:", 0l)) {
+            hpp("#include <" + i.lib.packagePath + ".hpp>");
           } else {
             hpp("#include \"" + path + ".hpp\"");
           }
@@ -74,8 +66,7 @@ public class CppGen implements Gen {
     }
     lib.parts.forEach(
         (i) -> {
-          String path = StringExt.replaceAll(i.path, ".dart", "");
-          hpp("#include \"" + path + ".hpp\"");
+          hpp("#include \"" + i.path + ".hpp\"");
         });
     hpp("");
     lib.objects.forEach(
@@ -96,38 +87,10 @@ public class CppGen implements Gen {
         });
     hpp("");
     hpp("#endif");
-    String outFolder = libOutFolder(lib);
-    FileUtils.writeFile(outFolder + outPath + ".hpp", ListExt.join(this.hppLines, "\n"));
-    FileUtils.writeFile(outFolder + outPath + ".cpp", ListExt.join(this.cppLines, "\n"));
+    FileUtils.writeFile(this.base + lib.packagePath + ".hpp", ListExt.join(this.hppLines, "\n"));
+    FileUtils.writeFile(this.base + lib.packagePath + ".cpp", ListExt.join(this.cppLines, "\n"));
     this.cppLines.clear();
     this.hppLines.clear();
-  }
-
-  public String libOutFolder(Library lib) {
-    if (lib.parent != null) {
-      Library top = lib.parent;
-      while (top.parent != null) {
-        top = top.parent;
-      }
-      String out = libOutFolder(top);
-      String extra = StringExt.replaceAll(lib.base, top.base, "");
-      out += extra;
-      return out;
-    }
-    if (StringExt.startsWith(lib.packagePath, "package:", 0l)) {
-      List<String> split = StringExt.split(lib.packagePath, ":");
-      split = StringExt.split(ListExt.last(split), "/");
-      return this.base + "packages/" + ListExt.first(split) + "/";
-    } else if (StringExt.startsWith(lib.packagePath, "dart:", 0l)) {
-      List<String> split = StringExt.split(lib.packagePath, ":");
-      String sub = ListExt.last(split);
-      if (StringExt.startsWith(sub, "_", 0l)) {
-        sub = StringExt.substring(sub, 1l, 0l);
-      }
-      return this.base + "dart/" + sub + "/";
-    } else {
-      return this.base + "packages/flutter/";
-    }
   }
 
   public void cpp(String line) {

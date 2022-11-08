@@ -314,7 +314,6 @@ public class TypeParser {
   public List<MethodParam> readParams(TypeKind start, TypeKind end, boolean constructor) {
     List<MethodParam> params = ListExt.asList();
     check(start);
-    TypeToken first = tok;
     while (true) {
       List<Comment> comments = eatComments();
       if (this.tok.kind == end || this.tok.kind == TypeKind.Eof) {
@@ -326,7 +325,7 @@ public class TypeParser {
       if (this.tok.kind == TypeKind.Comma) {
         next();
       } else {
-    	  break;
+        break;
       }
     }
     check(end);

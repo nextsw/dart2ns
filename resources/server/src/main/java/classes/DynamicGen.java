@@ -18,11 +18,17 @@ public class DynamicGen implements Gen{
 	Class<Gen> genImpl;
 	private Dart2NSContext context;
 	private String path;
+	private String monitorDir;
+	
+	public DynamicGen(String monitorDir) {
+		this.monitorDir = monitorDir;
+	}
 
 	@Override
 	public void gen(Dart2NSContext context, String path) {
 		this.context = context;
 		this.path = path;
+		this.monitorDir = monitorDir;
 		try {
 			genImpl = (Class<Gen>) Class.forName("classes.CppGen");
 		} catch (ClassNotFoundException e) {
@@ -35,7 +41,7 @@ public class DynamicGen implements Gen{
 	private void monitor() {
 		try {
 			WatchService watcher = FileSystems.getDefault().newWatchService();
-			Path dir = Path.of("/Users/rajesh/dev/dart2ns/build/server/build/classes/java/main/classes");
+			Path dir = Path.of(monitorDir);
 			dir.register(watcher,
 					StandardWatchEventKinds.ENTRY_CREATE,
 					StandardWatchEventKinds.ENTRY_MODIFY);
@@ -104,8 +110,8 @@ public class DynamicGen implements Gen{
 
 	private void generate() {
 		System.out.println("Generating again");
-		FileUtils.deleteFolder("/Users/rajesh/dev/ns/dart");
-		FileUtils.deleteFolder("/Users/rajesh/dev/ns/packages");
+		FileUtils.deleteFolder(this.path + "dart");
+		FileUtils.deleteFolder(this.path + "packages");
 		try {
 			Gen ins = genImpl.getConstructor().newInstance();
 			ins.gen(context, path);

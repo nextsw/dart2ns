@@ -12,11 +12,14 @@ public class Dart2NSContext {
   public List<Library> libs = ListExt.asList();
   public List<Library> stack = ListExt.asList();
   public Library current;
-  public static final String pkgBase =
-      "/Users/rajesh/Downloads/flutter/.pub-cache/hosted/pub.dartlang.org/";
+  public String flutterHome;
+  public String pkgBase = "/Users/rajesh/Downloads/flutter/.pub-cache/hosted/pub.dartlang.org/";
   public static Map<String, String> packages = Dart2NSContext.preparePackages();
 
-  public Dart2NSContext() {}
+  public Dart2NSContext(String flutterHome) {
+    this.flutterHome = flutterHome;
+    this.pkgBase = flutterHome + ".pub-cache/hosted/pub.dartlang.org/";
+  }
 
   public static Map<String, String> preparePackages() {
     Map<String, String> pkgs = MapExt.Map();
@@ -28,13 +31,11 @@ public class Dart2NSContext {
     return pkgs;
   }
 
-  public void start(String base, String path) {
-    String fullPath = base + path;
-    List<String> parts = StringExt.split(fullPath, "/");
-    String last = ListExt.removeLast(parts);
-    Library lib = new Library(ListExt.join(parts, "/") + "/", fullPath, path, null, last);
+  public void start(String packagePath) {
+    Library lib = new Library(this.flutterHome + packagePath + ".dart", packagePath, null);
     this.libs.add(lib);
     this.current = lib;
+    loadImport("dart:core");
     _parse(lib.fullPath);
   }
 
@@ -58,6 +59,9 @@ public class Dart2NSContext {
     if (loadedLib == null) {
       this.libs.add(lib);
       _push(lib);
+      if (!(Objects.equals(path, "dart:core"))) {
+        loadImport("dart:core");
+      }
       _parse(lib.fullPath);
       _pop();
       D3ELogger.info("Resuming : " + this.current.fullPath);
@@ -75,15 +79,17 @@ public class Dart2NSContext {
     this.current = ListExt.removeLast(this.stack);
   }
 
-  public boolean loadPart(String part) {
-    Library lib = loadLibrary(part);
-    Part p = new Part(this.current, part, lib);
+  public boolean loadPart(String path) {
+    Library lib = loadLibrary(path);
+    path = StringExt.replaceAll(path, ".dart", "");
+    Part p = new Part(this.current, path, lib);
     this.current.parts.add(p);
     return false;
   }
 
   public Export loadExport(String path) {
     Library lib = loadLibrary(path);
+    path = StringExt.replaceAll(path, ".dart", "");
     Export exp = new Export(this.current, path, lib);
     this.current.exports.add(exp);
     return exp;
@@ -91,6 +97,7 @@ public class Dart2NSContext {
 
   public Import loadImport(String path) {
     Library lib = loadLibrary(path);
+    path = StringExt.replaceAll(path, ".dart", "");
     Import imp = new Import(this.current, path, lib);
     this.current.imports.add(imp);
     return imp;
@@ -112,30 +119,42 @@ public class Dart2NSContext {
     List<String> pathItems = StringExt.split(ListExt.get(split, 1l), "/");
     String first = ListExt.first(pathItems);
     String version = Dart2NSContext.packages.get(first);
-    String newBase = Dart2NSContext.pkgBase + first + "-" + version + "/lib/";
+    String newBase = this.pkgBase + first + "-" + version + "/lib/";
     if (Objects.equals(ListExt.get(pathItems, 0l), "flutter")) {
-      newBase = "/Users/rajesh/Downloads/flutter/packages/flutter/lib/";
+      newBase = this.flutterHome + "packages/flutter/lib/";
     }
     ListExt.removeAt(pathItems, 0l);
     String fullPath = newBase + ListExt.join(pathItems, "/");
-    return new Library(newBase, fullPath, path, null, ListExt.join(pathItems, "/"));
+    return new Library(fullPath, "packages/" + first + "/" + first, null);
   }
 
   public Library dartLibrary(String path) {
     List<String> split = StringExt.split(path, ":");
-    String base = "/Users/rajesh/Downloads/flutter/bin/cache/pkg/sky_engine/lib/";
+    String base = this.flutterHome + "bin/cache/pkg/sky_engine/lib/";
     String sub = ListExt.get(split, 1l);
     if (StringExt.startsWith(sub, "_", 0l)) {
       sub = StringExt.substring(sub, 1l, 0l);
     }
     String fullPath = base + sub + "/" + sub + ".dart";
-    return new Library(base + "/" + sub + "/", fullPath, path, null, sub + ".dart");
+    String packagePath = "dart/" + sub + "/" + sub;
+    return new Library(fullPath, packagePath, null);
   }
 
   public Library relativeLibrary(String path) {
-    String fullPath = this.current.base + path;
+    String fullPath = this.current.fullPath;
     List<String> parts = StringExt.split(fullPath, "/");
-    String last = ListExt.removeLast(parts);
-    return new Library(ListExt.join(parts, "/") + "/", fullPath, path, this.current, last);
+    ListExt.removeLast(parts);
+    List<String> subs = StringExt.split(path, "/");
+    ListExt.addAll(parts, subs);
+    String fp = ListExt.join(parts, "/");
+    
+    path = StringExt.replaceAll(path, ".dart", "");
+    subs = StringExt.split(path, "/");
+    String packagePath = this.current.packagePath;
+    parts = StringExt.split(packagePath, "/");
+    ListExt.removeLast(parts);
+    ListExt.addAll(parts, subs);
+    String pp = ListExt.join(parts, "/");
+    return new Library(fp, pp, this.current);
   }
 }
