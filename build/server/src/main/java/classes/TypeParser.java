@@ -43,6 +43,10 @@ public class TypeParser {
     } catch (RuntimeException e) {
       D3ELogger.error(e.getMessage());
     }
+    res.forEach(
+        (i) -> {
+          context.add(i);
+        });
     return res;
   }
 
@@ -2049,7 +2053,7 @@ public class TypeParser {
           error("This is not a valid statement");
         }
       } else {
-        Expression index = indexExpr(exp, false, false);
+        Expression index = indexExpr(null, false, false);
         Assignment assign = readAssignment(index);
         exp.calls.add(assign);
       }

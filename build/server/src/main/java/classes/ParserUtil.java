@@ -70,7 +70,7 @@ public class ParserUtil {
     }
 
 	public static boolean isTypeName(String lit) {
-		if(lit.charAt(0) == '_') {
+		if(lit.charAt(0) == '_' && lit.length() > 1) {
 			return Character.isUpperCase(lit.charAt(1));
 		} else {
 			return Character.isUpperCase(lit.charAt(0));

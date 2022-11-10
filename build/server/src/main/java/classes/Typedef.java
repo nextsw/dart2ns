@@ -9,7 +9,7 @@ public class Typedef extends TopDecl {
   public List<Annotation> annotations = ListExt.asList();
 
   public Typedef(DefType type, FunctionType fnType) {
-    super(type.name, TopDeclType.Typedef, "");
+    super(fnType.name, TopDeclType.Typedef, "");
     this.type = type;
     this.fnType = fnType;
   }

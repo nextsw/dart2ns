@@ -1,0 +1,13 @@
+server class Scope {
+    Scope parent;
+    Map<String, DataType> variables = Map();
+    Map<String, String> casts = Map();
+    ClassDecl thisType;
+
+    Scope({this.parent, this.thisType});
+
+    void add(String name, DataType type){
+        variables.set(name, type);
+    }
+
+}

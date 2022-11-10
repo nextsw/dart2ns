@@ -13,8 +13,9 @@ public class Dart2NSContext {
   public List<Library> stack = ListExt.asList();
   public Library current;
   public String flutterHome;
-  public String pkgBase = "/Users/rajesh/Downloads/flutter/.pub-cache/hosted/pub.dartlang.org/";
+  public String pkgBase;
   public static Map<String, String> packages = Dart2NSContext.preparePackages();
+  public Map<String, TopDecl> objects = MapExt.Map();
 
   public Dart2NSContext(String flutterHome) {
     this.flutterHome = flutterHome;
@@ -29,6 +30,14 @@ public class Dart2NSContext {
     MapExt.set(pkgs, "meta", "1.8.0");
     MapExt.set(pkgs, "vector_math", "2.1.2");
     return pkgs;
+  }
+
+  public void add(TopDecl obj) {
+    MapExt.set(this.objects, obj.name, obj);
+  }
+
+  public TopDecl get(String name) {
+    return this.objects.get(name);
   }
 
   public void start(String packagePath) {

@@ -5,4 +5,5 @@ import java.util.List;
 
 public abstract class Expression {
   public List<Comment> comments = ListExt.asList();
+  public DataType resolvedType;
 }

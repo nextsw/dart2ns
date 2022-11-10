@@ -10,6 +10,8 @@ server class Dart2NSContext {
 
     static Map<String, String> packages = preparePackages();
 
+    Map<String, TopDecl> objects = Map();
+
     Dart2NSContext(this.flutterHome){
         pkgBase = flutterHome + '.pub-cache/hosted/pub.dartlang.org/';
     }
@@ -23,6 +25,14 @@ server class Dart2NSContext {
 		pkgs.set('vector_math', '2.1.2');
 		return pkgs;
 	}
+
+    void add(TopDecl obj) {
+        objects.set(obj.name, obj);
+    }
+    TopDecl get(String name) {
+        return objects.get(name);
+    }
+
 
     void start(String packagePath) {
         Library lib = Library(

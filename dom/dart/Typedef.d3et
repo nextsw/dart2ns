@@ -2,5 +2,5 @@ class Typedef extends TopDecl {
     DefType type;
     FunctionType fnType;
     List<Annotation> annotations = [];
-    Typedef(this.type, this.fnType) : super(type.name, TopDeclType.Typedef, '');
+    Typedef(this.type, this.fnType) : super(fnType.name, TopDeclType.Typedef, '');
 }

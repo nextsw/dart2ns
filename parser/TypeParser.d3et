@@ -43,6 +43,7 @@ server class TypeParser {
         } catch(e) {
             D3ELogger.error(e.message);
         }
+        res.forEach(i => context.add(i));
         return res;
     }
 
@@ -2115,7 +2116,7 @@ server class TypeParser {
                     error('This is not a valid statement');
                 }
             } else {
-                Expression index = indexExpr(exp);
+                Expression index = indexExpr(null);
                 Assignment assign = readAssignment(index);
                 exp.calls.add(assign);
             }

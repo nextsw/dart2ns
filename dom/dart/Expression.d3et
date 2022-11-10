@@ -1,3 +1,4 @@
 abstract class Expression {
-    List<Comment> comments = [];    
+    List<Comment> comments = [];   
+    DataType resolvedType; 
 }

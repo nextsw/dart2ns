@@ -1,5 +1,6 @@
 class TypeParam {
     String name;
     DataType extendType;
+    DataType resolvedType;
     TypeParam({this.name, this.extendType});
 }
