@@ -368,17 +368,25 @@ public class CppGen implements Gen {
     List<MethodParam> out = ListExt.asList();
     ListExt.addAll(out, params.positionalParams);
     ListExt.addAll(out, params.optionalParams);
+    ListExt.sort(
+        params.namedParams,
+        (a, b) -> {
+          String value$ = a.name;
+          if (value$ == null) {
+            value$ = "";
+          }
+          String value$1 = b.name;
+          if (value$1 == null) {
+            value$1 = "";
+          }
+          return StringExt.compareTo((value$), (value$1));
+        });
     ListExt.addAll(out, params.namedParams);
     out.forEach(
         (i) -> {
           if (i.name == null) {
             i.name = "";
           }
-        });
-    ListExt.sort(
-        out,
-        (a, b) -> {
-          return StringExt.compareTo(a.name, b.name);
         });
     return out;
   }
@@ -607,7 +615,7 @@ public class CppGen implements Gen {
     params.forEach(
         (p) -> {
           if (p.dataType == null) {
-            if (Objects.equals(p.thisToken, "this") && c != null) {
+            if (p.thisToken != null && c != null) {
               thisParams.add(p);
               DataType type = getFieldType(c, p.name);
               xp.apply(dataTypeToString(type, false, null));
@@ -1234,7 +1242,13 @@ public class CppGen implements Gen {
 
   public void genAssignment(Assignment exp, long depth, Xp xp) {
     genExp(exp.left, depth, xp);
-    xp.apply(" = ");
+    xp.apply(" ");
+    if (Objects.equals(exp.op, "??=")) {
+      xp.apply("|=");
+    } else {
+      xp.apply(exp.op);
+    }
+    xp.apply(" ");
     genExp(exp.right, depth, xp);
     exp.resolvedType = exp.left.resolvedType;
   }
@@ -1261,7 +1275,7 @@ public class CppGen implements Gen {
     genExp(exp.left, depth, xp);
     xp.apply(" ");
     if (Objects.equals(exp.op, "??")) {
-      xp.apply("or");
+      xp.apply("|");
     } else {
       xp.apply(exp.op);
     }
@@ -1481,22 +1495,39 @@ public class CppGen implements Gen {
     return null;
   }
 
-  public boolean hasMember(ClassDecl c, String name) {
+  public ClassMember getMember(ClassDecl c, String name) {
     if (c == null) {
-      return false;
+      return null;
     }
-    if (ListExt.any(
-        c.members,
-        (m) -> {
-          return Objects.equals(m.name, name);
-        })) {
-      return true;
+    ClassMember cm =
+        ListExt.firstWhere(
+            c.members,
+            (m) -> {
+              return Objects.equals(m.name, name);
+            },
+            null);
+    if (cm != null) {
+      return cm;
     }
     if (c.extendType != null) {
       ClassDecl parent = ((ClassDecl) this.context.get(c.extendType.name));
-      return hasMember(parent, name);
+      if (!(Objects.equals(parent, c))) {
+        return getMember(parent, name);
+      }
     }
-    return false;
+    for (DataType impl : c.impls) {
+      ClassDecl parent = ((ClassDecl) this.context.get(impl.name));
+      if (!(Objects.equals(parent, c))) {
+        return getMember(parent, name);
+      }
+    }
+    for (DataType impl : c.mixins) {
+      ClassDecl parent = ((ClassDecl) this.context.get(impl.name));
+      if (!(Objects.equals(parent, c))) {
+        return getMember(parent, name);
+      }
+    }
+    return null;
   }
 
   public void genFieldOrEnumExpression(FieldOrEnumExpression exp, long depth, Xp xp) {
@@ -1552,13 +1583,7 @@ public class CppGen implements Gen {
     }
     DataType fieldType = fieldTypeFromScope(exp.name);
     if (fieldType == null && onType != null) {
-      ClassMember cm =
-          ListExt.firstWhere(
-              onType.members,
-              (m) -> {
-                return Objects.equals(m.name, exp.name);
-              },
-              null);
+      ClassMember cm = getMember(onType, exp.name);
       if (cm instanceof MethodDecl) {
         MethodDecl md = ((MethodDecl) cm);
         if (md.getter) {
@@ -1706,7 +1731,6 @@ public class CppGen implements Gen {
     if (exp instanceof Block) {
       genBlock(((Block) exp), depth, xp, localScope);
     } else {
-      xp.apply(tab(depth));
       if (localScope == null) {
         localScope = new Scope(this.scope, null);
       }
@@ -1850,7 +1874,7 @@ public class CppGen implements Gen {
         }
       }
     } else {
-      if (this.instanceClass != null && hasMember(this.instanceClass, exp.name)) {
+      if (this.instanceClass != null && getMember(this.instanceClass, exp.name) != null) {
         onType = this.instanceClass;
       }
     }
@@ -1875,6 +1899,9 @@ public class CppGen implements Gen {
             xp.apply(", ");
           }
         });
+    if (ListExt.isNotEmpty(exp.positionArgs) && ListExt.isNotEmpty(exp.namedArgs)) {
+      xp.apply(", ");
+    }
     exp.namedArgs.forEach(
         (a) -> {
           genExp(a.value, depth, xp);
@@ -2024,14 +2051,11 @@ public class CppGen implements Gen {
   }
 
   public DataType getFieldType(ClassDecl c, String name) {
-    return (((FieldDecl)
-            ListExt.firstWhere(
-                c.members,
-                (m) -> {
-                  return (m instanceof FieldDecl) && Objects.equals(m.name, name);
-                },
-                null)))
-        .type;
+    ClassMember member = getMember(c, name);
+    if (member instanceof FieldDecl) {
+      return (((FieldDecl) member)).type;
+    }
+    return null;
   }
 
   public void genTypeDef(Typedef t) {}

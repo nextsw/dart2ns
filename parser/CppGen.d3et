@@ -297,13 +297,13 @@ server class CppGen implements Gen{
         List<MethodParam> out = [];
         out.addAll(params.positionalParams);
         out.addAll(params.optionalParams);
+        params.namedParams.sort((a,b) => (a.name?? '').compareTo((b.name ?? '')));
         out.addAll(params.namedParams);
         out.forEach((i){
             if(i.name == null){
                 i.name = '';
             }
         });
-        out.sort((a,b) => a.name.compareTo(b.name));
         return out;
     }
 
@@ -480,7 +480,7 @@ server class CppGen implements Gen{
         List<MethodParam> params = sortMethodParams(mp);
         params.forEach((p) {
             if(p.dataType == null) {
-                if(p.thisToken == 'this' && c != null){
+                if(p.thisToken != null && c != null){
                     thisParams.add(p);
                     DataType type = getFieldType(c, p.name);
                     xp(dataTypeToString(type));
@@ -926,7 +926,13 @@ server class CppGen implements Gen{
     }
     void genAssignment(Assignment exp, Integer depth, Xp xp) {
         genExp(exp.left, depth, xp);
-        xp(' = ');
+        xp(' ');
+        if(exp.op == '??=') {
+            xp('|=');
+        } else {
+            xp(exp.op);
+        }
+        xp(' ');
         genExp(exp.right, depth, xp);
         exp.resolvedType = exp.left.resolvedType;
     }
@@ -950,7 +956,7 @@ server class CppGen implements Gen{
         genExp(exp.left, depth, xp);
         xp(' ');
         if(exp.op == '??') {
-            xp('or');
+            xp('|');
         } else {
             xp(exp.op);
         }
@@ -1122,18 +1128,33 @@ server class CppGen implements Gen{
         }
         return null;
     }
-    Boolean hasMember(ClassDecl c, String name) {
+    ClassMember getMember(ClassDecl c, String name) {
         if(c == null) {
-            return false;
+            return null;
         }
-        if(c.members.any(m => m.name == name)){
-            return true;
+        ClassMember cm = c.members.firstWhere(m => m.name == name);
+        if(cm != null){
+            return cm;
         }
         if(c.extendType != null) {
             ClassDecl parent = context.get(c.extendType.name) as ClassDecl;
-            return hasMember(parent, name);
+            if(parent != c) {
+                return getMember(parent, name);
+            }
         }
-        return false;
+        for(DataType impl in c.impls) {
+            ClassDecl parent = context.get(impl.name) as ClassDecl;
+            if(parent != c) {
+                return getMember(parent, name);
+            }
+        }
+        for(DataType impl in c.mixins) {
+            ClassDecl parent = context.get(impl.name) as ClassDecl;
+            if(parent != c) {
+                return getMember(parent, name);
+            }
+        }
+        return null;
     }
     void genFieldOrEnumExpression(FieldOrEnumExpression exp, Integer depth, Xp xp) {
         ClassDecl onType = null;
@@ -1187,7 +1208,7 @@ server class CppGen implements Gen{
         }
         DataType fieldType = fieldTypeFromScope(exp.name);
         if(fieldType == null && onType != null) {
-            ClassMember cm = onType.members.firstWhere(m => m.name == exp.name);
+            ClassMember cm = getMember(onType, exp.name);
             if(cm is MethodDecl){
                 MethodDecl md = cm as MethodDecl;
                 if(md.getter) {
@@ -1313,7 +1334,6 @@ server class CppGen implements Gen{
             genBlock(exp as Block, depth, xp,
             localScope: localScope);
         } else {
-            xp(tab(depth));
             if(localScope == null) {
                 localScope = Scope(parent: scope);
             }
@@ -1432,7 +1452,7 @@ server class CppGen implements Gen{
             }
         } else {
             if(instanceClass != null 
-                && hasMember(instanceClass, exp.name)){
+                && getMember(instanceClass, exp.name) != null){
                 onType = instanceClass;
             }
         }
@@ -1456,6 +1476,9 @@ server class CppGen implements Gen{
                 xp(', ');
             }
         });
+        if(exp.positionArgs.isNotEmpty && exp.namedArgs.isNotEmpty) {
+            xp(', ');
+        }
         exp.namedArgs.forEach((a){
             genExp(a.value, depth, xp);
             if(a != exp.namedArgs.last) {
@@ -1583,7 +1606,11 @@ server class CppGen implements Gen{
 
 
     DataType getFieldType(ClassDecl c, String name){
-        return (c.members.firstWhere(m => (m is FieldDecl) && m.name == name) as FieldDecl).type;
+        ClassMember member = getMember(c, name);
+        if(member is FieldDecl) {
+            return (member as FieldDecl).type;
+        }
+        return null;
     }
 
     void genTypeDef(Typedef t) {

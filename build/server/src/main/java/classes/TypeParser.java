@@ -858,7 +858,7 @@ public class TypeParser {
       if (type == null || this.tok.kind != TypeKind.Name) {
         return null;
       }
-      if (!isTypeName(type.name)) {
+      if (type instanceof ValueType && !isTypeName(type.name)) {
         return null;
       }
     }

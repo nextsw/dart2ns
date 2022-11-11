@@ -866,7 +866,7 @@ server class TypeParser {
             if (type == null || this.tok.kind != TypeKind.Name) {
                 return null;
             }
-            if(!isTypeName(type.name)) {
+            if(type is ValueType && !isTypeName(type.name)) {
                 return null;
             }
         }

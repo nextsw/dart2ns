@@ -10,8 +10,8 @@ public class Main {
 		}
 		Dart2NSContext context = new Dart2NSContext(flutterHome);
 		context.start("packages/flutter/lib/widgets");
-		//Gen gen = new CppGen();
-		Gen gen = new DynamicGen(monitorDir);
+		Gen gen = new CppGen();
+//		Gen gen = new DynamicGen(monitorDir);
 		gen.gen(context, outDir);
 		System.out.println();
 	}
