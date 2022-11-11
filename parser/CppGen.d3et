@@ -13,6 +13,7 @@ server class CppGen implements Gen{
         'long',
         'bool',
         'auto',
+        'char',
     ];
     DataType objectType = ValueType('Object');
     DataType booleanType = ValueType('bool');
@@ -34,6 +35,11 @@ server class CppGen implements Gen{
         } else {
             return s;
         }
+    }
+
+    DataType ofUnknownType(){
+        D3ELogger.error('Unknown type');
+        return objectType;
     }
 
     void gen(Dart2NSContext context, String base) {
@@ -148,7 +154,7 @@ server class CppGen implements Gen{
             return '';
         }
 
-        return 'template<' + params.params.map(p => 'typename ' + typeParamToString(p)).join(', ') +'> ';
+        return 'template<' + params.params.map(p => 'typename ' + typeParamToString(p)).join(', ') +'>\n';
     }
     String typeArgsToString(List<DataType> args){
         if(args.isEmpty) {
@@ -181,19 +187,11 @@ server class CppGen implements Gen{
     }
 
     void functionTypeToString(FunctionType f, String name, Xp xp) {
+        xp('std::function<');
         if(f.returnType == null) {
             xp('void ');
         } else {
             xp(dataTypeToString(f.returnType));
-        }
-        xp(' ');
-        if(name == null) {
-            xp('Function');
-        } else {
-            xp(name);
-        }
-        if(f.typeArgs.isNotEmpty){
-            hp(typeArgsToString(f.typeArgs));
         }
         xp('(');
         if(f.params != null) {
@@ -202,7 +200,7 @@ server class CppGen implements Gen{
                 return paramToString(p);
             }).join(', '));
         }
-        xp(')');
+        xp(')>');
     }
 
     String defTypeToString(DefType d) {
@@ -286,13 +284,10 @@ server class CppGen implements Gen{
         } else {
             out += 'Unknown';
             if(scope != null) {
-                scope.add(p.name, objectType);
+                scope.add(p.name, ofUnknownType());
             }
         }
         String name = p.name;
-        if(p.dataType != null && (p.dataType is FunctionType)) {
-            name = '';
-        }
         out += ' ';
         out += variable(name);
         return out;
@@ -393,6 +388,9 @@ server class CppGen implements Gen{
         if(c != null && c.generics != null) {
             cp(generics(c.generics));
         }
+        if(m.generics != null){
+            cp(generics(m.generics));
+        }
         if(m.returnType == null) {
             if(c != null && c.name == m.name) {
 
@@ -420,16 +418,13 @@ server class CppGen implements Gen{
                 cp('Cls');
             }
         }
-        if(m.generics != null){
-            cp(generics(m.generics));
-        }
         cp('(');
         
+        scope = Scope(thisType: c);
         if(m.params != null) {
             genMethodParams(m.params, c, x => cp(x));
         }
         cp(')');
-        scope = Scope(parent:scope, thisType: c);
         if(isConstructor) {
             if(m.init != null) {
                 MethodCall superCall = removeSuperCall(m.init);
@@ -476,7 +471,6 @@ server class CppGen implements Gen{
             cl(';');
             cl('}');
         }
-        scope = scope.parent;
         cpp('');
         tempCount = 0;
     }
@@ -496,7 +490,7 @@ server class CppGen implements Gen{
                 } else {
                     xp('Unknown');
                     if(scope != null) {
-                        scope.add(p.name, objectType);
+                        scope.add(p.name, ofUnknownType());
                     }
                 }
                 xp(' ');
@@ -550,7 +544,9 @@ server class CppGen implements Gen{
         if(exp == null) {
             return;
         }
-        if(exp is ArrayAccess) {
+        if(exp is FieldOrEnumExpression) {
+            genFieldOrEnumExpression(exp as FieldOrEnumExpression, depth, xp);
+        } else if(exp is ArrayAccess) {
             genArrayAccess(exp as ArrayAccess, depth, xp);
         } else if(exp is ArrayExpression) {
             genArrayExpression(exp as ArrayExpression, depth, xp);
@@ -578,8 +574,6 @@ server class CppGen implements Gen{
             genDoWhileLoop(exp as DoWhileLoop, depth, xp);
         } else if(exp is DynamicTypeExpression) {
             genDynamicTypeExpression(exp as DynamicTypeExpression, depth, xp);
-        } else if(exp is FieldOrEnumExpression) {
-            genFieldOrEnumExpression(exp as FieldOrEnumExpression, depth, xp);
         } else if(exp is FnCallExpression) {
             genFnCallExpression(exp as FnCallExpression, depth, xp);
         } else if(exp is ForEachLoop) {
@@ -606,6 +600,8 @@ server class CppGen implements Gen{
             genPostfixExpression(exp as PostfixExpression, depth, xp);
         } else if(exp is PrefixExpression) {
             genPrefixExpression(exp as PrefixExpression, depth, xp);
+        } else if(exp is ThrowStatement) {
+            genThrowStatement(exp as ThrowStatement, depth, xp);
         } else if(exp is RethrowStatement) {
             genRethrowStatement(exp as RethrowStatement, depth, xp);
         } else if(exp is Return) {
@@ -644,7 +640,7 @@ server class CppGen implements Gen{
         xp('[');
         genExp(exp.index, depth, xp);
         xp(']');
-        exp.resolvedType = (exp.on.resolvedType as ValueType).args.first ?? objectType;
+        exp.resolvedType = (exp.on.resolvedType as ValueType).args.first ?? ofUnknownType();
     }
 
     Integer temp(){
@@ -921,7 +917,7 @@ server class CppGen implements Gen{
         if(exp.enforceType != null) {
             exp.resolvedType = exp.enforceType;
         } else{
-            exp.resolvedType = objectType;
+            exp.resolvedType = ofUnknownType();
             D3ELogger.info('Need to check Arrray Objects common type');
         }
     }
@@ -943,12 +939,12 @@ server class CppGen implements Gen{
         if(t is ValueType) {
             ValueType vt = t as ValueType;
             if(vt.args.length <= index) {
-                return objectType;
+                return ofUnknownType();
             } else {
                 return vt.args[index];
             }
         }
-        return objectType;
+        return ofUnknownType();
     }
     void genBinaryExpression(BinaryExpression exp, Integer depth, Xp xp) {
         genExp(exp.left, depth, xp);
@@ -966,7 +962,7 @@ server class CppGen implements Gen{
                 default: exp.left.resolvedType
             };
         } else {
-            exp.resolvedType = objectType;
+            exp.resolvedType = ofUnknownType();
             D3ELogger.error('Invalid binary exp');
         }
     }
@@ -976,14 +972,15 @@ server class CppGen implements Gen{
         return left;
     }
     void genBlock(Block exp, Integer depth, Xp xp,
-        {Scope scope}
+        {Scope localScope}
         ) {
         if(exp == null){
             return;
         }
-        if(scope == null) {
-            scope = Scope(parent: scope);
+        if(localScope == null) {
+            localScope = Scope(parent: scope);
         }
+        scope = localScope;
         xp('{\n');
         exp.statements.forEach((s){
             xp(tab(depth + 1));
@@ -1011,16 +1008,13 @@ server class CppGen implements Gen{
         xp(tab(depth));
         xp('}');
         scope = scope.parent;
-        exp.resolvedType = objectType;
     }
     void genBreak(Break exp, Integer depth, Xp xp) {
-        xp(tab(depth));
         xp('break');
         if(exp.label != null){
             xp(' ');
             xp(exp.label);
         }
-        exp.resolvedType = objectType;
     }
     void genCascadeExp(CascadeExp exp, Integer depth, Xp xp) {
         String tempVal = temp().toString();
@@ -1061,7 +1055,7 @@ server class CppGen implements Gen{
             xp(' ');
             xp(exp.label);
         }
-        exp.resolvedType = objectType;
+        exp.resolvedType = ofUnknownType();
     }
     void genDeclaration(Declaration exp, Integer depth, Xp xp) {
         if(exp.type != null) {
@@ -1079,14 +1073,16 @@ server class CppGen implements Gen{
                 resolvedType = n.value.resolvedType;
             }
             if(exp.type == null || exp.type.name == 'var') {
-                scope.add(n.name, resolvedType ?? objectType);
+                scope.add(n.name, resolvedType ?? ofUnknownType());
+            } else {
+                scope.add(n.name, exp.type);
             }
             if(exp.names.last != n) {
                 xp(', ');
             }
         }
         if(exp.type == null || exp.type.name == 'var') {
-            exp.resolvedType = resolvedType ?? objectType;
+            exp.resolvedType = resolvedType ?? ofUnknownType();
         } else {
             exp.resolvedType = exp.type;
         }
@@ -1097,11 +1093,9 @@ server class CppGen implements Gen{
         xp(' while (');
         genExp(exp.test, depth, xp);
         xp(')');
-        exp.resolvedType = objectType;
     }
     void genDynamicTypeExpression(DynamicTypeExpression exp, Integer depth, Xp xp) {
         xp('DynamicTypeExpression');
-        exp.resolvedType = objectType;
     }
 
     String getRecentCast(String name) {
@@ -1151,23 +1145,8 @@ server class CppGen implements Gen{
             } else {
                 // D3ELogger.error('Resolved Type is not Class in FEExp');
             }
-            Boolean shouldCast = !hasMember(onType, exp.name);
-            ClassDecl castType = null;
-            if(shouldCast){
-                castType = computeCastType(exp.on);
-                if(castType == null){
-                    shouldCast = false;
-                }
-            }
-            if(shouldCast) {
-                xp('as<');
-                xp(castType.name);
-                xp('Cls>(');
-            }
             genExp(exp.on, depth, xp);
-            if(shouldCast) {
-                xp(')');
-            }
+            
             if(exp.checkNull) {
                 xp('?->');
             } else if(exp.notNull) {
@@ -1181,11 +1160,27 @@ server class CppGen implements Gen{
                 }
             }
         }
-        if(ParserUtil.isTypeName(exp.name)){
+        Boolean shouldCast = scope.casts.containsKey(exp.name);
+        ClassDecl castType = null;
+        if(shouldCast){
+            castType = computeCastType(exp);
+            if(castType == null){
+                shouldCast = false;
+            }
+        }
+        if(shouldCast) {
+            xp('as<');
+            xp(castType.name);
+            xp('Cls>(');
+        }
+        if(ParserUtil.isTypeName(exp.name) && exp.name != exp.name.toUpperCase()){
             xp(exp.name);
             xp('Cls');
         } else {
             xp(variable(exp.name));
+        }
+        if(shouldCast) {
+            xp(')');
         }
         if(onType == null) {
             onType = instanceClass;
@@ -1199,15 +1194,19 @@ server class CppGen implements Gen{
                     xp('()');
                     exp.resolvedType = resolveType(onType, md.returnType);
                 } else {
-                    exp.resolvedType = objectType;
+                    exp.resolvedType = ofUnknownType();
                 }
             } else {
                 FieldDecl field = cm as FieldDecl;
                 if(field != null) {
                     exp.resolvedType = resolveType(onType, field.type);
                 } else {
-                    D3ELogger.error('No field found: ' + exp.name + ' in ' + onType.name);
-                    exp.resolvedType = objectType;
+                    if(exp.name == 'this') {
+                        exp.resolvedType = ValueType(instanceClass.name);
+                    } else {
+                        D3ELogger.error('No field found: ' + exp.name + ' in ' + onType.name);
+                        exp.resolvedType = ofUnknownType();
+                    }
                 }
             }
         } else if(fieldType != null) {
@@ -1215,7 +1214,7 @@ server class CppGen implements Gen{
             exp.resolvedType = fieldType;
         } else {
             D3ELogger.error('No field found: ' + exp.name);
-            exp.resolvedType = objectType;
+            exp.resolvedType = ofUnknownType();
         }
     }
 
@@ -1239,7 +1238,7 @@ server class CppGen implements Gen{
     }
     DataType resolveType(ClassDecl c, DataType r) {
         if(r == null ) {
-            return objectType;
+            return ofUnknownType();
         }
         if(c.generics != null) {
             TypeParam genType = c.generics.params.firstWhere(p => p.name == r.name);
@@ -1267,7 +1266,7 @@ server class CppGen implements Gen{
             exp.resolvedType = ft.returnType;
         } else {
             D3ELogger.error('We should not be calling non function types');
-            exp.resolvedType = objectType;
+            exp.resolvedType = ofUnknownType();
         }
 
     }
@@ -1285,7 +1284,6 @@ server class CppGen implements Gen{
         xp(') ');
         genAsBlock(exp.body, depth, xp);
         xp('\n');
-        exp.resolvedType = objectType;
     }
     void genForLoop(ForLoop exp, Integer depth, Xp xp) {
         xp('for (');
@@ -1307,19 +1305,19 @@ server class CppGen implements Gen{
         xp(') ');
         genAsBlock(exp.body, depth, xp);
         xp('\n');
-        exp.resolvedType = objectType;
     }
     void genAsBlock(Expression exp, Integer depth, Xp xp,
-        {Scope scope}
+        {Scope localScope}
         ) {
         if(exp is Block) {
             genBlock(exp as Block, depth, xp,
-            scope: scope);
+            localScope: localScope);
         } else {
             xp(tab(depth));
-            if(scope == null) {
-                scope = Scope(parent: scope);
+            if(localScope == null) {
+                localScope = Scope(parent: scope);
             }
+            scope = localScope;
             xp('{\n');
             xp(tab(depth + 1));
             genExp(exp, depth, xp);
@@ -1346,7 +1344,7 @@ server class CppGen implements Gen{
             }
         }
         genAsBlock(exp.thenStatement, depth, xp, 
-            scope :scope,
+            localScope :scope,
         );
         if(exp.elseStatement != null) {
             xp(' else ');
@@ -1359,16 +1357,15 @@ server class CppGen implements Gen{
         } else {
             xp('\n');
         }
-        exp.resolvedType = objectType;
     }
     void genInlineMethodStatement(InlineMethodStatement exp, Integer depth, Xp xp) {
         xp('InlineMethod');
-        exp.resolvedType = objectType;
+        exp.resolvedType = ofUnknownType();
     }
     void genLabelStatement(LabelStatement exp, Integer depth, Xp xp) {
         xp(exp.name);
         xp(':');
-        exp.resolvedType = objectType;
+        exp.resolvedType = ofUnknownType();
     }
     void genLambdaExpression(LambdaExpression exp, Integer depth, Xp xp) {
         xp('[=] (');
@@ -1392,7 +1389,7 @@ server class CppGen implements Gen{
             genBlock(exp.body, depth, xp);
         }
         //TODO we need to get the expected Type here
-        exp.resolvedType = objectType;
+        exp.resolvedType = ofUnknownType();
     }
     void genLiteralExpression(LiteralExpression exp, Integer depth, Xp xp) {
         switch(exp.type) {
@@ -1473,7 +1470,7 @@ server class CppGen implements Gen{
                 exp.resolvedType = resolveType(onType, md.returnType);
             } else {
                 // Error
-                exp.resolvedType = objectType;
+                exp.resolvedType = ofUnknownType();
             }
         } else {
             TopDecl td = context.get(exp.name);
@@ -1482,7 +1479,7 @@ server class CppGen implements Gen{
                 exp.resolvedType = md.returnType;
                 //TODO need to resolve on method type generics
             } else {
-                exp.resolvedType = objectType;
+                exp.resolvedType = ofUnknownType();
             }
         }
     }
@@ -1508,7 +1505,12 @@ server class CppGen implements Gen{
     }
     void genRethrowStatement(RethrowStatement exp, Integer depth, Xp xp) {
         xp('throw');
-        exp.resolvedType = objectType;
+        exp.resolvedType = ofUnknownType();
+    }
+    void genThrowStatement(ThrowStatement exp, Integer depth, Xp xp) {
+        xp('throw ');
+        genExp(exp.exp, depth, xp);
+        exp.resolvedType = ofUnknownType();
     }
     void genReturn(Return exp, Integer depth, Xp xp) {
         xp('return');
@@ -1516,7 +1518,6 @@ server class CppGen implements Gen{
             xp(' ');
             genExp(exp.expression, depth, xp);
         }
-        exp.resolvedType = objectType;
     }
     void genSwitchExpression(SwitchExpression exp, Integer depth, Xp xp) {
         xp('SwitchExpNotSupported');
@@ -1557,12 +1558,10 @@ server class CppGen implements Gen{
         xp(') ');
         genAsBlock(exp.body, depth, xp);
         xp('\n');
-        exp.resolvedType = objectType;
     }
     void genYieldExpression(YieldExpression exp, Integer depth, Xp xp) {
         xp('yield ');
         genExp(exp.exp, depth, xp);
-        exp.resolvedType = objectType;
     }
 
     void genTryCatchStatement(TryCatcheStatment exp, Integer depth, Xp xp) {

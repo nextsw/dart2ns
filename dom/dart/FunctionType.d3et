@@ -3,4 +3,16 @@ class FunctionType extends DataType{
     MethodParams params;
     List<DataType> typeArgs = [];
     FunctionType({this.returnType, this.params, this.optional, this.typeArgs});
+    String toString(){
+        String res = returnType != null ? returnType.toString() : 'void';
+        if(this.typeArgs.isNotEmpty) {
+            res = res + '<' + this.typeArgs.toString() +'>';
+        }
+        if(params != null) {
+            res = res + params.toString();
+        } else {
+            res = res + '()';
+        }
+        return res;
+    }
 }

@@ -11,4 +11,12 @@ public class ValueType extends DataType {
     this.name = name;
     this.optional = optional;
   }
+
+  public String toString() {
+    String res = this.name;
+    if (ListExt.isNotEmpty(this.args)) {
+      res = res + "<" + this.args.toString() + ">";
+    }
+    return res;
+  }
 }

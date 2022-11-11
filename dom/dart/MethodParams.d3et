@@ -2,4 +2,8 @@ class MethodParams {
     List<MethodParam> optionalParams = [];
     List<MethodParam> namedParams = [];
     List<MethodParam> positionalParams = [];
+
+    String toString(){
+        return positionalParams.toString() + optionalParams.toString() + namedParams.toString();
+    }
 }

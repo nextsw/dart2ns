@@ -9,4 +9,10 @@ public class MethodParams {
   public List<MethodParam> positionalParams = ListExt.asList();
 
   public MethodParams() {}
+
+  public String toString() {
+    return this.positionalParams.toString()
+        + this.optionalParams.toString()
+        + this.namedParams.toString();
+  }
 }

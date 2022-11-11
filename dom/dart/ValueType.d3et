@@ -2,4 +2,12 @@ class ValueType extends DataType {
     String in;
     List<DataType> args = [];
     ValueType(this.name, [this.optional = false]);
+
+    String toString(){
+        String res = name;
+        if(this.args.isNotEmpty) {
+            res = res + '<' + this.args.toString() +'>';
+        }
+        return res;
+    }
 }

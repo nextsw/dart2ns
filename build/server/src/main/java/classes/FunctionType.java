@@ -15,4 +15,17 @@ public class FunctionType extends DataType {
     this.returnType = returnType;
     this.typeArgs = typeArgs;
   }
+
+  public String toString() {
+    String res = this.returnType != null ? this.returnType.toString() : "void";
+    if (ListExt.isNotEmpty(this.typeArgs)) {
+      res = res + "<" + this.typeArgs.toString() + ">";
+    }
+    if (this.params != null) {
+      res = res + this.params.toString();
+    } else {
+      res = res + "()";
+    }
+    return res;
+  }
 }
