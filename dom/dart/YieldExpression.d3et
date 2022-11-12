@@ -1,4 +1,5 @@
 class YieldExpression extends Statement {
     Expression exp;
-    YieldExpression(this.exp);
+    Boolean pointer;
+    YieldExpression(this.exp, this.pointer);
 }

@@ -116,7 +116,11 @@ public class TypeParser {
         || isKey(this.tok, "extension")) {
       obj = readClass(annotations, start);
     } else {
-      obj = readClassMember("");
+      List<ClassMember> listOfMembers = ListExt.asList();
+      obj = readClassMember("", listOfMembers);
+      for (ClassMember cm : listOfMembers) {
+        list.add(cm);
+      }
     }
     if (obj != null) {
       list.add(obj);
@@ -144,6 +148,13 @@ public class TypeParser {
   }
 
   public void readImport(Import imp) {
+    if (isKey(this.tok, "if")) {
+      while (this.tok.kind != TypeKind.String) {
+        next();
+      }
+      imp.conditioned = this.tok.lit;
+      next();
+    }
     if (isKey(this.tok, "differred")) {
       next();
       imp.differed = true;
@@ -487,7 +498,7 @@ public class TypeParser {
         if (this.tok.kind == TypeKind.Rcbr || this.tok.kind == TypeKind.Eof) {
           break;
         }
-        ClassMember member = readClassMember(cls.name);
+        ClassMember member = readClassMember(cls.name, cls.members);
         member.comments = comments;
         cls.members.add(member);
       }
@@ -499,7 +510,7 @@ public class TypeParser {
     return cls;
   }
 
-  public ClassMember readClassMember(String className) {
+  public ClassMember readClassMember(String className, List<ClassMember> listOfMembers) {
     List<Comment> comments = eatComments();
     TypeToken start = this.tok;
     List<Annotation> annotations = readAnnotations();
@@ -559,11 +570,22 @@ public class TypeParser {
     }
     eatComments();
     String name = checkName();
-    if (this.tok.kind == TypeKind.Semicolon || this.tok.kind == TypeKind.Assign) {
+    while (this.tok.kind == TypeKind.Semicolon
+        || this.tok.kind == TypeKind.Assign
+        || this.tok.kind == TypeKind.Comma) {
       Expression init = null;
       if (this.tok.kind == TypeKind.Assign) {
         next();
         init = expr(0l);
+      }
+      if (this.tok.kind == TypeKind.Comma) {
+        next();
+        listOfMembers.add(
+            new FieldDecl(
+                annotations, comments, isConst, isExternal, isFinal, name, isStatic, type, init));
+        eatComments();
+        name = checkName();
+        continue;
       }
       check(TypeKind.Semicolon);
       return new FieldDecl(
@@ -741,7 +763,7 @@ public class TypeParser {
     if (isKey(this.tok, "return")) {
       smt = readReturn();
     } else if (isKey(this.tok, "yield")) {
-      smt = new YieldExpression(expr(0l));
+      smt = readYield();
     } else if (isKey(this.tok, "await")) {
       smt = new AwaitExpression(expr(0l));
       if (!skipSemiColon) {
@@ -882,6 +904,7 @@ public class TypeParser {
       MethodParams params = readMethodParams(false);
       Block block = null;
       Expression exp = null;
+      ASyncType asyncType = readAsyncType();
       if (this.tok.kind == TypeKind.Lcbr) {
         block = readBlock(true);
       } else {
@@ -892,7 +915,7 @@ public class TypeParser {
       MethodDecl method =
           new MethodDecl(
               ListExt.List(),
-              null,
+              asyncType,
               block,
               false,
               exp,
@@ -1198,6 +1221,17 @@ public class TypeParser {
     }
   }
 
+  public YieldExpression readYield() {
+    next();
+    boolean pointer = this.tok.kind == TypeKind.Mul;
+    if (pointer) {
+      next();
+    }
+    Expression exp = expr(0l);
+    check(TypeKind.Semicolon);
+    return new YieldExpression(exp, pointer);
+  }
+
   public ThrowStatement readThrow(boolean asExp) {
     TypeToken start = this.tok;
     next();
@@ -1474,7 +1508,13 @@ public class TypeParser {
     List<Param> params = ListExt.asList();
     while (this.tok.kind != TypeKind.Rpar) {
       if (this.tok.lit.equals("_")) {
+        params.add(new Param("_", null));
         next();
+        if (this.tok.kind == TypeKind.Comma) {
+          next();
+        } else {
+          break;
+        }
         continue;
       }
       if ((this.peekTok.kind == TypeKind.Rpar || this.peekTok.kind == TypeKind.Comma)) {
@@ -1680,7 +1720,7 @@ public class TypeParser {
   }
 
   public boolean isBeside(TypeToken first, TypeToken next) {
-    return first.pos + 1 == next.pos;
+    return first.pos + 1l == next.pos;
   }
 
   public DataType readType(boolean acceptFnWithNoRet) {

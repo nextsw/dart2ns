@@ -44,7 +44,7 @@ public class Dart2NSContext {
     Library lib = new Library(this.flutterHome + packagePath + ".dart", packagePath, null);
     this.libs.add(lib);
     this.current = lib;
-    loadImport("dart:core");
+    //loadImport("dart:core");
     _parse(lib.fullPath);
   }
 

@@ -6,5 +6,6 @@ class Import {
     List<String> hide = [];
     Boolean differed;
     String name; //as
+    String conditioned;
     Import(this.parent, this.path, this.lib);
 }

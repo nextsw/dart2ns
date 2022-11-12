@@ -509,11 +509,11 @@ public class TypeScanner {
       } else {
         escape = false;
       }
+      if (insideDollar && !ParserUtil.isFuncChar(c)) {
+    	  insideDollar = false;
+      }
       if (Objects.equals(c, dollar)) {
         insideDollar = true;
-      }
-      if (insideDollar && !ParserUtil.isFuncChar(c)) {
-        insideDollar = false;
       }
       if (Objects.equals(prevc, dollar) && Objects.equals(c, "{")) {
         insideExp++;

@@ -718,7 +718,7 @@ server class TypeScanner {
         if (token.index < 0) {
             token.index = 0;
         }
-        token.pos = lastNlPos + token.index;
+        token.pos = this.pos;
         return token;
     }
 

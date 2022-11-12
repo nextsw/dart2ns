@@ -112,7 +112,11 @@ server class TypeParser {
             || isKey(tok, 'extension')) {
             obj = readClass(annotations, start);
         } else {
-            obj = readClassMember('');
+            List<ClassMember> listOfMembers = [];
+            obj = readClassMember('', listOfMembers);
+            for(ClassMember cm in listOfMembers) {
+                list.add(cm);
+            }
         }
         if(obj != null) {
             list.add(obj);
@@ -140,6 +144,13 @@ server class TypeParser {
     }
 
     void readImport(Import imp) {
+        if(isKey(tok, 'if')) {
+            while(tok.kind != TypeKind.String) {
+                next();
+            }
+            imp.conditioned = tok.lit;
+            next();
+        }
         if(isKey(tok, 'differred')) {
             next();
             imp.differed = true;
@@ -489,7 +500,7 @@ server class TypeParser {
                 if (tok.kind == TypeKind.Rcbr || tok.kind == TypeKind.Eof) {
                     break;
                 }
-                ClassMember member = readClassMember(cls.name);
+                ClassMember member = readClassMember(cls.name, cls.members);
                 member.comments = comments;
                 cls.members.add(member);
             }
@@ -501,7 +512,7 @@ server class TypeParser {
         return cls;
     }
 
-    ClassMember readClassMember(String className) {
+    ClassMember readClassMember(String className, List<ClassMember> listOfMembers) {
         List<Comment> comments = eatComments();
         TypeToken start = tok;
         List<Annotation> annotations = readAnnotations();
@@ -561,11 +572,30 @@ server class TypeParser {
         eatComments();
         String name = checkName();
 
-        if(tok.kind == TypeKind.Semicolon || tok.kind == TypeKind.Assign) {
+        while(tok.kind == TypeKind.Semicolon 
+            || tok.kind == TypeKind.Assign
+            || tok.kind == TypeKind.Comma) {
             Expression init = null;
             if(tok.kind == TypeKind.Assign) {
                 next();
                 init = expr(0);
+            }
+            if(tok.kind == TypeKind.Comma) {
+                next();
+                listOfMembers.add(FieldDecl(
+                    name: name,
+                    type: type,
+                    final: isFinal,
+                    static: isStatic,
+                    const: isConst,
+                    external: isExternal,
+                    value: init,
+                    annotations: annotations,
+                    comments: comments,
+                ));
+                eatComments();
+                name = checkName();
+                continue;
             }
             check(TypeKind.Semicolon);
             return FieldDecl(
@@ -750,7 +780,7 @@ server class TypeParser {
         if (isKey(tok, 'return')) {
             smt = readReturn();
         } else if (isKey(this.tok, 'yield')) {
-          smt = YieldExpression(expr(0));
+          smt = readYield();
         } else if (isKey(this.tok, 'await')) {
             smt = AwaitExpression(expr(0));
             if (!skipSemiColon) {
@@ -888,6 +918,7 @@ server class TypeParser {
             MethodParams params = readMethodParams(false);
             Block block = null;
             Expression exp = null;
+            ASyncType asyncType = readAsyncType();
             if(this.tok.kind == TypeKind.Lcbr) {
                 block = readBlock(true);
             } else {
@@ -901,7 +932,8 @@ server class TypeParser {
                 generics: typeParams,
                 name: name,
                 params: params,
-                returnType: type
+                returnType: type,
+                asyncType: asyncType,
             );
             return InlineMethodStatement(method);
         }
@@ -1202,6 +1234,17 @@ server class TypeParser {
         }
     }
 
+    YieldExpression readYield() {
+        next();
+        Boolean pointer = tok.kind == TypeKind.Mul;
+        if(pointer) {
+            next();
+        }
+        Expression exp = expr(0);
+        check(TypeKind.Semicolon);
+        return YieldExpression(exp, pointer);
+    }
+
     ThrowStatement readThrow(Boolean asExp) {
         TypeToken start = this.tok;
         next();
@@ -1478,7 +1521,13 @@ server class TypeParser {
         List<Param> params = [];
         while (tok.kind != TypeKind.Rpar) {
             if(tok.lit.equals('_')) {
+                params.add(Param(name: '_'));
                 next();
+                if (this.tok.kind == TypeKind.Comma) {
+                    next();
+                } else {
+                    break;
+                }
                 continue;
             }
             if((peekTok.kind == TypeKind.Rpar ||
@@ -1713,7 +1762,7 @@ server class TypeParser {
 	    return type;
     }
     Boolean isBeside(TypeToken first, TypeToken next) {
-	    return first.pos + first.len == next.pos;
+	    return first.pos + 1 == next.pos;
     }
 
     DataType readType(Boolean acceptFnWithNoRet) {
@@ -1931,6 +1980,7 @@ server class TypeParser {
 
     Symbol symbolExpr(){
         String value = '';
+        next();
         while(true) {
             value = value + tok.lit;
             next();

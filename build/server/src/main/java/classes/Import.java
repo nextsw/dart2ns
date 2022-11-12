@@ -11,6 +11,7 @@ public class Import {
   public List<String> hide = ListExt.asList();
   public boolean differed = false;
   public String name;
+  public String conditioned;
 
   public Import(Library parent, String path, Library lib) {
     this.parent = parent;
