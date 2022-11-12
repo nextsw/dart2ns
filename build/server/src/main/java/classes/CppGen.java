@@ -216,6 +216,21 @@ public class CppGen implements Gen {
     }
     if (ListExt.isNotEmpty(v.args)) {
       res += typeArgsToString(v.args);
+    } else {
+      TopDecl top = this.context.get(v.name);
+      if (top != null && top instanceof ClassDecl) {
+        ClassDecl cd = ((ClassDecl) top);
+        if (cd.generics != null) {
+          res += "<";
+          for (TypeParam p : cd.generics.params) {
+            res += "any";
+            if (!(Objects.equals(p, ListExt.last(cd.generics.params)))) {
+              res += ", ";
+            }
+          }
+          res += ">";
+        }
+      }
     }
     return res;
   }
