@@ -1,0 +1,9 @@
+class InsideInfo {
+    Boolean insideString;
+    Boolean isMultiLine;
+    String quote;
+    Boolean isRaw;
+    Boolean insideDollar;
+    Boolean insideDollarExpr;
+    InsideInfo({this.insideDollar, this.insideDollarExpr, this.isMultiLine, this.quote, this.insideString, this.isRaw});
+}

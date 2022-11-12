@@ -635,6 +635,8 @@ server class CppGen implements Gen{
             genTryCatchStatement(exp as TryCatcheStatment, depth, xp);
         } else if(exp is Symbol) {
             genSymbol(exp as Symbol, xp);
+        } else if(exp is StringInterExp) {
+            genStringIntr(exp as StringInterExp, xp);
         } else {
 
         }
@@ -646,6 +648,13 @@ server class CppGen implements Gen{
             depth--;
         }
         return s;
+    }
+
+    void genStringIntr(StringInterExp exp, Xp xp) {
+        xp('__s("');
+        xp(exp.str);
+        xp('")');
+        exp.resolvedType = stringType;
     }
 
     void genSymbol(Symbol exp, Xp xp) {

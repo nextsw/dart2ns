@@ -776,6 +776,8 @@ public class CppGen implements Gen {
       genTryCatchStatement(((TryCatcheStatment) exp), depth, xp);
     } else if (exp instanceof Symbol) {
       genSymbol(((Symbol) exp), xp);
+    } else if (exp instanceof StringInterExp) {
+      genStringIntr(((StringInterExp) exp), xp);
     } else {
     }
   }
@@ -787,6 +789,13 @@ public class CppGen implements Gen {
       depth--;
     }
     return s;
+  }
+
+  public void genStringIntr(StringInterExp exp, Xp xp) {
+    xp.apply("__s(\"");
+    xp.apply(exp.str);
+    xp.apply("\")");
+    exp.resolvedType = this.stringType;
   }
 
   public void genSymbol(Symbol exp, Xp xp) {

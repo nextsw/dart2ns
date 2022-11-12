@@ -637,11 +637,11 @@ public class TypeParser {
     if (this.tok.kind == TypeKind.Colon) {
       next();
       init = new Block();
-      Statement stmt = readStatement(ListExt.List(), true);
+      Statement stmt = readStatement(ListExt.List(), true, true);
       init.statements.add(stmt);
       while (this.tok.kind == TypeKind.Comma) {
         next();
-        stmt = readStatement(ListExt.List(), true);
+        stmt = readStatement(ListExt.List(), true, true);
         init.statements.add(stmt);
       }
     } else if (this.tok.kind == TypeKind.Assign) {
@@ -657,7 +657,8 @@ public class TypeParser {
     String nativeString = null;
     if (isKey(this.tok, "native")) {
       next();
-      nativeString = stringExpr().value;
+      nativeString = this.tok.lit;
+      next();
     }
     if (this.tok.kind == TypeKind.Lcbr) {
       body = readBlock(true);
@@ -733,7 +734,7 @@ public class TypeParser {
         block.afterComments = comments;
         break;
       }
-      Statement smt = readStatement(comments, false);
+      Statement smt = readStatement(comments, false, false);
       if (smt == null) {
         block.afterComments = comments;
         break;
@@ -750,7 +751,7 @@ public class TypeParser {
     return block;
   }
 
-  public Statement readStatement(List<Comment> comments, boolean skipSemiColon) {
+  public Statement readStatement(List<Comment> comments, boolean fromInit, boolean skipSemiColon) {
     comments = comments != null ? comments : eatComments();
     Statement smt = null;
     TypeToken start = this.tok;
@@ -812,7 +813,7 @@ public class TypeParser {
       smt = readBlock(true);
     } else {
       save();
-      smt = readDecl();
+      smt = fromInit ? null : readDecl();
       if (smt != null) {
         drop();
       } else {
@@ -1029,12 +1030,12 @@ public class TypeParser {
     check(TypeKind.Lpar);
     Expression test = expr(0l);
     check(TypeKind.Rpar);
-    Statement thenVal = readStatement(ListExt.List(), false);
+    Statement thenVal = readStatement(ListExt.List(), false, false);
     eatComments();
     Statement elseS = null;
     if (isKey(this.tok, "else")) {
       next();
-      elseS = readStatement(ListExt.List(), false);
+      elseS = readStatement(ListExt.List(), false, false);
     }
     return new IfStatement(elseS, test, thenVal);
   }
@@ -1081,7 +1082,7 @@ public class TypeParser {
           if (this.tok.kind == TypeKind.Name && this.peekTok.kind == TypeKind.Colon) {
             break;
           }
-          Statement smt = readStatement(comments2, false);
+          Statement smt = readStatement(comments2, false, false);
           if (smt == null) {
             break;
           }
@@ -1093,7 +1094,7 @@ public class TypeParser {
         check(TypeKind.Colon);
         while (this.tok.kind != TypeKind.Rcbr) {
           List<Comment> comments2 = eatComments();
-          ss.defaults.add(readStatement(comments2, false));
+          ss.defaults.add(readStatement(comments2, false, false));
         }
         break;
       } else if (this.tok.kind == TypeKind.Name && this.peekTok.kind == TypeKind.Colon) {
@@ -1121,7 +1122,7 @@ public class TypeParser {
     if (this.tok.kind == TypeKind.Lcbr) {
       stmt = readBlock(true);
     } else {
-      stmt = readStatement(ListExt.List(), false);
+      stmt = readStatement(ListExt.List(), false, false);
     }
     return new WhileLoop(stmt, test);
   }
@@ -1149,7 +1150,7 @@ public class TypeParser {
     next();
     Expression block = null;
     if (!forCollection) {
-      block = readStatement(ListExt.List(), false);
+      block = readStatement(ListExt.List(), false, false);
     }
     return new ForEachLoop(block, exp, type, name);
   }
@@ -1183,7 +1184,7 @@ public class TypeParser {
           next();
           break;
         }
-        inits.add(readStatement(ListExt.List(), false));
+        inits.add(readStatement(ListExt.List(), false, false));
         if (this.tok.kind != TypeKind.Comma) {
           break;
         }
@@ -1206,7 +1207,7 @@ public class TypeParser {
         if (this.tok.kind == TypeKind.Rpar || this.tok.kind == TypeKind.Eof) {
           break;
         }
-        resets.add(readStatement(ListExt.List(), true));
+        resets.add(readStatement(ListExt.List(), false, true));
         if (this.tok.kind != TypeKind.Comma) {
           break;
         }
@@ -1215,7 +1216,7 @@ public class TypeParser {
       check(TypeKind.Rpar);
       Expression block = null;
       if (!forCollection) {
-        block = readStatement(ListExt.List(), false);
+        block = readStatement(ListExt.List(), false, false);
       }
       return new ForLoop(block, decl, inits, resets, exp);
     }
@@ -1926,7 +1927,7 @@ public class TypeParser {
     return new Symbol(value);
   }
 
-  public LiteralExpression stringExpr() {
+  public Expression stringExpr() {
     TypeToken start = this.tok;
     boolean isRaw = false;
     String value = "";
@@ -1940,14 +1941,27 @@ public class TypeParser {
       eatComments();
     } while (this.tok.kind == TypeKind.String || Objects.equals(this.tok.lit, "r"));
     LiteralExpression node;
-    if (this.tok.kind != TypeKind.Dollar) {
+    if (this.tok.kind != TypeKind.StrIntr) {
       node = new LiteralExpression(isRaw, LiteralType.TypeString, isRaw ? value : value);
       return node;
+    } else {
+      return readStringIntrExp(value, isRaw);
     }
-    /*
-     Handle string interpolation
-    */
-    return null;
+  }
+
+  public StringInterExp readStringIntrExp(String value, boolean isRaw) {
+    StringInterExp exp = new StringInterExp(value);
+    while (this.tok.kind == TypeKind.StrIntr) {
+      next();
+      Expression sub = expr(0l);
+      exp.values.add(sub);
+      exp.str += "%s";
+      while (this.tok.kind == TypeKind.String) {
+        next();
+        exp.str += this.tok.lit;
+      }
+    }
+    return exp;
   }
 
   public Expression nameExpr() {
@@ -2159,6 +2173,8 @@ public class TypeParser {
   public void save() {
     TokenFrame frame =
         new TokenFrame(
+            this.scanner.doingDollor,
+            this.scanner.insideInfo,
             this.peekTok,
             this.peekTok2,
             this.peekTok3,
@@ -2166,6 +2182,7 @@ public class TypeParser {
             this.scanner.pos,
             this.prevTok,
             this.tok);
+    frame.stack = ListExt.from(this.scanner.stack, false);
     this.savedFrames.add(frame);
   }
 
@@ -2175,6 +2192,9 @@ public class TypeParser {
     }
     TokenFrame frame = ListExt.removeLast(this.savedFrames);
     this.scanner.pos = frame.pos;
+    this.scanner.insideInfo = frame.insideInfo;
+    this.scanner.doingDollor = frame.doingDollor;
+    this.scanner.stack = ListExt.from(frame.stack, false);
     this.tok = frame.tok;
     this.prevTok = frame.tok;
     this.peekTok = frame.peekTok;

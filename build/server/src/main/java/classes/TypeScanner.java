@@ -3,6 +3,7 @@ package classes;
 import d3e.core.IterableExt;
 import d3e.core.ListExt;
 import d3e.core.StringExt;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -13,20 +14,32 @@ public class TypeScanner {
   public long pos = 0l;
   public long lineNo = 0l;
   public long lastNlPos = 0l;
-  public boolean isInsideString = false;
-  public boolean isInterStart = false;
-  public boolean isInterEnd = false;
+  public long countOrLcbr = 0l;
   public String lineComment;
   public boolean isStarted = false;
   public long tidex = 0l;
   public String text;
-  public String quote;
+  public InsideInfo insideInfo;
+  public List<InsideInfo> stack = ListExt.asList();
   public long noLines = 0l;
   public long eofs = 0l;
   public long savedPos = 0l;
+  public boolean doingDollor = false;
 
   public TypeScanner(String text) {
     this.text = text;
+  }
+
+  public boolean getIsInsideString() {
+    return this.insideInfo != null && this.insideInfo.insideString;
+  }
+
+  public boolean getInsideDollarExpr() {
+    return this.insideInfo != null && this.insideInfo.insideDollarExpr;
+  }
+
+  public boolean getInsideDollar() {
+    return this.insideInfo != null && this.insideInfo.insideDollar;
   }
 
   public TypeToken scan() {
@@ -38,13 +51,10 @@ public class TypeScanner {
       if (this.pos >= StringExt.length(this.text)) {
         return endOfFile();
       }
-      if (!this.isInsideString) {
-        skipWhiteSpace();
-      }
-      if (this.isInterEnd) {
-        /*
-         TODO
-        */
+      if (this.doingDollor) {
+        this.doingDollor = false;
+        this.pos--;
+        return resumeString();
       }
       skipWhiteSpace();
       if (this.pos >= StringExt.length(this.text)) {
@@ -56,19 +66,15 @@ public class TypeScanner {
         String name = identName();
         String nextChar = lookAhead(1l);
         TypeKind kind = TypeToken.keywords.get(name);
+        if (this.getInsideDollar()) {
+          this.doingDollor = true;
+        }
         if (kind != TypeKind.Unknown && kind != null) {
           return newToken(kind, name, StringExt.length(name));
         }
-        if (this.isInsideString) {
-          if (Objects.equals(nextChar, this.quote)) {
-            this.isInterEnd = true;
-            this.isInterStart = false;
-            this.isInsideString = false;
-          }
-        }
         return newToken(TypeKind.Name, name, StringExt.length(name));
       } else if (ParserUtil.isDigit(c) || ((Objects.equals(c, ".") && ParserUtil.isDigit(nextc)))) {
-        if (!this.isInsideString) {
+        if (!this.getIsInsideString()) {
           long startPos = this.pos;
           while (startPos < StringExt.length(this.text)
               && Objects.equals(StringExt.get(this.text, startPos), "0")) {
@@ -187,8 +193,8 @@ public class TypeScanner {
         case "{":
           {
             {
-              if (this.isInsideString) {
-                continue;
+              if (this.getInsideDollarExpr()) {
+                this.countOrLcbr++;
               }
               return newToken(TypeKind.Lcbr, "{", 1l);
             }
@@ -196,27 +202,28 @@ public class TypeScanner {
         case "$":
           {
             {
-              if (this.isInsideString) {
-                return newToken(TypeKind.StrDollar, "$", 1l);
+              if (this.getIsInsideString()) {
+                push();
+                if (Objects.equals(nextc, "{")) {
+                  this.pos++;
+                  this.insideInfo = new InsideInfo(false, true, false, false, false, null);
+                } else {
+                  this.insideInfo = new InsideInfo(true, false, false, false, false, null);
+                }
+                return newToken(TypeKind.StrIntr, "$", 1l);
               }
-              return newToken(TypeKind.Dollar, "", 1l);
+              return newToken(TypeKind.Dollar, "$", 1l);
             }
           }
         case "}":
           {
             {
-              if (this.isInsideString) {
-                this.pos++;
-                if (Objects.equals(StringExt.get(this.text, this.pos), this.quote)) {
-                  this.isInsideString = false;
-                  return newToken(
-                      TypeKind.String,
-                      Objects.equals(this.quote, TypeScanner.singleQuote) ? "'" : "\"",
-                      1l);
-                }
-                String identStr = identString();
-                return newToken(TypeKind.String, identStr, StringExt.length(identStr) + 2l);
+              if (this.getInsideDollarExpr() && this.countOrLcbr == 0l) {
+                return resumeString();
               } else {
+                if (this.getInsideDollarExpr()) {
+                  this.countOrLcbr--;
+                }
                 return newToken(TypeKind.Rcbr, "}", 1l);
               }
             }
@@ -225,8 +232,7 @@ public class TypeScanner {
         case "\"":
           {
             {
-              String identStr = identString();
-              return newToken(TypeKind.String, identStr, StringExt.length(identStr) + 2l);
+              return identString();
             }
           }
         case "&":
@@ -458,7 +464,7 @@ public class TypeScanner {
     return true;
   }
 
-  public String identString() {
+  public TypeToken identString() {
     String q = StringExt.get(this.text, this.pos);
     String q1 = StringExt.get(this.text, this.pos + 1l);
     String q2 = StringExt.get(this.text, this.pos + 2l);
@@ -469,22 +475,19 @@ public class TypeScanner {
         isQuote
             && (this.pos > 0l)
             && (Objects.equals(StringExt.get(this.text, this.pos - 1l), "r"));
-    if (isQuote && !this.isInsideString) {
-      this.quote = q;
-    }
     long nCrChars = 0l;
-    long start = this.pos;
-    this.isInsideString = false;
     String slash = "\\";
     String dollar = "$";
     boolean escape = false;
-    boolean insideDollar = false;
-    long insideExp = 0l;
     long totalClose = isMultiLine ? 3l : 1l;
     long closeCount = totalClose;
     if (isMultiLine) {
       this.pos += 2l;
     }
+    long start = this.pos + 1l;
+    push();
+    this.insideInfo = new InsideInfo(false, false, true, isMultiLine, isRaw, q);
+    boolean partial = false;
     while (true) {
       this.pos++;
       if (this.pos >= StringExt.length(this.text)) {
@@ -492,8 +495,8 @@ public class TypeScanner {
       }
       String c = StringExt.get(this.text, this.pos);
       String prevc = StringExt.get(this.text, this.pos - 1l);
-      if (insideExp == 0l && !escape) {
-        if (Objects.equals(c, this.quote)) {
+      if (!escape) {
+        if (Objects.equals(c, q)) {
           closeCount--;
           if (closeCount == 0l) {
             break;
@@ -509,32 +512,24 @@ public class TypeScanner {
       } else {
         escape = false;
       }
-      if (insideDollar && !ParserUtil.isFuncChar(c)) {
-    	  insideDollar = false;
-      }
-      if (Objects.equals(c, dollar)) {
-        insideDollar = true;
-      }
-      if (Objects.equals(prevc, dollar) && Objects.equals(c, "{")) {
-        insideExp++;
-      }
-      if (insideExp > 0l && Objects.equals(c, "}")) {
-        insideExp--;
+      if (!isRaw && !escape && Objects.equals(c, dollar)) {
+        partial = true;
+        break;
       }
       if (Objects.equals(c, "\r")) {
         nCrChars++;
       }
-      if (!isMultiLine && insideExp == 0l && Objects.equals(c, "\n")) {
+      if (!isMultiLine && Objects.equals(c, "\n")) {
         break;
       }
     }
     String lit = "";
-    if (Objects.equals(StringExt.get(this.text, start), this.quote)) {
-      start++;
-    }
     long end = this.pos;
-    if (this.isInsideString) {
-      end++;
+    if (!partial) {
+      end -= totalClose - 1l;
+      pop();
+    } else {
+      this.pos--;
     }
     if (start <= this.pos) {
       String stringSoFar = StringExt.substring(this.text, start, end);
@@ -547,7 +542,89 @@ public class TypeScanner {
         lit = stringSoFar;
       }
     }
-    return lit;
+    return newToken(TypeKind.String, lit, StringExt.length(lit) + 2l);
+  }
+
+  public void push() {
+    this.stack.add(this.insideInfo);
+  }
+
+  public void pop() {
+    this.insideInfo = ListExt.removeLast(this.stack);
+  }
+
+  public TypeToken resumeString() {
+    boolean insideDollarExpr = this.insideInfo.insideDollarExpr;
+    pop();
+    /*
+     we should get string info here
+    */
+    boolean isMultiLine = this.insideInfo.isMultiLine;
+    boolean isRaw = this.insideInfo.isRaw;
+    String quote = this.insideInfo.quote;
+    long nCrChars = 0l;
+    String slash = "\\";
+    String dollar = "$";
+    boolean escape = false;
+    long totalClose = isMultiLine ? 3l : 1l;
+    long closeCount = totalClose;
+    boolean partial = false;
+    long start = this.pos + 1l;
+    while (true) {
+      this.pos++;
+      if (this.pos >= StringExt.length(this.text)) {
+        break;
+      }
+      String c = StringExt.get(this.text, this.pos);
+      String prevc = StringExt.get(this.text, this.pos - 1l);
+      if (!escape) {
+        if (Objects.equals(c, quote)) {
+          closeCount--;
+          if (closeCount == 0l) {
+            break;
+          } else {
+            continue;
+          }
+        } else {
+          closeCount = totalClose;
+        }
+      }
+      if (!isRaw && Objects.equals(c, slash)) {
+        escape = !escape;
+      } else {
+        escape = false;
+      }
+      if (!isRaw && !escape && Objects.equals(c, dollar)) {
+        partial = true;
+        break;
+      }
+      if (Objects.equals(c, "\r")) {
+        nCrChars++;
+      }
+      if (!isMultiLine && Objects.equals(c, "\n")) {
+        break;
+      }
+    }
+    String lit = "";
+    long end = this.pos;
+    if (!partial) {
+      end -= totalClose - 1l;
+      pop();
+    } else {
+      this.pos--;
+    }
+    if (start <= this.pos) {
+      String stringSoFar = StringExt.substring(this.text, start, end);
+      if (nCrChars > 0l) {
+        stringSoFar = StringExt.replaceAll(stringSoFar, "\r", "");
+      }
+      if (StringExt.contains(stringSoFar, "\\\n", 0l)) {
+        lit = trimSlashLineBreak(stringSoFar);
+      } else {
+        lit = stringSoFar;
+      }
+    }
+    return newToken(TypeKind.String, lit, StringExt.length(lit) + 2l);
   }
 
   public String identDecNumber() {

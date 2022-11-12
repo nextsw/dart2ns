@@ -41,7 +41,7 @@ server class Dart2NSContext {
         );
         libs.add(lib);
         this.current = lib;
-        loadImport('dart:core');
+        // loadImport('dart:core');
         _parse(lib.fullPath);
     }
 

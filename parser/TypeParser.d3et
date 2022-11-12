@@ -655,13 +655,15 @@ server class TypeParser {
             next();
             init = Block();
             Statement stmt = readStatement(
-                skipSemiColon: true
+                skipSemiColon: true,
+                fromInit: true,
             );
             init.statements.add(stmt);
             while(tok.kind == TypeKind.Comma) {
                 next();
                 stmt = readStatement(
-                    skipSemiColon: true
+                    skipSemiColon: true,
+                    fromInit: true,
                 );
                 init.statements.add(stmt);
             } 
@@ -679,7 +681,8 @@ server class TypeParser {
         if(isKey(tok, 'native' )) 
         {
             next();
-            nativeString = stringExpr().value;
+            nativeString = tok.lit;
+            next();
         }
         if (tok.kind == TypeKind.Lcbr) {
             body = readBlock(true);
@@ -767,7 +770,7 @@ server class TypeParser {
         return block;
     }
 
-    Statement readStatement({Boolean skipSemiColon = false, List<Comment> comments}) {
+    Statement readStatement({Boolean skipSemiColon = false, List<Comment> comments, Boolean fromInit}) {
         comments = comments != null ? comments : eatComments();
         Statement smt = null;
         TypeToken start = tok;
@@ -830,7 +833,7 @@ server class TypeParser {
             smt = readBlock(true);
         } else {
             save();
-            smt = readDecl();
+            smt = fromInit? null : readDecl();
             if (smt != null) {
                 drop();
             } else {
@@ -1994,7 +1997,7 @@ server class TypeParser {
         return Symbol(value);
     }
 
-    LiteralExpression stringExpr() {
+    Expression stringExpr() {
         TypeToken start = tok;
         Boolean isRaw = false;
         String value = '';
@@ -2008,17 +2011,35 @@ server class TypeParser {
             eatComments();
         } while (tok.kind == TypeKind.String || tok.lit == 'r');
         LiteralExpression node;
-        if (tok.kind != TypeKind.Dollar) {
+        if (tok.kind != TypeKind.StrIntr) {
             node = LiteralExpression(
                 type: LiteralType.TypeString,
                 value: isRaw ? value: value,
                 isRawString: isRaw,
             );
             return node;
+        } else {
+            return readStringIntrExp(value, isRaw);
         }
-        // Handle string interpolation
-        return null;
     }
+
+    StringInterExp readStringIntrExp(String value, Boolean isRaw) {
+        StringInterExp exp = StringInterExp(str :value);
+        while(tok.kind == TypeKind.StrIntr) {
+            next();
+            Expression sub = expr(0);
+            exp.values.add(sub);
+            exp.str += '%s';
+            while(tok.kind ==TypeKind.String) {
+                next();
+                exp.str += tok.lit;
+            }
+        }
+
+        return exp;
+    }
+
+
 
     Expression nameExpr() {
         if (expectingType) {
@@ -2242,7 +2263,10 @@ server class TypeParser {
             peekTok4: peekTok4,
             prevTok: prevTok,
             pos: scanner.pos,
+            insideInfo: scanner.insideInfo,
+            doingDollor: scanner.doingDollor,
         );
+        frame.stack = List.from(scanner.stack);
         savedFrames.add(frame);
     }
 
@@ -2252,6 +2276,9 @@ server class TypeParser {
         }
         TokenFrame frame = savedFrames.removeLast();
         this.scanner.pos = frame.pos;
+        this.scanner.insideInfo =frame.insideInfo;
+        this.scanner.doingDollor = frame.doingDollor;
+        this.scanner.stack = List.from(frame.stack);
         this.tok = frame.tok;
         this.prevTok = frame.tok;
         this.peekTok = frame.peekTok;

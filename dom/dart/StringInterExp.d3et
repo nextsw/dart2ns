@@ -1,0 +1,5 @@
+class StringInterExp extends Expression {
+    String str;
+    List<Expression> values = [];
+    StringInterExp({this.str}); 
+}

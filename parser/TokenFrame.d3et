@@ -6,6 +6,9 @@ server class TokenFrame {
     TypeToken peekTok3;
     TypeToken peekTok4;
     Integer pos;
+    InsideInfo insideInfo = null;
+    Boolean doingDollor;
+    List<InsideInfo> stack = [];
     TokenFrame({
         this.tok,
         this.prevTok,
@@ -14,5 +17,7 @@ server class TokenFrame {
         this.peekTok3,
         this.peekTok4,
         this.pos,
+        this.insideInfo,
+        this.doingDollor,
     });
 }
