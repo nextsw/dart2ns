@@ -1,0 +1,4 @@
+class Symbol extends Expression {
+    String name;
+    Symbol(this.name);
+}

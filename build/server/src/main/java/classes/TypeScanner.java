@@ -819,7 +819,7 @@ public class TypeScanner {
     if (token.index < 0l) {
       token.index = 0l;
     }
-    token.pos = this.lastNlPos + token.index;
+    token.pos = this.pos;
     return token;
   }
 

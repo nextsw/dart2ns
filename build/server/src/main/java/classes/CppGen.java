@@ -774,6 +774,8 @@ public class CppGen implements Gen {
       genYieldExpression(((YieldExpression) exp), depth, xp);
     } else if (exp instanceof TryCatcheStatment) {
       genTryCatchStatement(((TryCatcheStatment) exp), depth, xp);
+    } else if (exp instanceof Symbol) {
+      genSymbol(((Symbol) exp), xp);
     } else {
     }
   }
@@ -785,6 +787,12 @@ public class CppGen implements Gen {
       depth--;
     }
     return s;
+  }
+
+  public void genSymbol(Symbol exp, Xp xp) {
+    xp.apply("__symbol(\"");
+    xp.apply(exp.name);
+    xp.apply("\")");
   }
 
   public void genArrayAccess(ArrayAccess exp, long depth, Xp xp) {

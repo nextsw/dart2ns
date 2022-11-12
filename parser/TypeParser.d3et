@@ -682,7 +682,9 @@ server class TypeParser {
         return decl;
     }
     Boolean isTypeName(String name) {
-	    return name != null && (primitives.contains(name) || ParserUtil.isTypeName(name));
+	    return name != null && (primitives.contains(name) 
+        || ParserUtil.isTypeName(name)
+        || name == 'pragma');
     }
 
     Boolean isFactoryDecl() {
@@ -1242,7 +1244,7 @@ server class TypeParser {
                         return singleParamLambda();
                     } else if (isKey(tok, 'throw')) {
                         return readThrow(true);
-                    } else if (isKey(tok, 'r')) {
+                    } else if (isKey(tok, 'r') && peekTok.kind == TypeKind.String) {
                         node = stringExpr();
                     } else if (isKey(tok, 'new')) {
                         next();
@@ -1250,6 +1252,10 @@ server class TypeParser {
                     } else {
                         node = nameExpr();
                     }
+                }
+            case TypeKind.Hash: 
+                {
+                    node = symbolExpr();
                 }
 
             case TypeKind.String:
@@ -1923,6 +1929,21 @@ server class TypeParser {
         return null;
     }
 
+    Symbol symbolExpr(){
+        String value = '';
+        while(true) {
+            value = value + tok.lit;
+            next();
+            if(tok.kind == TypeKind.Dot) {
+                value += '.';
+                next();
+            } else {
+                break;
+            }
+        }
+        return Symbol(value);
+    }
+
     LiteralExpression stringExpr() {
         TypeToken start = tok;
         Boolean isRaw = false;
@@ -1935,7 +1956,7 @@ server class TypeParser {
             value = value + tok.lit;
             next();
             eatComments();
-        } while (tok.kind == TypeKind.String || peekTok.lit == 'r');
+        } while (tok.kind == TypeKind.String || tok.lit == 'r');
         LiteralExpression node;
         if (tok.kind != TypeKind.Dollar) {
             node = LiteralExpression(

@@ -670,7 +670,10 @@ public class TypeParser {
   }
 
   public boolean isTypeName(String name) {
-    return name != null && (TypeParser.primitives.contains(name) || ParserUtil.isTypeName(name));
+    return name != null
+        && (TypeParser.primitives.contains(name)
+            || ParserUtil.isTypeName(name)
+            || Objects.equals(name, "pragma"));
   }
 
   public boolean isFactoryDecl() {
@@ -1235,7 +1238,7 @@ public class TypeParser {
               return singleParamLambda();
             } else if (isKey(this.tok, "throw")) {
               return readThrow(true);
-            } else if (isKey(this.tok, "r")) {
+            } else if (isKey(this.tok, "r") && this.peekTok.kind == TypeKind.String) {
               node = stringExpr();
             } else if (isKey(this.tok, "new")) {
               next();
@@ -1243,6 +1246,13 @@ public class TypeParser {
             } else {
               node = nameExpr();
             }
+          }
+          break;
+        }
+      case Hash:
+        {
+          {
+            node = symbolExpr();
           }
           break;
         }
@@ -1670,7 +1680,7 @@ public class TypeParser {
   }
 
   public boolean isBeside(TypeToken first, TypeToken next) {
-    return first.pos + first.len == next.pos;
+    return first.pos + 1 == next.pos;
   }
 
   public DataType readType(boolean acceptFnWithNoRet) {
@@ -1860,6 +1870,22 @@ public class TypeParser {
     return null;
   }
 
+  public Symbol symbolExpr() {
+    String value = "";
+    next();
+    while (true) {
+      value = value + this.tok.lit;
+      next();
+      if (this.tok.kind == TypeKind.Dot) {
+        value += ".";
+        next();
+      } else {
+        break;
+      }
+    }
+    return new Symbol(value);
+  }
+
   public LiteralExpression stringExpr() {
     TypeToken start = this.tok;
     boolean isRaw = false;
@@ -1872,7 +1898,7 @@ public class TypeParser {
       value = value + this.tok.lit;
       next();
       eatComments();
-    } while (this.tok.kind == TypeKind.String || Objects.equals(this.peekTok.lit, "r"));
+    } while (this.tok.kind == TypeKind.String || Objects.equals(this.tok.lit, "r"));
     LiteralExpression node;
     if (this.tok.kind != TypeKind.Dollar) {
       node = new LiteralExpression(isRaw, LiteralType.TypeString, isRaw ? value : value);

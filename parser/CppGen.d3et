@@ -633,6 +633,8 @@ server class CppGen implements Gen{
             genYieldExpression(exp as YieldExpression, depth, xp);
         } else if(exp is TryCatcheStatment) {
             genTryCatchStatement(exp as TryCatcheStatment, depth, xp);
+        } else if(exp is Symbol) {
+            genSymbol(exp as Symbol, xp);
         } else {
 
         }
@@ -644,6 +646,12 @@ server class CppGen implements Gen{
             depth--;
         }
         return s;
+    }
+
+    void genSymbol(Symbol exp, Xp xp) {
+        xp('__symbol("');
+        xp(exp.name);
+        xp('")');
     }
     void genArrayAccess(ArrayAccess exp, Integer depth, Xp xp) {
         genExp(exp.on, depth, xp);
