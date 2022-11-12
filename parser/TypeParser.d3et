@@ -256,6 +256,9 @@ server class TypeParser {
         check(TypeKind.Lt);
         TypeParams params = TypeParams();
         while (true) {
+            if (this.tok.kind == TypeKind.At) {
+                readAnnotation();
+            }
             if (tok.kind == TypeKind.Gt) {
                 break;
             }
@@ -378,7 +381,8 @@ server class TypeParser {
             }
         }
         
-        if (this.tok.kind == TypeKind.Assign) {
+        if (this.tok.kind == TypeKind.Assign
+            || tok.kind == TypeKind.Colon) {
             next();
             def = expr(0);
         }
@@ -542,9 +546,7 @@ server class TypeParser {
         Boolean isConstructor = (tok.lit == className)
             && (peekTok.kind == TypeKind.Lpar
                 || peekTok.kind == TypeKind.Dot);
-        if (isKey(tok, 'pragma')) {
-		  checkName();
-        } else if(!isFactory && !isConstructor) {
+        if(!isFactory && !isConstructor) {
             if((isConst || isFinal) && peekTok.kind == TypeKind.Assign) {
             } else {
                 if (isKey(tok, 'Function')) {
@@ -1083,9 +1085,15 @@ server class TypeParser {
         check(TypeKind.Lpar);
         Expression test = expr(0);
         check(TypeKind.Rpar);
-        Block block = readBlock(true);
+        Statement stmt = null;
+        if(this.tok.kind == TypeKind.Lcbr) {
+            stmt = readBlock(true);
+        } else {
+            stmt = readStatement();
+        }
+
         return WhileLoop(
-            body: block,
+            body: stmt,
             test: test,
         );
     }
@@ -1234,6 +1242,8 @@ server class TypeParser {
                         return singleParamLambda();
                     } else if (isKey(tok, 'throw')) {
                         return readThrow(true);
+                    } else if (isKey(tok, 'r')) {
+                        node = stringExpr();
                     } else if (isKey(tok, 'new')) {
                         next();
                         return expr(precedence);
@@ -1726,6 +1736,7 @@ server class TypeParser {
                 return null;
             }
             args.add(sub);
+            eatComments();
             if (this.tok.kind != TypeKind.Comma) {
                 break;
             } else {
@@ -1914,18 +1925,17 @@ server class TypeParser {
 
     LiteralExpression stringExpr() {
         TypeToken start = tok;
-        Boolean isRaw = tok.kind == TypeKind.Name && tok.lit == 'r';
-        if (isRaw) {
-            next();
-        }
-        String value = tok.lit;
-        next();
-        eatComments();
-        while (this.tok.kind == TypeKind.String) {
-            value = value + this.tok.lit;
+        Boolean isRaw = false;
+        String value = '';
+        do {
+            isRaw = tok.kind == TypeKind.Name && tok.lit == 'r';
+            if (isRaw) {
+                next();
+            }
+            value = value + tok.lit;
             next();
             eatComments();
-        }
+        } while (tok.kind == TypeKind.String || peekTok.lit == 'r');
         LiteralExpression node;
         if (tok.kind != TypeKind.Dollar) {
             node = LiteralExpression(

@@ -262,9 +262,9 @@ public class TypeParser {
     check(TypeKind.Lt);
     TypeParams params = new TypeParams();
     while (true) {
-    	if (this.tok.kind == TypeKind.At) {
-            readAnnotation();
-          }
+      if (this.tok.kind == TypeKind.At) {
+        readAnnotation();
+      }
       if (this.tok.kind == TypeKind.Gt) {
         break;
       }
@@ -1092,10 +1092,10 @@ public class TypeParser {
     Expression test = expr(0l);
     check(TypeKind.Rpar);
     Statement stmt = null;
-    if(this.tok.kind == TypeKind.Lcbr) {
-    	stmt = readBlock(true);
+    if (this.tok.kind == TypeKind.Lcbr) {
+      stmt = readBlock(true);
     } else {
-    	stmt = readStatement(ListExt.List(), false);
+      stmt = readStatement(ListExt.List(), false);
     }
     return new WhileLoop(stmt, test);
   }
@@ -1225,7 +1225,6 @@ public class TypeParser {
       case Name:
         {
           {
-        	String tokLit = this.tok.lit;
             if (isKey(this.tok, "true") || isKey(this.tok, "false")) {
               node = new LiteralExpression(false, LiteralType.TypeBoolean, this.tok.lit);
               next();
@@ -1236,7 +1235,7 @@ public class TypeParser {
               return singleParamLambda();
             } else if (isKey(this.tok, "throw")) {
               return readThrow(true);
-            } else if (isKey(this.tok, "r") && this.peekTok.kind == TypeKind.String) {
+            } else if (isKey(this.tok, "r")) {
               node = stringExpr();
             } else if (isKey(this.tok, "new")) {
               next();
@@ -1873,7 +1872,7 @@ public class TypeParser {
       value = value + this.tok.lit;
       next();
       eatComments();
-    } while (this.tok.kind == TypeKind.String || this.peekTok.lit.equals("r"));
+    } while (this.tok.kind == TypeKind.String || Objects.equals(this.peekTok.lit, "r"));
     LiteralExpression node;
     if (this.tok.kind != TypeKind.Dollar) {
       node = new LiteralExpression(isRaw, LiteralType.TypeString, isRaw ? value : value);
