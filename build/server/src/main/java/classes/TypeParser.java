@@ -766,6 +766,7 @@ public class TypeParser {
     } else if (isKey(this.tok, "yield")) {
       smt = readYield();
     } else if (isKey(this.tok, "await")) {
+      next();
       smt = new AwaitExpression(expr(0l));
       if (!skipSemiColon) {
         check(TypeKind.Semicolon);
@@ -1957,8 +1958,8 @@ public class TypeParser {
       exp.values.add(sub);
       exp.str += "%s";
       while (this.tok.kind == TypeKind.String) {
-        next();
         exp.str += this.tok.lit;
+        next();
       }
     }
     return exp;

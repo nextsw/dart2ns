@@ -208,6 +208,9 @@ public class CppGen implements Gen {
 
   public String valueTypeToString(ValueType v, boolean cls) {
     String res = v.name;
+    if (Objects.equals(res, "dynamic")) {
+      res = "Object";
+    }
     if (cls) {
       res += "Cls";
     }
@@ -792,9 +795,16 @@ public class CppGen implements Gen {
   }
 
   public void genStringIntr(StringInterExp exp, Xp xp) {
-    xp.apply("__s(\"");
+    xp.apply("__sf(\"");
     xp.apply(exp.str);
-    xp.apply("\")");
+    xp.apply("\", ");
+    for (Expression val : exp.values) {
+      genExp(val, 0l, xp);
+      if (!(Objects.equals(val, ListExt.last(exp.values)))) {
+        xp.apply(", ");
+      }
+    }
+    xp.apply(")");
     exp.resolvedType = this.stringType;
   }
 
@@ -1455,7 +1465,7 @@ public class CppGen implements Gen {
     if (exp.type != null) {
       xp.apply(dataTypeToString(exp.type, false, null));
     } else {
-      xp.apply("Unknown");
+      xp.apply("auto");
     }
     xp.apply(" ");
     DataType resolvedType = null;
