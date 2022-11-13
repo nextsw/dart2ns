@@ -466,6 +466,9 @@ public class CppGen implements Gen {
     }
     hp("(");
     if (m.params != null) {
+      if (c != null) {
+        updateSuperAndParams(m, c);
+      }
       genMethodParams(
           m.params,
           c,
@@ -627,24 +630,169 @@ public class CppGen implements Gen {
     this.tempCount = 0l;
   }
 
+  public DataType getSuperParamType(ClassDecl c, String name) {
+    ClassMember cm = getMember(c, c.name);
+    if (cm == null) {
+      /*
+       No constructor found
+      */
+      return null;
+    }
+    MethodDecl md = ((MethodDecl) cm);
+    if (md.params == null) {
+      return null;
+    }
+    MethodParam param =
+        ListExt.firstWhere(
+            md.params.positionalParams,
+            (m) -> {
+              return Objects.equals(m.name, name);
+            },
+            null);
+    if (param != null) {
+      return param.dataType;
+    }
+    param =
+        ListExt.firstWhere(
+            md.params.optionalParams,
+            (m) -> {
+              return Objects.equals(m.name, name);
+            },
+            null);
+    if (param != null) {
+      return param.dataType;
+    }
+    param =
+        ListExt.firstWhere(
+            md.params.namedParams,
+            (m) -> {
+              return Objects.equals(m.name, name);
+            },
+            null);
+    if (param != null) {
+      return param.dataType;
+    }
+    return null;
+  }
+
+  public void updateSuperAndParams(MethodDecl md, ClassDecl c) {
+    if (md.params == null) {
+      return;
+    }
+    List<MethodParam> superPosParams = ListExt.asList();
+    List<MethodParam> superNamedParams = ListExt.asList();
+    MethodDecl superCon = null;
+    if (c.extendType != null) {
+      ClassDecl superCls = ((ClassDecl) this.context.get(c.extendType.name));
+      if (superCls != null) {
+        superCon = ((MethodDecl) getMember(superCls, superCls.name));
+      }
+    }
+    long x = 0l;
+    for (MethodParam p : md.params.positionalParams) {
+      if (Objects.equals(p.thisToken, "this")) {
+        p.dataType = getFieldType(c, p.name);
+      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
+        superPosParams.add(p);
+        MethodParam superParam = getParamAtIndex(superCon.params, x);
+        p.dataType = superParam.dataType;
+      }
+      x++;
+    }
+    for (MethodParam p : md.params.optionalParams) {
+      if (Objects.equals(p.thisToken, "this")) {
+        p.dataType = getFieldType(c, p.name);
+      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
+        superPosParams.add(p);
+        MethodParam superParam = getParamAtIndex(superCon.params, x);
+        p.dataType = superParam.dataType;
+      }
+      x++;
+    }
+    for (MethodParam p : md.params.namedParams) {
+      if (Objects.equals(p.thisToken, "this")) {
+        p.dataType = getFieldType(c, p.name);
+      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
+        superNamedParams.add(p);
+        MethodParam superParam = getParamByName(superCon.params, p.name);
+        p.dataType = superParam.dataType;
+      }
+    }
+    if (superPosParams.isEmpty() || superNamedParams.isEmpty()) {
+      return;
+    }
+    MethodCall superCall = null;
+    if (md.init == null) {
+      Block block = new Block();
+      md.init = block;
+      superCall = new MethodCall("super", ListExt.List(), ListExt.List(), ListExt.List());
+      block.statements.add(superCall);
+    } else {
+      Block block = (((Block) md.init));
+      superCall =
+          ((MethodCall)
+              ListExt.firstWhere(
+                  block.statements,
+                  (s) -> {
+                    return s instanceof MethodCall
+                        && Objects.equals((((MethodCall) s)).name, "super");
+                  },
+                  null));
+      if (superCall == null) {
+        superCall = new MethodCall("super", ListExt.List(), ListExt.List(), ListExt.List());
+        ListExt.insert(block.statements, 0l, superCall);
+      }
+    }
+    List<Argument> posArgs =
+        IterableExt.toList(
+            ListExt.map(
+                superPosParams,
+                (p) -> {
+                  return new Argument(
+                      ListExt.List(), new FieldOrEnumExpression(false, p.name, false, null));
+                }),
+            false);
+    ListExt.insertAll(superCall.positionArgs, 0l, posArgs);
+    List<NamedArgument> namedArgs =
+        IterableExt.toList(
+            ListExt.map(
+                superPosParams,
+                (p) -> {
+                  return new NamedArgument(
+                      ListExt.List(),
+                      p.name,
+                      new FieldOrEnumExpression(false, p.name, false, null));
+                }),
+            false);
+    ListExt.insertAll(superCall.namedArgs, 0l, namedArgs);
+  }
+
+  public MethodParam getParamAtIndex(MethodParams m, long i) {
+    if (i < ListExt.length(m.positionalParams)) {
+      return ListExt.get(m.positionalParams, i);
+    }
+    i = i - ListExt.length(m.positionalParams);
+    return ListExt.get(m.optionalParams, i);
+  }
+
+  public MethodParam getParamByName(MethodParams m, String name) {
+    return ListExt.firstWhere(
+        m.namedParams,
+        (p) -> {
+          return Objects.equals(p.name, name);
+        },
+        null);
+  }
+
   public void genMethodParams(MethodParams mp, ClassDecl c, Xp xp) {
     List<MethodParam> thisParams = ListExt.asList();
     List<MethodParam> params = sortMethodParams(mp);
     params.forEach(
         (p) -> {
           if (p.dataType == null) {
-            if (p.thisToken != null && c != null) {
-              thisParams.add(p);
-              DataType type = getFieldType(c, p.name);
-              xp.apply(dataTypeToString(type, false, null));
-              if (this.scope != null) {
-                this.scope.add(p.name, type);
-              }
-            } else {
-              xp.apply("Unknown");
-              if (this.scope != null) {
-                this.scope.add(p.name, ofUnknownType());
-              }
+            xp.apply("Unknown");
+            if (this.scope != null) {
+              this.scope.add(p.name, ofUnknownType());
             }
             xp.apply(" ");
             xp.apply(p.name);

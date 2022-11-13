@@ -379,6 +379,9 @@ server class CppGen implements Gen{
         }
         hp('(');
         if(m.params != null) {
+            if(c != null) {
+                updateSuperAndParams(m, c);
+            }
             genMethodParams(m.params, c, x => hp(x));
         }
         hp(')');
@@ -493,23 +496,131 @@ server class CppGen implements Gen{
         tempCount = 0;
     }
 
+    DataType getSuperParamType(ClassDecl c, String name) {
+        ClassMember cm = getMember(c, c.name);
+        if(cm == null) {
+            // No constructor found
+            return null;
+        }
+        MethodDecl md = cm as MethodDecl;
+        if(md.params == null) {
+            return null;
+        }
+        MethodParam param = md.params.positionalParams.firstWhere(m => m.name == name);
+        if(param != null) {
+            return param.dataType;
+        }
+        param = md.params.optionalParams.firstWhere(m => m.name == name);
+        if(param != null) {
+            return param.dataType;
+        }
+        param = md.params.namedParams.firstWhere(m => m.name == name);
+        if(param != null) {
+            return param.dataType;
+        }
+        return null;
+    }
+
+    void updateSuperAndParams(MethodDecl md, ClassDecl c) {
+        if(md.params == null) {
+            return;
+        }
+        List<MethodParam> superPosParams = [];
+        List<MethodParam> superNamedParams = [];
+        MethodDecl superCon = null;
+        if(c.extendType != null) {
+            ClassDecl superCls = context.get(c.extendType.name) as ClassDecl;
+            if(superCls != null) {
+                superCon = getMember(superCls, superCls.name) as MethodDecl;
+            }
+        }
+        Integer x = 0;
+        for(MethodParam p in md.params.positionalParams){
+            if(p.thisToken == 'this') {
+                p.dataType = getFieldType(c, p.name);
+            } else if (p.thisToken == 'super' && superCon != null) {
+                superPosParams.add(p);
+                MethodParam superParam = getParamAtIndex(superCon.params, x);
+                p.dataType = superParam.dataType;
+            }
+            x++;
+        }
+        for(MethodParam p in md.params.optionalParams){
+            if(p.thisToken == 'this') {
+                p.dataType = getFieldType(c, p.name);
+            } else if (p.thisToken == 'super' && superCon != null) {
+                superPosParams.add(p);
+                MethodParam superParam = getParamAtIndex(superCon.params, x);
+                p.dataType = superParam.dataType;
+            }
+            x++;
+        }
+        for(MethodParam p in md.params.namedParams){
+            if(p.thisToken == 'this') {
+                p.dataType = getFieldType(c, p.name);
+            } else if (p.thisToken == 'super' && superCon != null) {
+                superNamedParams.add(p);
+                MethodParam superParam = getParamByName(superCon.params, p.name);
+                p.dataType = superParam.dataType;
+            }
+        }
+        if(superPosParams.isEmpty || superNamedParams.isEmpty){
+            return;
+        }
+        MethodCall superCall = null;
+        if(md.init == null) {
+            Block block = Block();
+            md.init = block;
+            superCall = MethodCall(
+                name: 'super',
+            );
+            block.statements.add(superCall);
+        } else {
+            Block block = (md.init as Block);
+            superCall = block.statements.firstWhere(s => s is MethodCall && (s as MethodCall).name == 'super') as MethodCall;
+            if(superCall == null) {
+                superCall = MethodCall(
+                    name: 'super',
+                );
+                block.statements.insert(0, superCall);
+            }
+        }
+        List<Argument> posArgs = superPosParams.map(p => Argument(
+            arg: FieldOrEnumExpression(
+                name: p.name,
+            ),
+        )).toList();
+        superCall.positionArgs.insertAll(0, posArgs);
+
+        List<NamedArgument> namedArgs = superPosParams.map(p => NamedArgument(
+            name: p.name,
+            value: FieldOrEnumExpression(
+                name: p.name,
+            ),
+        )).toList();
+        superCall.namedArgs.insertAll(0, namedArgs);
+    }
+
+    MethodParam getParamAtIndex(MethodParams m, Integer i) {
+        if(i < m.positionalParams.length) {
+            return m.positionalParams.get(i);
+        }
+        i = i - m.positionalParams.length;
+        return m.optionalParams.get(i);
+    }
+
+    MethodParam getParamByName(MethodParams m, String name) {
+        return m.namedParams.firstWhere(p => p.name == name);
+    }
+
     void genMethodParams(MethodParams mp, ClassDecl c, Xp xp) {
         List<MethodParam> thisParams = [];
         List<MethodParam> params = sortMethodParams(mp);
         params.forEach((p) {
             if(p.dataType == null) {
-                if(p.thisToken != null && c != null){
-                    thisParams.add(p);
-                    DataType type = getFieldType(c, p.name);
-                    xp(dataTypeToString(type));
-                    if(scope != null) {
-                        scope.add(p.name, type);
-                    }
-                } else {
-                    xp('Unknown');
-                    if(scope != null) {
-                        scope.add(p.name, ofUnknownType());
-                    }
+                xp('Unknown');
+                if(scope != null) {
+                    scope.add(p.name, ofUnknownType());
                 }
                 xp(' ');
                 xp(p.name);
