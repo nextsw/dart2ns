@@ -1,6 +1,14 @@
-class CollectionSpread extends ArrayItem {
+server class CollectionSpread extends ArrayItem {
     Expression values;
     List<Comment> beforeComments = [];
     Boolean checkNull;
     CollectionSpread({this.values, this.beforeComments, this.checkNull});
+
+
+    void resolve(ResolveContext context) {
+        values.resolve(context);
+    }
+    void collectUsedTypes(Set<String> types) {
+        values.collectUsedTypes(types);
+    }
 }

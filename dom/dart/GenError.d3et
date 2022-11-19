@@ -1,4 +1,4 @@
-class GenError {
+server class GenError {
     String error;
     String path;
 }

@@ -1,10 +1,9 @@
-class MethodDecl extends ClassMember{
+server class MethodDecl extends ClassMember{
     String name;
     List<Annotation> annotations = [];
     MethodParams params;
     DataType returnType;
     Boolean final;
-    Boolean static;
     Boolean const;
     Boolean external;
     Boolean setter;
@@ -37,5 +36,65 @@ class MethodDecl extends ClassMember{
         this.external,
     }) : super(name, TopDeclType.Method, '');
     String content;
+
+    void resolve(ResolveContext context){
+        MethodDecl prev = context.method;
+        context.method = this;
+        context.scope = Scope(parent: context.scope);
+        if(params != null) {
+            for(MethodParam p in context.sortMethodParams(params)){
+                if(p.dataType != null) {
+                    if(p.dataType.name != null && p.dataType.name.length == 1) {
+                        // Need to resolve the type...
+                        DataType paramType = resolveGegeric(context, p.dataType.name);
+                        context.scope.add(p.name, paramType);
+                    } else {
+                        context.scope.add(p.name, p.dataType);
+                    }
+                }
+            }
+        }
+        if(init != null) {
+            init.resolve(context);
+        }
+        if(body != null) {
+            body.resolve(context);
+        } else if(exp != null) {
+            exp.resolve(context);
+        }
+        context.scope = context.scope.parent;
+        context.method = prev;
+    }
+
+    void collectUsedTypes(){
+        if(init != null) {
+            init.collectUsedTypes(usedTypes);
+        }
+        if(body != null) {
+            body.collectUsedTypes(usedTypes);
+        } else if(exp != null) {
+            exp.collectUsedTypes(usedTypes);
+        }
+    }
+
+    String toString(){
+        return name;
+    }
+
+    DataType resolveGegeric(ResolveContext context, String name) {
+        if(generics != null) {
+            TypeParam p = generics.params.firstWhere(x => x.name==name);
+            if(p != null && p.extendType != null) {
+                return p.extendType;
+            }
+        }
+        if(context.instanceClass != null && context.instanceClass.generics != null) {
+            TypeParam p = context.instanceClass.generics.params.firstWhere(x => x.name==name);
+            if(p != null && p.extendType != null) {
+                return p.extendType;
+            }
+        }
+        return context.ofUnknownType();
+    }
 
 }

@@ -1,4 +1,17 @@
-class Block extends Statement {
+server class Block extends Statement {
     List<Comment> afterComments = [];
     List<Statement> statements = [];
+
+    void resolve(ResolveContext context) {
+        context.scope = Scope(parent: context.scope);
+        for(Statement stmt in statements) {
+            stmt.resolve(context);
+        }
+        context.scope = context.scope.parent;
+    }
+    void collectUsedTypes(Set<String> types) {
+        for(Statement stmt in statements) {
+            stmt.collectUsedTypes(types);
+        }
+    }
 }

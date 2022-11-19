@@ -1,7 +1,21 @@
-class TypeCastOrCheckExpression extends Statement {
+server class TypeCastOrCheckExpression extends Statement {
     Boolean check;
     DataType dataType;
     Expression exp;
     Boolean isNot;
     TypeCastOrCheckExpression({this.check, this.dataType, this.exp, this.isNot});
+
+
+    void resolve(ResolveContext context) {
+        exp.resolve(context);
+        if(check) {
+            resolvedType = context.booleanType;
+        } else {
+            resolvedType = dataType;
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        exp.collectUsedTypes(types);
+        types.add(dataType.name);
+    }
 }

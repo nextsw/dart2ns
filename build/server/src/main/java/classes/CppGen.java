@@ -725,7 +725,7 @@ public class CppGen implements Gen {
     if (md.init == null) {
       Block block = new Block();
       md.init = block;
-      superCall = new MethodCall("super", ListExt.List(), ListExt.List(), ListExt.List());
+      superCall = new MethodCall("super", ListExt.List(), null, ListExt.List(), ListExt.List());
       block.statements.add(superCall);
     } else {
       Block block = (((Block) md.init));
@@ -739,7 +739,7 @@ public class CppGen implements Gen {
                   },
                   null));
       if (superCall == null) {
-        superCall = new MethodCall("super", ListExt.List(), ListExt.List(), ListExt.List());
+        superCall = new MethodCall("super", ListExt.List(), null, ListExt.List(), ListExt.List());
         ListExt.insert(block.statements, 0l, superCall);
       }
     }

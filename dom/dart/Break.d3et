@@ -1,4 +1,11 @@
-class Break extends Statement {
+server class Break extends Statement {
     String label;
-    Break(this.label);    
+    Break(this.label);
+
+    void resolve(ResolveContext context) {
+
+    }
+    void collectUsedTypes(Set<String> types) {
+        
+    }
 }

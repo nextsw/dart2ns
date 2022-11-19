@@ -19,9 +19,11 @@ public class DynamicGen implements Gen{
 	private Dart2NSContext context;
 	private String path;
 	private String monitorDir;
+	private String clsName;
 	
-	public DynamicGen(String monitorDir) {
+	public DynamicGen(String monitorDir, String clsName) {
 		this.monitorDir = monitorDir;
+		this.clsName = clsName;
 	}
 
 	@Override
@@ -30,7 +32,7 @@ public class DynamicGen implements Gen{
 		this.path = path;
 		this.monitorDir = monitorDir;
 		try {
-			genImpl = (Class<Gen>) Class.forName("classes.CppGen");
+			genImpl = (Class<Gen>) Class.forName(clsName);
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -84,20 +86,20 @@ public class DynamicGen implements Gen{
 			ClassLoader urlClassLoader = new URLClassLoader(new URL[] {p.toUri().toURL()}, new ClassLoader() {
 				@Override
 				public Class<?> loadClass(String name) throws ClassNotFoundException {
-					if(name.equals("classes.CppGen")) {
+					if(name.equals(clsName)) {
 						return null;
 					}
 					return super.loadClass(name);
 				}
 				@Override
 				protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-					if(name.equals("classes.CppGen")) {
+					if(name.equals(clsName)) {
 						return null;
 					}
 					return super.loadClass(name, resolve);
 				}
 			});
-			genImpl = (Class<Gen>) urlClassLoader.loadClass("classes.CppGen");
+			genImpl = (Class<Gen>) urlClassLoader.loadClass(clsName);
 			System.out.println("loaded Class again");
 		} catch (MalformedURLException e) {
 			// TODO Auto-generated catch block

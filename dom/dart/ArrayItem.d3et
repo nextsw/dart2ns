@@ -1,4 +1,5 @@
-class ArrayItem extends Expression {
+abstract server class ArrayItem extends Expression {
     List<Comment> afterComments = [];
     List<Comment> beforeComments = [];
+
 }

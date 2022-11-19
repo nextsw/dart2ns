@@ -1,7 +1,17 @@
-class MapItem extends ArrayItem {
+server class MapItem extends ArrayItem {
     Expression key;
     Expression value;
     MapItem({this.key, this.value, List<Comment> comments}){
         this.comments = comments;
+    }
+
+
+    void resolve(ResolveContext context) {
+        key.resolve(context);
+        value.resolve(context);
+    }
+    void collectUsedTypes(Set<String> types) {
+        key.collectUsedTypes(types);
+        value.collectUsedTypes(types);
     }
 }

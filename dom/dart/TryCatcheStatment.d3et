@@ -1,6 +1,28 @@
-class TryCatcheStatment extends Statement {
+server class TryCatcheStatment extends Statement {
     Block body;
     Block finallyBody;
     List<CatchPart> catchParts = [];
     TryCatcheStatment({this.body, this.finallyBody, this.catchParts});
+
+     void resolve(ResolveContext context) {
+        body.resolve(context);
+        if(finallyBody != null) {
+            finallyBody.resolve(context);
+        }
+        for(CatchPart c in catchParts) {
+            body.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        body.collectUsedTypes(types);
+        if(finallyBody != null) {
+            finallyBody.collectUsedTypes(types);
+        }
+        for(CatchPart c in catchParts) {
+            body.collectUsedTypes(types);
+            if(c.onType != null) {
+                c.onType.collectUsedTypes(types);
+            }
+        }
+    }
 }

@@ -1,5 +1,8 @@
 package classes;
 
+import java.util.Objects;
+import java.util.Set;
+
 public class BinaryExpression extends Expression {
   public String op;
   public Expression left;
@@ -9,5 +12,43 @@ public class BinaryExpression extends Expression {
     this.left = left;
     this.op = op;
     this.right = right;
+  }
+
+  public void resolve(ResolveContext context) {
+    this.left.resolve(context);
+    /*
+     Create new scope if needed
+    */
+    boolean newScope = false;
+    if (Objects.equals(this.op, "&&")) {
+      Expression check = this.left;
+      if (check instanceof ParExpression) {
+        check = (((ParExpression) check)).exp;
+      }
+      if (this.left instanceof TypeCastOrCheckExpression) {
+        TypeCastOrCheckExpression typeCheck = ((TypeCastOrCheckExpression) check);
+        if (typeCheck.check && typeCheck.exp instanceof FieldOrEnumExpression) {
+          FieldOrEnumExpression fe = ((FieldOrEnumExpression) typeCheck.exp);
+          if (fe.on == null) {
+            context.scope = new Scope(context.scope, null);
+            context.scope.add(fe.name, typeCheck.dataType);
+            newScope = true;
+          }
+        }
+      }
+    }
+    this.right.resolve(context);
+    if (newScope) {
+      context.scope = context.scope.parent;
+    }
+    this.resolvedType =
+        this.op == "??"
+            ? context.commonType(this.left.resolvedType, this.right.resolvedType)
+            : this.left.resolvedType;
+  }
+
+  public void collectUsedTypes(Set<String> types) {
+    this.left.collectUsedTypes(types);
+    this.right.collectUsedTypes(types);
   }
 }

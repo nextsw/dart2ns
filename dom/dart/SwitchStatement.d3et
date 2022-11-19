@@ -1,6 +1,26 @@
-class SwitchStatement extends Statement {
+server class SwitchStatement extends Statement {
     Expression test;
     List<SwitchCaseBlock> cases = [];
     SwitchStatement({this.test});
     List<Statement> defaults = [];
+
+
+    void resolve(ResolveContext context) {
+        test.resolve(context);
+        cases.forEach((c) {
+            c.resolve(context);
+        });
+        defaults.forEach((d){
+            d.resolve(context);
+        });
+    }
+    void collectUsedTypes(Set<String> types) {
+        test.collectUsedTypes(types);
+        cases.forEach((c) {
+            c.collectUsedTypes(types);
+        });
+        defaults.forEach((d){
+            d.collectUsedTypes(types);
+        });
+    }
 }

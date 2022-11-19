@@ -1,0 +1,8 @@
+enum MemberFilter {
+    Any,
+    AllFields,
+    AllMethods,
+    FieldsAndGetters,
+    FieldsAndSetters,
+    MethodsWithoutGettersAndSetters,
+}

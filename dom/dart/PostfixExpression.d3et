@@ -1,5 +1,14 @@
-class PostfixExpression extends Statement {
+server class PostfixExpression extends Statement {
     String postfix;
     Expression on;
     PostfixExpression({this.postfix, this.on});
+
+
+    void resolve(ResolveContext context) {
+        on.resolve(context);
+        resolvedType = on.resolvedType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        on.collectUsedTypes(types);
+    }
 }

@@ -2,6 +2,7 @@ package classes;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -150,5 +151,9 @@ public class AutoGenerateUtil {
       pieces.add(sb.toString());
     }
     return pieces.stream().toArray(String[]::new);
+  }
+  
+  public static String generateUUID(String prefix) {
+	  return prefix + UUID.randomUUID().toString().replace("-", "");
   }
 }

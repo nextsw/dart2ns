@@ -1,8 +1,7 @@
-class FieldDecl extends ClassMember {
+server class FieldDecl extends ClassMember {
     String name;
     DataType type;
     Expression value;
-    Boolean static;
     Boolean final;
     Boolean const;
     Boolean external;
@@ -19,4 +18,24 @@ class FieldDecl extends ClassMember {
         this.annotations,
         this.external,
     }): super(name, TopDeclType.Field, '');
+
+    void collectUsedTypes(){
+        if(type != null) {
+            type.collectUsedTypes(usedTypes);
+        }
+    }
+
+    void resolve(ResolveContext context){
+        if(value != null) {
+            value.resolve(context);
+            if(type == null){
+                type = value.resolvedType;
+            }
+        }
+        context.scope.add(name, type);
+    }
+
+    String toString(){
+        return name;
+    }
 }

@@ -1,4 +1,13 @@
-class ExpressionArrayItem extends ArrayItem{
+server class ExpressionArrayItem extends ArrayItem{
     Expression exp;
     ExpressionArrayItem({this.exp});
+
+
+    void resolve(ResolveContext context) {
+        exp.resolve(context);
+        resolvedType = exp.resolvedType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        exp.collectUsedTypes(types);
+    }
 }

@@ -1,4 +1,4 @@
-class ValueType extends DataType {
+server class ValueType extends DataType {
     String in;
     List<DataType> args = [];
     ValueType(this.name, [this.optional = false]);
@@ -9,5 +9,9 @@ class ValueType extends DataType {
             res = res + '<' + this.args.toString() +'>';
         }
         return res;
+    }
+
+    void collectUsedTypes(Set<String> types) {
+        types.add(name);
     }
 }

@@ -1,8 +1,14 @@
-abstract class TopDecl {
+abstract server class TopDecl {
     TopDeclType type;
     String name;
     String path;
     List<GenError> errors;
     List<Annotation> annotations;
+    Library lib;
+
+    Set<String> usedTypes = Set();
     TopDecl(this.name, this.type, this.path);
+
+    void collectUsedTypes();
+    void resolve(ResolveContext context);
 }

@@ -1,5 +1,15 @@
-class CollectionFor extends ArrayItem {
+server class CollectionFor extends ArrayItem {
     Statement stmt;
     ArrayItem value;
     CollectionFor({this.stmt, this.value});
+
+
+    void resolve(ResolveContext context) {
+        stmt.resolve(context);
+        value.resolve(context);
+    }
+    void collectUsedTypes(Set<String> types) {
+        stmt.collectUsedTypes(types);
+        value.collectUsedTypes(types);
+    }
 }

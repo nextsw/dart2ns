@@ -1,5 +1,14 @@
-class CascadeExp extends Statement {
+server class CascadeExp extends Statement {
     Expression on;
 	List<Statement> calls = [];
     CascadeExp(this.on);
+
+
+    void resolve(ResolveContext context) {
+        on.resolve(context);
+        resolvedType = on.resolvedType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        on.collectUsedTypes(types);
+    }
 }

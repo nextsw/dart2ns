@@ -1,4 +1,4 @@
-class MethodCall extends Statement {
+server class MethodCall extends Statement {
     String name;
     List<DataType> typeArgs = [];
     List<Argument> positionArgs = [];
@@ -6,10 +6,120 @@ class MethodCall extends Statement {
     Boolean checkNull;
     Boolean notNull;
     Expression on;
+    String onTypeName;
+    MethodDecl resolvedMethod;
     MethodCall({
         this.name,
         this.typeArgs,
         this.positionArgs,
         this.namedArgs,
+        this.onTypeName,
     });
+
+
+    void resolve(ResolveContext context) {
+        ClassDecl onType = null;
+        Boolean onLibrary = false;
+        if(on != null) {
+            on.resolve(context);
+            if(on.resolvedType == context.libraryType) {
+                onLibrary = true;
+            } else if(on.resolvedType == context.typeType) {
+                if(!(on is FieldOrEnumExpression)){
+                    D3ELogger.error('Mist be FE Exp');
+                    resolvedType = context.ofUnknownType();
+                    return;
+                }
+                String typeName = (on as FieldOrEnumExpression).name;
+                TopDecl top = context.get(typeName);
+                if(top is ClassDecl){
+                    onType = top as ClassDecl;
+                } else if(top is Enum) {
+                    onType = (top as Enum).toClassDecl();
+                }
+            } else  if(on.resolvedType is ValueType) {
+                TopDecl top = context.get(on.resolvedType.name);
+                if(top is ClassDecl) {
+                    onType = top as ClassDecl;
+                }
+            }
+        } else {
+            if(context.instanceClass != null 
+                && context.getMember(context.instanceClass, name) != null){
+                onType = context.instanceClass;
+            }
+            if(onTypeName != null) {
+                TopDecl top = context.get(onTypeName);
+                if(top is ClassDecl){
+                    onType = top as ClassDecl;
+                }
+            }
+        }
+        for(Argument arg in positionArgs) {
+            arg.arg.resolve(context);
+        }
+        for(NamedArgument arg in namedArgs) {
+            arg.value.resolve(context);
+        }
+
+        if(onType != null) {
+            ClassMember cm = onType.members.firstWhere(m => m is MethodDecl && (m.name == name || (m as MethodDecl).factoryName == name));
+            if(cm != null && cm is MethodDecl) {
+                MethodDecl md = cm as MethodDecl;
+                if(md.returnType == null) {
+                    //Assuming it is constuctor
+                    resolvedType = ValueType(onType.name);
+                } else {
+                    resolvedType = context.resolveType(onType, md.returnType);
+                }
+                resolvedMethod = md;
+            } else {
+                // Error
+                resolvedType = context.ofUnknownType();
+            }
+        } else if(onLibrary) {
+            if(!(on is FieldOrEnumExpression)){
+                D3ELogger.error('Mist be FE Exp');
+                resolvedType = context.ofUnknownType();
+                return;
+            }
+            String importName = (on as FieldOrEnumExpression).name;
+            Library libToCheck = context.instanceClass.lib;
+            if(context.instanceClass.lib.partOf != null) {
+                libToCheck = libToCheck.parent;
+            }
+            Import import = libToCheck.imports.firstWhere(i => i.name == importName);
+            TopDecl topCm = import.lib.get(name);
+            if(topCm is MethodDecl) {
+                MethodDecl md = topCm as MethodDecl;
+                resolvedType = md.returnType;
+            } else {
+                // Error
+                resolvedType = context.ofUnknownType();
+            }
+        } else {
+            TopDecl td = context.get(name);
+            if(td is MethodDecl) {
+                MethodDecl md = td as MethodDecl;
+                resolvedType = md.returnType;
+                resolvedMethod = md;
+                //TODO need to resolve on method type generics
+            } else if(td is ClassDecl){
+                resolvedType = ValueType(name);
+            } else {
+                resolvedType = context.ofUnknownType();
+            }
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        if(on != null) {
+            on.collectUsedTypes(types);
+        }
+        for(Argument arg in positionArgs) {
+            arg.arg.collectUsedTypes(types);
+        }
+        for(NamedArgument arg in namedArgs) {
+            arg.value.collectUsedTypes(types);
+        }
+    }
 }

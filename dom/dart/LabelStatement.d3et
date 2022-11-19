@@ -1,4 +1,12 @@
-class LabelStatement extends Statement {
+server class LabelStatement extends Statement {
     String name;
     LabelStatement(this.name);
+
+    void resolve(ResolveContext context) {
+
+    }
+
+    void collectUsedTypes(Set<String> types) {
+        
+    }
 }

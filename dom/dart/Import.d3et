@@ -1,4 +1,4 @@
-class Import {
+server class Import {
     String path;
     Library lib;
     Library parent;

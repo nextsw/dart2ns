@@ -1,4 +1,12 @@
-class Symbol extends Expression {
+server class Symbol extends Expression {
     String name;
     Symbol(this.name);
+
+
+    void resolve(ResolveContext context) {
+        resolvedType = context.objectType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        
+    }
 }

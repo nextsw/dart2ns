@@ -1,4 +1,13 @@
-class InlineMethodStatement extends Statement {
+server class InlineMethodStatement extends Statement {
     MethodDecl method;
     InlineMethodStatement(this.method);
+
+    void resolve(ResolveContext context) {
+        method.resolve(context);
+    }
+
+    void collectUsedTypes(Set<String> types) {
+        method.collectUsedTypes();
+        types.addAll(method.usedTypes);
+    }
 }

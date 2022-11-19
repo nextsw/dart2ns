@@ -1,0 +1,31 @@
+abstract server class ResolveContext {
+    DataType objectType = ValueType('Object');
+    DataType booleanType = ValueType('bool');
+    DataType integerType = ValueType('int');
+    DataType doubleType = ValueType('double');
+    DataType nullType = ValueType('null');
+    DataType stringType = ValueType('String');
+    DataType typeType = ValueType('__Type');
+    DataType libraryType = ValueType('__Library');
+    DataType dynamicType = ValueType('dynamic');
+
+    ClassDecl instanceClass;
+
+    MethodDecl method;
+
+    Scope scope;
+
+
+    TopDecl get(String name);
+
+    DataType fieldTypeFromScope(String name);
+    DataType resolveType(ClassDecl onType, DataType type);
+    ClassMember getMember(ClassDecl onType, String name,{MemberFilter filter});
+    DataType commonType(DataType first, DataType second);
+    DataType subType(DataType type, [Integer index]);
+    List<MethodParam> sortMethodParams(MethodParams params);
+    DataType getListValueType(ClassDecl cls);
+
+    DataType ofUnknownType();
+
+}

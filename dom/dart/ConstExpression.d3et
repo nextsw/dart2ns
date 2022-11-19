@@ -1,4 +1,21 @@
-class ConstExpression extends Statement {
+server class ConstExpression extends Statement {
     Expression exp;
     ConstExpression(this.exp);
+
+
+    void resolve(ResolveContext context) {
+        if(exp is Assignment){
+            Assignment ass = exp as Assignment;
+            FieldOrEnumExpression fe = ass.left as FieldOrEnumExpression;
+            ass.right.resolve(context);
+            resolvedType = ass.right.resolvedType;
+            context.scope.add(fe.name, resolvedType);
+        } else {
+            exp.resolve(context);
+            resolvedType = exp.resolvedType;
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        exp.collectUsedTypes(types);
+    }
 } 

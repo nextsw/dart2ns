@@ -1,7 +1,24 @@
-class ForEachLoop extends Statement {
+server class ForEachLoop extends Statement {
     Expression body;
     DataType dataType;
     String name;
     Expression collection;
     ForEachLoop({this.body, this.dataType, this.name, this.collection});
+
+
+    void resolve(ResolveContext context) {
+        collection.resolve(context);
+        if(body != null) {
+            body.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        if(dataType != null){
+            dataType.collectUsedTypes(types);
+        }
+        if(body != null) {
+            body.collectUsedTypes(types);
+        }
+        collection.collectUsedTypes(types);
+    }
 }

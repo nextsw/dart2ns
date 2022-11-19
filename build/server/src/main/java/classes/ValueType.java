@@ -2,6 +2,7 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
+import java.util.Set;
 
 public class ValueType extends DataType {
   public String in;
@@ -18,5 +19,9 @@ public class ValueType extends DataType {
       res = res + "<" + this.args.toString() + ">";
     }
     return res;
+  }
+
+  public void collectUsedTypes(Set<String> types) {
+    types.add(this.name);
   }
 }

@@ -1,6 +1,23 @@
-class LiteralExpression extends Expression {
+server class LiteralExpression extends Expression {
     String value;
     LiteralType type;
     Boolean isRawString;
     LiteralExpression({this.value, this.type, this.isRawString});
+
+
+    void resolve(ResolveContext context) {
+        switch(type) {
+            case TypeBoolean: 
+                resolvedType = context.booleanType;
+            case TypeString:
+                resolvedType = context.stringType;
+            case TypeDouble:
+                resolvedType = context.doubleType;
+            case TypeInteger:
+                resolvedType = context.integerType;
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        
+    }
 }

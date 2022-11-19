@@ -92,9 +92,12 @@ public class TypeParser {
       if (isKey(this.peekTok, "of")) {
         next();
         next();
+        List<String> str = ListExt.asList();
         while (this.tok.kind != TypeKind.Semicolon) {
+          str.add(this.tok.lit);
           next();
         }
+        this.context.addPartOf(ListExt.join(str, ""));
         next();
         return true;
       }
@@ -555,6 +558,7 @@ public class TypeParser {
     boolean isConstructor =
         (Objects.equals(this.tok.lit, className))
             && (this.peekTok.kind == TypeKind.Lpar || this.peekTok.kind == TypeKind.Dot);
+    String factoryName = null;
     if (!isFactory && !isConstructor) {
       if ((isConst || isFinal) && this.peekTok.kind == TypeKind.Assign) {
       } else {
@@ -606,7 +610,7 @@ public class TypeParser {
       }
       if (this.tok.kind == TypeKind.Dot) {
         check(TypeKind.Dot);
-        name = checkName();
+        factoryName = checkName();
       }
     } else {
       if (Objects.equals(name, "set") && this.tok.kind == TypeKind.Name) {
@@ -678,7 +682,7 @@ public class TypeParser {
             exp,
             isExternal,
             isFactory,
-            null,
+            factoryName,
             isFinal,
             typeParams,
             isGet,
@@ -1960,6 +1964,7 @@ public class TypeParser {
       while (this.tok.kind == TypeKind.String) {
         exp.str += this.tok.lit;
         next();
+        eatComments();
       }
     }
     return exp;
@@ -1995,8 +2000,8 @@ public class TypeParser {
         restore();
       } else {
         drop();
+        return callExpr(name, args);
       }
-      return callExpr(name, args);
     }
     if (this.tok.kind == TypeKind.Lpar) {
       return callExpr(name, ListExt.List());
@@ -2006,11 +2011,13 @@ public class TypeParser {
 
   public MethodCall callExpr(String name, List<DataType> typeArgs) {
     TypeToken start = this.tok;
+    String onTypeName = null;
     if (this.tok.kind == TypeKind.Dot) {
       /*
        Call on Type
       */
       next();
+      onTypeName = name;
       name = checkName();
     }
     if (this.tok.kind != TypeKind.Lpar) {
@@ -2018,7 +2025,7 @@ public class TypeParser {
     } else {
       next();
     }
-    MethodCall mCall = new MethodCall(name, ListExt.List(), ListExt.List(), typeArgs);
+    MethodCall mCall = new MethodCall(name, ListExt.List(), onTypeName, ListExt.List(), typeArgs);
     while (true) {
       List<Comment> comments = eatComments();
       if (this.tok.kind == TypeKind.Rpar

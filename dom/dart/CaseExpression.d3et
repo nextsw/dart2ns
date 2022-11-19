@@ -1,4 +1,17 @@
-class CaseExpression {
+server class CaseExpression {
     List<Expression> tests = [];
     Expression result;
+
+    void resolve(ResolveContext context) {
+        tests.forEach((c) {
+            c.resolve(context);
+        });
+        result.resolve(context);
+    }
+    void collectUsedTypes(Set<String> types) {
+        tests.forEach((c) {
+            c.collectUsedTypes(types);
+        });
+        result.collectUsedTypes(types);
+    }    
 }

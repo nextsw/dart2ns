@@ -1,5 +1,22 @@
-class SwitchCaseBlock {
+server class SwitchCaseBlock {
     List<Expression> tests = [];
     List<Statement> statements = [];
     String label;
+
+    void resolve(ResolveContext context) {
+        tests.forEach((c) {
+            c.resolve(context);
+        });
+        statements.forEach((d){
+            d.resolve(context);
+        });
+    }
+    void collectUsedTypes(Set<String> types) {
+        tests.forEach((c) {
+            c.collectUsedTypes(types);
+        });
+        statements.forEach((d){
+            d.collectUsedTypes(types);
+        });
+    }
 }

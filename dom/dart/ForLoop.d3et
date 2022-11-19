@@ -1,8 +1,44 @@
-class ForLoop extends Statement {
+server class ForLoop extends Statement {
     Expression body;
     Declaration decl;
     Expression test;
     List<Statement> inits = [];
     List<Statement> resets = [];
     ForLoop({this.body, this.decl, this.test, this.inits, this.resets});
+
+
+    void resolve(ResolveContext context) {
+        if(decl != null){
+            decl.resolve(context);
+        }
+        for(Statement s in inits){
+            s.resolve(context);
+        }
+        for(Statement s in resets){
+            s.resolve(context);
+        }
+        if(test!= null){
+            test.resolve(context);
+        }
+        if(body != null) {
+            body.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        inits.forEach((i){
+            i.collectUsedTypes(types);
+        });
+        resets.forEach((r){
+            r.collectUsedTypes(types);
+        });
+        if(decl != null){
+            decl.collectUsedTypes(types);
+        }
+        if(test!= null){
+            test.collectUsedTypes(types);
+        }
+        if(body != null) {
+            body.collectUsedTypes(types);
+        }
+    }
 }

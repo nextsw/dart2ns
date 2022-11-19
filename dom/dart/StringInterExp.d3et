@@ -1,5 +1,18 @@
-class StringInterExp extends Expression {
+server class StringInterExp extends Expression {
     String str;
     List<Expression> values = [];
     StringInterExp({this.str}); 
+
+
+    void resolve(ResolveContext context) {
+        resolvedType = context.stringType;
+        for(Expression exp in values) {
+            exp.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        for(Expression exp in values) {
+            exp.collectUsedTypes(types);
+        }
+    }
 }

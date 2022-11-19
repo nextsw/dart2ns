@@ -1,6 +1,33 @@
-class SwitchExpression extends Expression {
+server class SwitchExpression extends Expression {
     Expression on;
     List<CaseExpression> cases = [];
     Expression onElse;
     SwitchExpression({this.on, this.cases});
+
+
+    void resolve(ResolveContext context) {
+        on.resolve(context);
+        resolvedType = null;
+        cases.forEach((c) {
+            c.resolve(context);
+            if(resolvedType == null) {
+                resolvedType = c.result.resolvedType;
+            } else {
+                resolvedType = context.commonType(resolvedType, c.result.resolvedType);
+            }
+        });
+        if(onElse != null) {
+            onElse.resolve(context);
+            resolvedType = context.commonType(resolvedType, onElse.resolvedType);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        on.collectUsedTypes(types);
+        cases.forEach((c) {
+            c.collectUsedTypes(types);
+        });
+        if(onElse != null) {
+            onElse.collectUsedTypes(types);
+        }
+    }
 }

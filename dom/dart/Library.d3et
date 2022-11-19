@@ -1,4 +1,4 @@
-class Library {
+server class Library {
     String fullPath;
     String packagePath;
     String id;
@@ -7,12 +7,44 @@ class Library {
     List<Export> exports = [];
     List<TopDecl> objects = [];
     List<Part> parts = [];
+    String partOf;
 
     Library({this.parent, this.fullPath, this.packagePath});
     
 
     TopDecl get(String name) {
         return objects.firstWhere(o => o.name == name);
+    }
+
+    void subs(List<TopDecl> libs, Set<Library> collected) {
+        if(collected.contains(this)) {
+            return;
+        }
+        collected.add(this);
+        for(Part p in parts){
+            p.lib.subs(libs, collected);
+        }
+        for(Export p in exports){
+            List<TopDecl> exported = List();
+            p.lib.subs(exported, collected);
+            if(p.hide.isNotEmpty) {
+                for(TopDecl top in exported){
+                    if(p.hide.contains(top.name)){
+                        continue;
+                    }
+                    libs.add(top);
+                }
+            } else if(p.show.isNotEmpty) {
+                for(TopDecl top in exported){
+                    if(p.show.contains(top.name)){
+                        libs.add(top);
+                    }
+                }
+            } else {
+                libs.addAll(exported);
+            }
+        }
+        libs.addAll(objects);
     }
 
 }

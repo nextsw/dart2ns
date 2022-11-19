@@ -1,0 +1,1977 @@
+server class CGen extends ResolveContext implements Gen{
+    Dart2NSContext context;
+    String base;
+    List<String> cppLines = [];
+    List<String> hppLines = [];
+    List<String> cpLines = [];
+    List<String> hpLines = [];
+    List<String> blockLines = [];
+    List<String> blockWords = [];
+    List<String> keywords = [
+        'string',
+        'int',
+        'long',
+        'bool',
+        'auto',
+        'char',
+        'union',
+    ];
+    List<String> primitives = [
+        'int',
+        'bool',
+        'double',
+        'num',
+        'void',
+    ];
+
+
+    Integer tempCount = 0;
+
+    TopDecl get(String name) {
+        return context.get(name);
+    }
+
+
+    String variable(String s) {
+        if(keywords.contains(s)) {
+            return s+'Value';
+        } else {
+            return s;
+        }
+    }
+
+    DataType commonType(DataType a, DataType b) {
+        //TODO we need to provide common type here
+        return a;
+    }
+
+    DataType subType(DataType t, [Integer index]) {
+        if(t is ValueType) {
+            ValueType vt = t as ValueType;
+            if(vt.args.length <= index) {
+                return ofUnknownType();
+            } else {
+                return vt.args[index];
+            }
+        }
+        return ofUnknownType();
+    }
+
+
+    DataType ofUnknownType(){
+        D3ELogger.error('Unknown type');
+        return objectType;
+    }
+
+    void gen(Dart2NSContext context, String base) {
+        this.context = context;
+        this.base = base;
+        generate();
+    }
+
+    void generate() {
+        for(Library lib in context.libs){
+            // List<TopDecl> subs = List();
+            // lib.subs(subs, Set());
+            List<ClassDecl> classes = lib.objects.where(m => m is ClassDecl).map(m => m as ClassDecl).toList();
+            for(ClassDecl cls in classes) {
+                genLibraryClass(cls);
+            }
+            genLibrary(lib);
+        }
+    }
+
+    void genLibrary(Library lib) {
+        String outPath = lib.packagePath;
+        List<String> split = outPath.split('/');
+        String nameOnly = split.last;
+        String upper = outPath.replaceAll('/', '_').toUpperCase();
+        hpp('#ifndef ' + upper);
+        hpp('#define ' + upper);
+        cpp('#include "' + nameOnly + '.h"');
+        hpp('#include <base.h>');
+
+        // lib.exports.forEach((e){
+        //     String path = e.path;
+        //     if(e.path.startsWith('package:') || e.path.startsWith('dart:')) {
+        //         cpp('#include <' + e.lib.packagePath +'.h>');
+        //     } else {
+        //         cpp('#include "' + path +'.h"');
+        //     }
+        // });
+        // hpp('');
+        // lib.imports.forEach((i){
+        //     String path = i.path;
+        //     if(i.path.startsWith('package:') || i.path.startsWith('dart:')) {
+        //         cpp('#include <' + i.lib.packagePath +'.h>');
+        //     } else {
+        //         cpp('#include "' + path +'.h"');
+        //     }
+        // });
+        hpp('');
+        lib.objects.forEach((obj) {
+            obj.resolve(this);
+            obj.collectUsedTypes();
+        });
+        List<TopDecl> objects = List.from(lib.objects);
+        objects.sort((a, b) => a == b? 0 : a.usedTypes.contains(b.name)? 1 : -1);
+
+        Set<String> usedTypes = Set();
+        // Collect parents used types too
+        objects.forEach((obj) {
+            if(obj is ClassDecl) {
+                ClassDecl cls = obj as ClassDecl;
+                collectUsedTypesRec(cls, usedTypes);
+             } else {
+                usedTypes.addAll(obj.usedTypes);
+             }
+        });
+
+        usedTypes.removeAll(primitives);
+        usedTypes.remove('void');
+        usedTypes.remove('Object');
+        for(String str in usedTypes) {
+            hp('CLASS(');
+            hp(str);
+            hl(')');
+        }
+
+        objects.forEach((obj) {
+            if(obj is ClassDecl) {
+                // hp('CLASS(__');
+                // hp(obj.name);
+                // hl('Type)');
+                // genClassDecl(obj as ClassDecl);
+            } else if(obj is Enum) {
+                genEnum(obj as Enum);
+            } else if(obj is Typedef) {
+                genTypeDef(obj as Typedef);
+            } else if(obj is MethodDecl) {
+                genMethodDecl(null, obj as MethodDecl, 0);
+            } else if(obj is FieldDecl) {
+                genFieldDecl(obj as FieldDecl, null, true, 0, (x) => hp(x));
+                genFieldDecl(obj as FieldDecl, null, false, 0, (x) => cp(x));
+            } else {
+                D3ELogger.error('Unknown object type');
+            }
+        });
+        hpp('');
+        // if(lib.parts.isNotEmpty) {
+        //     hpp('// Parts');
+        // }
+        // lib.parts.forEach((i){
+        //     hpp('#include "' + i.path +'.h"');
+        // });
+        hpp('');
+        hpp('#endif');
+        FileUtils.writeFile(base + lib.packagePath + '.h', hppLines.join('\n'));
+        FileUtils.writeFile(base + lib.packagePath + '.c', cppLines.join('\n'));
+        cppLines.clear();
+        hppLines.clear();
+    }
+
+    void genLibraryClass(ClassDecl cls) {
+        String path = cls.packagePath;
+        String upper = path.replaceAll('/', '_').toUpperCase();
+        hpp('#ifndef ' + upper);
+        hpp('#define ' + upper);
+        cpp('#include "' + cls.name + '.h"');
+        hpp('#include <base.h>');
+
+        hp('CLASS(');
+        hp(cls.name);
+        hl(')');
+        Set<String> usedTypes = Set();
+        collectUsedTypesRec(cls, usedTypes);
+
+        usedTypes.removeAll(primitives);
+        usedTypes.remove('void');
+        usedTypes.remove('Object');
+        for(String str in usedTypes) {
+            // Lets import those specific types
+            TopDecl top = context.get(str);
+            if(top != null && top is ClassDecl) {
+                ClassDecl usedCls = top as ClassDecl;
+                hpp('#include <' + usedCls.packagePath +'.h>');
+            }
+        }
+        // lib.exports.forEach((e){
+        //     String path = e.path;
+        //     if(e.path.startsWith('package:') || e.path.startsWith('dart:')) {
+        //         cpp('#include <' + e.lib.packagePath +'.h>');
+        //     } else {
+        //         cpp('#include "' + path +'.h"');
+        //     }
+        // });
+        // hpp('');
+        // lib.imports.forEach((i){
+        //     String path = i.path;
+        //     if(i.path.startsWith('package:') || i.path.startsWith('dart:')) {
+        //         cpp('#include <' + i.lib.packagePath +'.h>');
+        //     } else {
+        //         cpp('#include "' + path +'.h"');
+        //     }
+        // });
+        hpp('');
+        cls.resolve(this);
+        hp('CLASS(__');
+        hp(cls.name);
+        hl('Type)');
+        genClassDecl(cls);
+        hp('extern __');
+        hp(cls.name);
+        hp('Type* ___');
+        hp(cls.name);
+        hl(';');
+
+        hpp('');
+        hpp('#endif');
+        FileUtils.writeFile(base + path + '.h', hppLines.join('\n'));
+        FileUtils.writeFile(base + path + '.c', cppLines.join('\n'));
+        cppLines.clear();
+        hppLines.clear();
+    }
+
+    void collectUsedTypesRec(ClassDecl cls, Set<String> types){
+        cls.collectUsedTypes();
+        if(cls.extendType != null) {
+            TopDecl top = context.get(cls.extendType.name);
+            if(top is ClassDecl) {
+                ClassDecl parent = top as ClassDecl;
+                collectUsedTypesRec(parent, types);
+            }
+        }
+        types.addAll(cls.usedTypes);
+    }
+
+    void cpp(String line) {
+        if(cpLines.isNotEmpty) {
+            cppLines.add(cpLines.join(''));
+            cpLines.clear();
+        }
+        cppLines.add(line);
+    }
+    void hpp(String line) {
+        if(hpLines.isNotEmpty) {
+            hppLines.add(hpLines.join(''));
+            hpLines.clear();
+        }
+        hppLines.add(line);
+    }
+    void cp(String word) {
+        cpLines.add(word);
+    }
+    void hp(String word) {
+        hpLines.add(word);
+    }
+    void cl(String word) {
+        cpLines.add(word);
+        cppLines.add(cpLines.join(''));
+        cpLines.clear();
+    }
+    void bp(String word) {
+        blockWords.add(word);
+    }
+    void bl(String word) {
+        blockWords.add(word);
+        blockLines.add(blockWords.join(''));
+        blockWords.clear();
+    }
+    void hl(String word) {
+        hpLines.add(word);
+        hppLines.add(hpLines.join(''));
+        hpLines.clear();
+    }
+
+    String valueTypeToString(ValueType v, {Boolean noPtr = false}) {
+        String res = v.name;
+        if(res == 'dynamic') {
+            res = 'Object';
+        }
+        if(res.length == 1) {
+            res = 'void*';
+        } else if(!noPtr && !primitives.contains(res)) {
+            res+='*';
+        }
+        if(res == 'var') {
+            res = 'auto';
+        }
+        return res;
+    }
+
+    void functionTypeToString(FunctionType f, String name, Xp xp) {
+        if(f.returnType == null) {
+            xp('void ');
+        } else {
+            xp(dataTypeToString(f.returnType));
+        }
+        xp('(*');
+        if(name!=null) {
+            xp(name);
+        }
+        xp(')(');
+        if(f.params != null) {
+            List<MethodParam> params = sortMethodParams(f.params);
+            xp(params.map((p) {
+                return paramToString(p, skipName: true);
+            }).join(', '));
+        }
+        xp(')');
+    }
+
+    String defTypeToString(DefType d) {
+        return 'DefType';
+    }
+    
+
+    String dataTypeToString(DataType d, {String name, Boolean noPtr}) {
+        if(d is ValueType){
+            return valueTypeToString(d as ValueType, noPtr: noPtr);
+        } else if(d is FunctionType) {
+            List<String> res = [];
+            functionTypeToString(d as FunctionType, name, (x) => res.add(x));
+            return res.join('');
+        } else if(d is DefType) {
+            return defTypeToString(d as DefType);
+        }
+        return 'Unknown';
+    }
+
+    void genClassDecl(ClassDecl c) {
+        hp('typedef struct ');
+        hp(c.name);
+        hl(' {');
+        hp('    __');
+        hp(c.name);
+        hl('Type* __type;');
+        hl('    i32 __refcount;');
+        declareClassFields(c, false);            
+        hp('} ');
+        hp(c.name);
+        hl(';');
+        hpp('');
+        hp('typedef struct __');
+        hp(c.name);
+        hl('Type {');
+        hl('    i32 id;');
+        declareClassFields(c, true);
+        if(!c.isAbstract){
+            hp('    ');
+            hp(c.name);
+            hl('* (*make)();');
+        }
+        declareClassMethods(c, Set(), true);
+        hp('} __');
+        hp(c.name);
+        hl('Type;');
+        hpp('');
+        c.members.where(o => o is MethodDecl).forEach((obj){
+            genMethodDecl(c, obj as MethodDecl, 0);
+        });
+    }
+    void declareClassFields(ClassDecl c, Boolean static) {
+        if(c.extendType != null && c.name != 'Object') {
+            TopDecl top = context.get(c.extendType.name);
+            if(top is ClassDecl) {
+                ClassDecl parent = top as ClassDecl;
+                declareClassFields(parent, static);
+            }
+        }
+        hp('    // ');
+        hp(c.name);
+        hl(' fields');
+        declareFields(c, static);
+    }
+    void declareFields(ClassDecl c, Boolean static) {
+        c.members.where(m => (m is FieldDecl)).forEach((m) {
+            FieldDecl fd = m as FieldDecl;
+            if(static == fd.static) {
+                genFieldDecl(fd, null, false, 1, x => hp(x));
+            }
+            if(static && fd.static) {
+                genFieldDecl(fd, null, false, 1, x => cp(x));
+            }
+        });
+    }
+    void declareClassMethods(ClassDecl c, Set<String> added, Boolean topLevel) {
+        if(c.extendType != null) {
+            TopDecl top = context.get(c.extendType.name);
+            if(top is ClassDecl) {
+                ClassDecl parent = top as ClassDecl;
+                declareClassMethods(parent, added, false);
+            }
+        }
+        hp('    // ');
+        hp(c.name);
+        hl(' methods');
+        c.members.where(x => x is MethodDecl).forEach((i) {
+            MethodDecl m = i as MethodDecl;
+            genClassMethodDecl(c, m, added, topLevel);
+        });
+    }
+    void genClassMethodDecl(ClassDecl c, MethodDecl m, Set<String> added, Boolean topLevel) {
+        Boolean isConstructor = c != null && c.name == m.name;
+        if(isConstructor && !topLevel){
+            return;
+        }
+        if(!isConstructor && added.contains(m.name)){
+            return;
+        }
+        added.add(m.name);
+        hp(tab(1));
+        if(m.returnType == null) {
+            if(isConstructor) {
+                hp(c.name);
+                hp('*');
+            } else {
+                hp('void ');
+            }
+        } else {
+            hp(dataTypeToString(m.returnType));
+        }
+        if(c!= null) {
+            hp('(*');
+        } else {
+            hp(' ');
+        }
+        if(!ParserUtil.isNameChar(m.name)){
+            hp('_');
+            if(m.params == null || m.params.positionalParams.isEmpty){
+                hp('uminus');
+            } else {
+                hp(operatorToName(m.name));
+            }
+        } else {
+            if(isConstructor) {
+                hp('new');
+            } else {
+                hp(variable(m.name));
+            }
+        }
+        if(c != null) {
+            hp(')');
+        }
+        hp('(');
+        Boolean needThis = c != null && !m.static && !isConstructor;
+        if(needThis) {
+            hp(c.name);
+            hp('* this');
+        }
+        if(m.params != null) {
+            if(c != null) {
+                updateSuperAndParams(m, c);
+            }
+            genMethodParams(m.params, c, needThis, x => hp(x));
+        }
+        hp(')');
+        hl(';');
+    }
+
+    String paramToString(MethodParam p, {Boolean skipName}) {
+        String out = '';
+        if(p.dataType != null) {
+            if(p.dataType is FunctionType){
+                skipName = true;
+            }
+            out+= dataTypeToString(p.dataType, name: variable(p.name));
+            if(scope != null) {
+                scope.add(p.name, p.dataType);
+            }
+        } else {
+            out += 'Unknown';
+            if(scope != null) {
+                scope.add(p.name, ofUnknownType());
+            }
+        }
+        String name = p.name;
+        if(!skipName){
+            out += ' ';
+            out += variable(name);
+        }
+        return out;
+    }
+
+    List<MethodParam> sortMethodParams(MethodParams params) {
+        List<MethodParam> out = [];
+        out.addAll(params.positionalParams);
+        out.addAll(params.optionalParams);
+        params.namedParams.sort((a,b) => (a.name?? '').compareTo((b.name ?? '')));
+        out.addAll(params.namedParams);
+        out.forEach((i){
+            if(i.name == null){
+                i.name = '';
+            }
+        });
+        return out;
+    }
+
+    void genEnum(Enum e) {
+        hpp('');
+        hpp('enum '+ e.name + '{');
+        e.values.forEach((v) {
+            hpp('    ' + variable(v) + ',');
+        });
+        hpp('} // end ' + e.name);
+    }
+
+    String operatorToName(String op) {
+        // < 	+ 	| 	>>>
+        // > 	/ 	^ 	[]
+        // <= 	~/ 	& 	[]=
+        //>= 	* 	<< 	~
+        //- 	% 	>> 	==
+        switch(op) {
+            case '<': return 'lt';
+            case '>': return 'gt';
+            case '<=': return 'le';
+            case '>=': return 'ge';
+            case '-': return 'minus';
+            case '+': return 'plus';
+            case '/': return 'div';
+            case '~/': return 'div2';
+            case '*': return 'mul';
+            case '%': return 'mod';
+            case '|': return 'or';
+            case '^': return 'not';
+            case '&': return 'and';
+            case '<<': return 'lshift';
+            case '>>': return 'rshift';
+            case '>>>': return 'rshift2';
+            case '[]': return 'get';
+            case '[]=': return 'set';
+            case '~': return 'tilt';
+            case '==': return 'eq';
+            default: return op;
+        }
+    }
+
+    void genMethodDecl(ClassDecl c, MethodDecl m, Integer depth) {
+        if(m.body == null && m.exp == null && m.init == null) {
+            return;
+        }
+        if(m.external) {
+            hp('extern ');
+        }
+        
+        Boolean isConstructor = c != null && c.name == m.name;
+        if(!isConstructor && !m.static && !m.external && c != null) {
+            //hp('virtual ');
+        }
+        if(m.returnType == null) {
+            if(isConstructor) {
+                hp(c.name);
+                hp('*');
+            } else {
+                hp('void ');
+            }
+        } else {
+            hp(dataTypeToString(m.returnType));
+        }
+        hp(' ');
+        if(!ParserUtil.isNameChar(m.name)){
+            hp('_');
+            if(m.params == null || m.params.positionalParams.isEmpty){
+                hp('uminus');
+            } else {
+                hp(operatorToName(m.name));
+            }
+        } else {
+            if(isConstructor) {
+                hp('new');
+            } else {
+                hp(m.name);
+            }
+        }
+        if(c != null) {
+            hp('_');
+            hp(c.name);
+        }
+        hp('(');
+        Boolean needThis = c != null && !m.static;
+        if(needThis || isConstructor) {
+            hp(c.name);
+            hp('* this');
+        } 
+        if(m.params != null) {
+            if(c != null) {
+                updateSuperAndParams(m, c);
+            }
+            genMethodParams(m.params, c, needThis, x => hp(x));
+        }
+        hp(')');
+        hl(';');
+        hpp('');
+
+        if(!m.static) {
+            instanceClass = c;
+        } else {
+            instanceClass = null;
+        }
+        if(m.returnType == null) {
+            if(isConstructor) {
+                cp(c.name);
+                cp('* ');
+            } else {
+                cp('void ');
+            }
+        } else {
+            cp(dataTypeToString(m.returnType));
+            cp(' ');
+        }
+
+        if(!ParserUtil.isNameChar(m.name)){
+            cp('_');
+            if(m.params == null || m.params.positionalParams.isEmpty){
+                cp('uminus');
+            } else {
+                cp(operatorToName(m.name));
+            }
+        } else {
+            if(isConstructor) {
+                cp('new');
+            } else {
+                cp(m.name);
+            }
+        }
+        if(c != null) {
+            cp('_');
+            cp(c.name);
+        }
+        cp('(');
+        if(needThis || isConstructor) {
+            cp(c.name);
+            cp('* this ');
+        }
+        scope = Scope(thisType: c);
+        if(m.params != null) {
+            genMethodParams(m.params, c, needThis, x => cp(x));
+        }
+        cp(')');
+        if(isConstructor) {
+            if(m.init != null) {
+                cl(' {');
+                if((m.init as Block).statements.isNotEmpty) {
+                    cp(tab(1));
+                    genExp(m.init, 1, x => cp(x));
+                    cl('');
+                }
+            } else {
+                cl(' {');
+            }
+            if(m.body != null) {
+                cp(tab(1));
+                genBlock(m.body, 1, x => cp(x));
+                cl('');
+            }
+            cl('}');
+        } else if(m.body != null) {
+            cp(' ');
+            genBlock(m.body, 0, x => cp(x));
+        } else if(m.exp != null){
+            cl(' {');
+            cp('    return ');
+            genExp(m.exp, 1, x => cp(x));
+            cl(';');
+            cl('}');
+        }
+        cpp('');
+        tempCount = 0;
+    }
+
+    DataType getSuperParamType(ClassDecl c, String name) {
+        ClassMember cm = getMember(c, c.name);
+        if(cm == null) {
+            // No constructor found
+            return null;
+        }
+        MethodDecl md = cm as MethodDecl;
+        if(md.params == null) {
+            return null;
+        }
+        MethodParam param = md.params.positionalParams.firstWhere(m => m.name == name);
+        if(param != null) {
+            return param.dataType;
+        }
+        param = md.params.optionalParams.firstWhere(m => m.name == name);
+        if(param != null) {
+            return param.dataType;
+        }
+        param = md.params.namedParams.firstWhere(m => m.name == name);
+        if(param != null) {
+            return param.dataType;
+        }
+        return null;
+    }
+
+    void updateSuperAndParams(MethodDecl md, ClassDecl c) {
+        if(md.params == null) {
+            return;
+        }
+        List<MethodParam> superPosParams = [];
+        List<MethodParam> superNamedParams = [];
+        MethodDecl superCon = null;
+        if(c.extendType != null) {
+            ClassDecl superCls = context.get(c.extendType.name) as ClassDecl;
+            if(superCls != null) {
+                superCon = getMember(superCls, superCls.name) as MethodDecl;
+            }
+        }
+        Integer x = 0;
+        for(MethodParam p in md.params.positionalParams){
+            if(p.thisToken == 'this') {
+                p.dataType = getFieldType(c, p.name);
+            } else if (p.thisToken == 'super' && superCon != null) {
+                superPosParams.add(p);
+                MethodParam superParam = getParamAtIndex(superCon.params, x);
+                if(superParam != null) {
+                    p.dataType = superParam.dataType;
+                }
+            }
+            x++;
+        }
+        for(MethodParam p in md.params.optionalParams){
+            if(p.thisToken == 'this') {
+                p.dataType = getFieldType(c, p.name);
+            } else if (p.thisToken == 'super' && superCon != null) {
+                superPosParams.add(p);
+                MethodParam superParam = getParamAtIndex(superCon.params, x);
+                if(superParam != null) {
+                    p.dataType = superParam.dataType;
+                }
+            }
+            x++;
+        }
+        for(MethodParam p in md.params.namedParams){
+            if(p.thisToken == 'this') {
+                p.dataType = getFieldType(c, p.name);
+            } else if (p.thisToken == 'super' && superCon != null) {
+                superNamedParams.add(p);
+                MethodParam superParam = getParamByName(superCon.params, p.name);
+                if(superParam != null) {
+                    p.dataType = superParam.dataType;
+                }
+            }
+        }
+        if(superPosParams.isEmpty || superNamedParams.isEmpty){
+            return;
+        }
+        MethodCall superCall = null;
+        if(md.init == null) {
+            Block block = Block();
+            md.init = block;
+            superCall = MethodCall(
+                name: 'super',
+            );
+            block.statements.add(superCall);
+        } else {
+            Block block = (md.init as Block);
+            superCall = block.statements.firstWhere(s => s is MethodCall && (s as MethodCall).name == 'super') as MethodCall;
+            if(superCall == null) {
+                superCall = MethodCall(
+                    name: 'super',
+                );
+                block.statements.insert(0, superCall);
+            }
+        }
+        List<Argument> posArgs = superPosParams.map(p => Argument(
+            arg: FieldOrEnumExpression(
+                name: p.name,
+            ),
+        )).toList();
+        superCall.positionArgs.insertAll(0, posArgs);
+
+        List<NamedArgument> namedArgs = superPosParams.map(p => NamedArgument(
+            name: p.name,
+            value: FieldOrEnumExpression(
+                name: p.name,
+            ),
+        )).toList();
+        superCall.namedArgs.insertAll(0, namedArgs);
+    }
+
+    MethodParam getParamAtIndex(MethodParams m, Integer i) {
+        if(i < m.positionalParams.length) {
+            return m.positionalParams.get(i);
+        }
+        i = i - m.positionalParams.length;
+        if(i < m.optionalParams.length) {
+            return m.optionalParams.get(i);
+        }
+        return null;
+    }
+
+    MethodParam getParamByName(MethodParams m, String name) {
+        return m.namedParams.firstWhere(p => p.name == name);
+    }
+
+    void genMethodParams(MethodParams mp, ClassDecl c, Boolean addedParams, Xp xp) {
+        List<MethodParam> thisParams = [];
+        List<MethodParam> params = sortMethodParams(mp);
+        if(params.isNotEmpty && addedParams) {
+            xp(', '); //for this*
+        }
+        params.forEach((p) {
+            if(p.dataType == null) {
+                xp('Unknown');
+                if(scope != null) {
+                    scope.add(p.name, ofUnknownType());
+                }
+                xp(' ');
+                xp(p.name);
+            } else {
+                xp(paramToString(p));
+            }
+            if(p != params.last) {
+                xp(', ');
+            }
+        });
+    }
+
+    Boolean isOverriding(ClassDecl c, String name) {
+        if(c.extendType == null) {
+            return false;
+        }
+        TopDecl obj = context.get(c.extendType.name);
+        if(!(obj is ClassDecl)){
+            return false;
+        }
+
+
+        ClassDecl parent = obj as ClassDecl;
+        obj = parent.members.firstWhere(m => m.name == name);
+        if(obj == null || !(obj is MethodDecl)){
+            return false;
+        }
+        return true;
+    }
+
+    MethodCall removeSuperCall(Expression init) {
+        // We remove super from all init calls..
+        // so that we can generate like B() : A() {}
+        if(init is Block) {
+            Block block = init as Block;
+            for(Statement s in block.statements){
+                if(s is MethodCall){
+                    MethodCall m = (s as MethodCall);
+                    if(m.name == 'super') {
+                        block.statements.remove(m);
+                        return m;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    void genExp(Expression exp, Integer depth, Xp xp) {
+        if(exp == null) {
+            return;
+        }
+        if(exp is FieldOrEnumExpression) {
+            genFieldOrEnumExpression(exp as FieldOrEnumExpression, depth, xp);
+        } else if(exp is ArrayAccess) {
+            genArrayAccess(exp as ArrayAccess, depth, xp);
+        } else if(exp is ArrayExpression) {
+            genArrayExpression(exp as ArrayExpression, depth, xp);
+        } else if(exp is ArrayItem) {
+            genArrayItem(exp as ArrayItem, depth, xp);
+        } else if(exp is Assignment) {
+            genAssignment(exp as Assignment, depth, xp);
+        } else if(exp is AwaitExpression) {
+            genAwaitExpression(exp as AwaitExpression, depth, xp);
+        } else if(exp is BinaryExpression) {
+            genBinaryExpression(exp as BinaryExpression, depth, xp);
+        } else if(exp is Block) {
+            genBlock(exp as Block, depth, xp);
+        } else if(exp is Break) {
+            genBreak(exp as Break, depth, xp);
+        } else if(exp is CascadeExp) {
+            genCascadeExp(exp as CascadeExp, depth, xp);
+        } else if(exp is ConstExpression) {
+            genConstExpression(exp as ConstExpression, depth, xp);
+        } else if(exp is Continue) {
+            genContinue(exp as Continue, depth, xp);
+        } else if(exp is Declaration) {
+            genDeclaration(exp as Declaration, depth, xp);
+        } else if(exp is DoWhileLoop) {
+            genDoWhileLoop(exp as DoWhileLoop, depth, xp);
+        } else if(exp is DynamicTypeExpression) {
+            genDynamicTypeExpression(exp as DynamicTypeExpression, depth, xp);
+        } else if(exp is FnCallExpression) {
+            genFnCallExpression(exp as FnCallExpression, depth, xp);
+        } else if(exp is ForEachLoop) {
+            genForEachLoop(exp as ForEachLoop, depth, xp);
+        } else if(exp is ForLoop) {
+            genForLoop(exp as ForLoop, depth, xp);
+        } else if(exp is IfStatement) {
+            genIfStatement(exp as IfStatement, depth, xp);
+        } else if(exp is InlineMethodStatement) {
+            genInlineMethodStatement(exp as InlineMethodStatement, depth, xp);
+        } else if(exp is LabelStatement) {
+            genLabelStatement(exp as LabelStatement, depth, xp);
+        } else if(exp is LambdaExpression) {
+            genLambdaExpression(exp as LambdaExpression, depth, xp);
+        } else if(exp is LiteralExpression) {
+            genLiteralExpression(exp as LiteralExpression, depth, xp);
+        } else if(exp is MethodCall) {
+            genMethodCall(exp as MethodCall, depth, xp);
+        } else if(exp is NullExpression) {
+            genNullExpression(exp as NullExpression, depth, xp);
+        } else if(exp is ParExpression) {
+            genParExpression(exp as ParExpression, depth, xp);
+        } else if(exp is PostfixExpression) {
+            genPostfixExpression(exp as PostfixExpression, depth, xp);
+        } else if(exp is PrefixExpression) {
+            genPrefixExpression(exp as PrefixExpression, depth, xp);
+        } else if(exp is ThrowStatement) {
+            genThrowStatement(exp as ThrowStatement, depth, xp);
+        } else if(exp is RethrowStatement) {
+            genRethrowStatement(exp as RethrowStatement, depth, xp);
+        } else if(exp is Return) {
+            genReturn(exp as Return, depth, xp);
+        } else if(exp is SwitchExpression) {
+            genSwitchExpression(exp as SwitchExpression, depth, xp);
+        } else if(exp is TerinaryExpression) {
+            genTerinaryExpression(exp as TerinaryExpression, depth, xp);
+        } else if(exp is TypeCastOrCheckExpression) {
+            genTypeCastOrCheckExpression(exp as TypeCastOrCheckExpression, depth, xp);
+        } else if(exp is WhileLoop) {
+            genWhileLoop(exp as WhileLoop, depth, xp);
+        } else if(exp is YieldExpression) {
+            genYieldExpression(exp as YieldExpression, depth, xp);
+        } else if(exp is TryCatcheStatment) {
+            genTryCatchStatement(exp as TryCatcheStatment, depth, xp);
+        } else if(exp is Symbol) {
+            genSymbol(exp as Symbol, xp);
+        } else if(exp is StringInterExp) {
+            genStringIntr(exp as StringInterExp, xp);
+        } else {
+
+        }
+    }
+    String tab(Integer depth) {
+        String s = '';
+        while(depth > 0){
+            s += '    ';
+            depth--;
+        }
+        return s;
+    }
+
+    void genStringIntr(StringInterExp exp, Xp xp) {
+        xp('__sf("');
+        xp(exp.str);
+        xp('", ');
+        for(Expression val in exp.values) {
+            genExp(val, 0, xp);
+            if(val != exp.values.last) {
+                xp(', ');
+            }
+        }
+        xp(')');
+    }
+
+    void genSymbol(Symbol exp, Xp xp) {
+        xp('__symbol("');
+        xp(exp.name);
+        xp('")');
+    }
+    void genArrayAccess(ArrayAccess exp, Integer depth, Xp xp) {
+        genExp(exp.on, depth, xp);
+        if(exp.checkNull) {
+            xp('?');
+        } else if(exp.notNull) {
+            // No need for anything
+        }
+        xp('.get(');
+        genExp(exp.index, depth, xp);
+        xp(')');
+    }
+
+    Integer temp(){
+        tempCount++;
+        return tempCount;
+    }
+    void genArrayExpression(ArrayExpression exp, Integer depth, Xp xp) {
+        if(exp.values.any(v => !(v is ExpressionArrayItem))){
+            // We need builder here
+            String tempVal = temp().toString();
+            switch(exp.type){
+                case List: {
+                    if(exp.enforceType != null){
+                        bp('List* list');
+                        bp(tempVal);
+                        bl(' = new_List();');
+                    }
+                    exp.values.forEach((v){
+                        if(v is CollectionIf) {
+                            CollectionIf cIf = v as CollectionIf;
+                            bp('if (');
+                            genExp(cIf.test, depth, x => bp(x));
+                            bp(') {\n');
+                            bp('    add_List(list');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(cIf.thenItem, depth, x => bp(x));
+                            bp(');\n');
+                            bp('}');
+                            if(cIf.elseItem != null){
+                                bp(' else {\n');
+                                bp('    add_List(list');
+                                bp(tempVal);
+                                bp(', ');
+                                genExp(cIf.elseItem, depth, x => bp(x));
+                                bp(');\n');
+                                bp('}');
+                            }
+                        } else if(v is CollectionFor) {
+                            CollectionFor cFor = v as CollectionFor;
+                            genExp(cFor.stmt, depth, x => bp(x));
+                            bp('{\n');
+                            bp('    add_List(list');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(cFor.value, depth, x => bp(x));
+                            bp(');\n');
+                            bp('}');
+                        } else if(v is CollectionSpread) {
+                            CollectionSpread spread = v as CollectionSpread;
+                            bp('for (Iterator* _x');
+                            bp(tempVal);
+                            bp(' = ');
+                            genExp(spread.values, depth, x => bp(x));
+                            bp('; hasNext_Iterator(_x');
+                            bp(tempVal);
+                            bp('); next_Iterator(_x');
+                            bp(tempVal);
+                            bp(')) {\n');
+                            bp('{\n');
+                            bp('    add_List(list');
+                            bp(tempVal);
+                            bp(', get_Iterator(_x');
+                            bp(tempVal);
+                            bp('));\n');
+                            bp('}');
+                        } else {
+                            bp('add_List(list');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(v, depth, x => bp(x));
+                            bp(');\n');
+                        }
+                    });
+                    xp('list');
+                    xp(tempVal);
+                }
+                case Map: {
+                    if(exp.enforceType != null){
+                        bp('Map* map');
+                        bp(tempVal);
+                        bl(' = new_Map();');
+                    }
+                    exp.values.forEach((v){
+                        if(v is CollectionIf) {
+                            CollectionIf cIf = v as CollectionIf;
+                            if(!(cIf.thenItem is MapItem)) {
+                                bp('NeedMapItemHere');
+                                return;
+                            }
+                            if(cIf.elseItem != null && !(cIf.elseItem is MapItem)) {
+                                bp('NeedMapItemHere');
+                                return;
+                            }
+                            MapItem thenItem = cIf.thenItem as MapItem;
+                            MapItem elseItem = cIf.elseItem as MapItem;
+                            bp('if (');
+                            genExp(cIf.test, depth, x => bp(x));
+                            bp(') ');
+                            bp('{\n');
+                            bp('    set_Map(map');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(thenItem.key, depth, x => bp(x));
+                            bp(', ');
+                            genExp(thenItem.value, depth, x => bp(x));
+                            bp(');\n');
+                            bp('}');
+                            if(elseItem != null){
+                                bp(' else {\n');
+                                bp('    set_Map(map');
+                                bp(tempVal);
+                                bp(', ');
+                                genExp(elseItem.key, depth, x => bp(x));
+                                bp(', ');
+                                genExp(elseItem.value, depth, x => bp(x));
+                                bp(');\n');
+                                bp('}');
+                            }
+                        } else if(v is CollectionFor) {
+                            CollectionFor cFor = v as CollectionFor;
+                            if(!(cFor.value is MapItem)) {
+                                bp('NeedMapItemHere');
+                                return;
+                            }
+                            MapItem item = cFor.value as MapItem;
+                            genExp(cFor.stmt, depth, x => bp(x));
+                            bp('{\n');
+                            bp('    set_Map(map');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(item.key, depth, x => bp(x));
+                            bp(', ');
+                            genExp(item.value, depth, x => bp(x));
+                            bp(');\n');
+                            bp('}');
+                        } else if(v is CollectionSpread) {
+                            CollectionSpread spread = v as CollectionSpread;
+                            bp('addAll_Map(map');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(spread.values, depth, x => bp(x));
+                            bp(');');
+                        } else {
+                            if(!(v is MapItem)) {
+                                bp('NeedMapItemHere');
+                                return;
+                            }
+                            MapItem item = v as MapItem;
+                            bp('set_Map(map');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(item.key, depth, x => bp(x));
+                            bp(', ');
+                            genExp(item.value, depth, x => bp(x));
+                            bp(');\n');
+                        }
+                    });
+                    xp('map');
+                    xp(tempVal);
+                }
+                case Set: {
+                    if(exp.enforceType != null){
+                        bp('Set* set');
+                        bp(tempVal);
+                        bl(' = new_Set();');
+                    }
+                    exp.values.forEach((v){
+                        if(v is CollectionIf) {
+                            CollectionIf cIf = v as CollectionIf;
+                            bp('if (');
+                            genExp(cIf.test, depth, x => bp(x));
+                            bp(') {\n');
+                            bp('    add_Set(set');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(cIf.thenItem, depth, x => bp(x));
+                            bp(');\n');
+                            bp('}');
+                            if(cIf.elseItem != null){
+                                bp(' else {\n');
+                                bp('    add_Set(set');
+                                bp(tempVal);
+                                bp(', ');
+                                genExp(cIf.elseItem, depth, x => bp(x));
+                                bp(');\n');
+                                bp('}');
+                            }
+                        } else if(v is CollectionFor) {
+                            CollectionFor cFor = v as CollectionFor;
+                            genExp(cFor.stmt, depth, x => bp(x));
+                            bp('{\n');
+                            bp('    add_Set(set');
+                            bp(tempVal);
+                            bp(', ');
+                            genExp(cFor.value, depth, x => bp(x));
+                            bp(');\n');
+                            bp('}');
+                        } else if(v is CollectionSpread) {
+                            CollectionSpread spread = v as CollectionSpread;
+                            bp('for (auto _x');
+                            bp(tempVal);
+                            bp(' : ');
+                            genExp(spread.values, depth, x => bp(x));
+                            bp(') {\n');
+                            bp('{\n');
+                            bp('    add_Set(set');
+                            bp(tempVal);
+                            bp(', _x');
+                            bp(tempVal);
+                            bp(');\n');
+                            bp('}');
+                        } else {
+                            bp('set');
+                            bp(tempVal);
+                            bp('.add(');
+                            genExp(v, depth, x => bp(x));
+                            bp(');\n');
+                        }
+                    });
+                    xp('set');
+                    xp(tempVal);
+                }
+            }
+        } else {
+            // 
+            switch(exp.type){
+                case List:
+                    xp('__makeList(');
+                    exp.values.forEach((v){
+                        genExp(v, depth, xp);
+                        if(v != exp.values.last) {
+                            xp(', ');
+                        }
+                    });
+                    xp(')');
+                case Map:
+                    xp('__makeMap(');
+                    xp('__makeList(');
+                    exp.values.forEach((v){
+                        MapItem i = v as MapItem;
+                        genExp(i.key, depth, xp);
+                        if(v != exp.values.last) {
+                            xp(', ');
+                        }
+                    });
+                    xp('), __makeList(');
+                    exp.values.forEach((v){
+                        MapItem i = v as MapItem;
+                        genExp(i.value, depth, xp);
+                        if(v != exp.values.last) {
+                            xp(', ');
+                        }
+                    });
+                    xp(')');
+                case Set:
+                    xp('__makeSet(');
+                    exp.values.forEach((v){
+                        genExp(v, depth, xp);
+                        if(v != exp.values.last) {
+                            xp(', ');
+                        }
+                    });
+                    xp(')');
+            }
+        }
+    }
+    void genArrayItem(ArrayItem exp, Integer depth, Xp xp) {
+        xp('ArrayItem');// TODO
+    }
+    void genAssignment(Assignment exp, Integer depth, Xp xp) {
+        if(exp.op == '??=') {
+            xp('__or_assign(&');//TODO Overload based on type
+            genExp(exp.left, depth, xp);
+            xp(', ');
+            genExp(exp.right, depth, xp);
+            xp(')');
+        } else {
+            genExp(exp.left, depth, xp);
+            xp(' ');
+            xp(exp.op);
+            xp(' ');
+            genExp(exp.right, depth, xp);
+        }
+    }
+    void genAwaitExpression(AwaitExpression exp, Integer depth, Xp xp) {
+        xp('await ');
+        genExp(exp.exp, depth, xp);
+    }
+    
+    void genBinaryExpression(BinaryExpression exp, Integer depth, Xp xp) {
+        if(exp.op == '??') {
+            xp('__or(&');
+            genExp(exp.left, depth, xp);
+            xp(', ');
+            genExp(exp.right, depth, xp);
+            xp(')');
+        } else {
+            genExp(exp.left, depth, xp);
+            xp(' ');
+            xp(exp.op);
+            xp(' ');
+            genExp(exp.right, depth, xp);
+        }
+    }
+
+   
+    void genBlock(Block exp, Integer depth, Xp xp,
+        {Scope localScope}
+        ) {
+        if(exp == null){
+            return;
+        }
+        if(localScope == null) {
+            localScope = Scope(parent: scope);
+        }
+        scope = localScope;
+        xp('{\n');
+        exp.statements.forEach((s){
+            xp(tab(depth + 1));
+            Integer blockIndex = cpLines.length;
+            genExp(s, depth + 1, xp);
+            if((s is WhileLoop)
+             || (s is ForLoop)
+             || (s is ForEachLoop)
+             || (s is Block)
+             || (s is IfStatement)){
+                // No need for semicolon
+            } else {
+                xp(';\n');
+            }
+            if(blockWords.isNotEmpty) {
+                blockLines.add(blockWords.join(''));
+                blockWords.clear();
+            }
+            if(blockLines.isNotEmpty){
+                Iterable<String> withTab = blockLines.join('\n').split('\n').map(i => tab(depth) + i);
+                cpLines.insertAll(blockIndex, withTab);
+                blockLines.clear();
+            }
+        });
+        xp(tab(depth));
+        xp('}');
+        scope = scope.parent;
+    }
+    void genBreak(Break exp, Integer depth, Xp xp) {
+        xp('break');
+        if(exp.label != null){
+            xp(' ');
+            xp(exp.label);
+        }
+    }
+    void genCascadeExp(CascadeExp exp, Integer depth, Xp xp) {
+        String tempVal = temp().toString();
+        bp('auto _c');
+        bp(tempVal);
+        bp(' = ');
+        genExp(exp.on, depth, x => bp(x));
+        bp(';\n');
+        exp.calls.forEach((c){
+            bp('_c');
+            bp(tempVal);
+            if(c is Assignment && (c as Assignment).left is ArrayAccess) {
+                Assignment a = c as Assignment;
+                ArrayAccess aa = a.left as ArrayAccess;
+                bp('[');
+                genExp(aa.index, depth, x => bp(x));
+                bp('] ');
+                bp(a.op);
+                genExp(a.right, depth, x => bp(x));
+            } else {
+                bp('.');
+                genExp(c, depth, x => bp(x));
+            }
+            bp(';\n');
+        });
+        xp('_c');
+        xp(tempVal);
+    }
+    void genConstExpression(ConstExpression exp, Integer depth, Xp xp) {
+        // xp('const ');
+        genExp(exp.exp, depth, xp);
+        exp.resolvedType = exp.exp.resolvedType;
+    }
+    void genContinue(Continue exp, Integer depth, Xp xp) {
+        xp('continue');
+        if(exp.label != null){
+            xp(' ');
+            xp(exp.label);
+        }
+        exp.resolvedType = ofUnknownType();
+    }
+    void genDeclaration(Declaration exp, Integer depth, Xp xp) {
+        if(exp.type != null) {
+            xp(dataTypeToString(exp.type));
+        } else {
+            xp('auto');
+        }
+        xp(' ');
+        DataType resolvedType = null;
+        for(NameAndValue n in exp.names){
+            xp(n.name);
+            if(n.value != null) {
+                xp(' = ');
+                genExp(n.value, 0, xp);
+                resolvedType = n.value.resolvedType;
+            }
+            if(exp.type == null || exp.type.name == 'var') {
+                scope.add(n.name, resolvedType ?? ofUnknownType());
+            } else {
+                scope.add(n.name, exp.type);
+            }
+            if(exp.names.last != n) {
+                xp(', ');
+            }
+        }
+    }
+    void genDoWhileLoop(DoWhileLoop exp, Integer depth, Xp xp) {
+        xp('do ');
+        genBlock(exp.body, depth, xp);
+        xp(' while (');
+        genExp(exp.test, depth, xp);
+        xp(')');
+    }
+    void genDynamicTypeExpression(DynamicTypeExpression exp, Integer depth, Xp xp) {
+        xp('DynamicTypeExpression');
+    }
+
+    String getRecentCast(String name) {
+        Scope s = this.scope;
+        while(s != null) {
+            if(s.casts.containsKey(name)){
+                return s.casts.get(name);
+            }
+            s = s.parent;
+        }
+        return null;
+    }
+
+    ClassDecl computeCastType(Expression exp) {
+        if(exp is FieldOrEnumExpression) {
+            String name = (exp as FieldOrEnumExpression).name;
+            String typeName = getRecentCast(name);
+            if(typeName != null) {
+                TopDecl dec = context.get(typeName);
+                if(dec != null && dec is ClassDecl) {
+                    return dec as ClassDecl;
+                }
+            }
+        }
+        return null;
+    }
+    ClassMember getMember(ClassDecl c, String name, {MemberFilter filter}) {
+        if(c == null) {
+            return null;
+        }
+        ClassMember cm = c.members.firstWhere((m){
+            if(m.name != name){
+                return false;
+            }
+            if(filter == null) {
+                return true;
+            }
+            switch(filter){
+                case AllFields:
+                    if(m is MethodDecl){
+                        return false;
+                    }
+                case AllMethods:
+                    if(m is FieldDecl){
+                        return false;
+                    }
+                case FieldsAndGetters:
+                    if(m is MethodDecl) {
+                        MethodDecl md = m as MethodDecl;
+                        if(!md.getter){
+                            return false;
+                        }
+                    }
+                case FieldsAndSetters:
+                    if(m is MethodDecl) {
+                    MethodDecl md = m as MethodDecl;
+                        if(!md.setter) {
+                            return false;
+                        }
+                    }
+                case MethodsWithoutGettersAndSetters:
+                    if(m is FieldDecl){
+                        return false;
+                    }
+                    if(m is MethodDecl) {
+                        MethodDecl md = m as MethodDecl;
+                        if(md.setter || md.getter) {
+                            return false;
+                        }
+                    }
+            }
+            return true;
+        });
+        if(cm != null){
+            return cm;
+        }
+        if(c.extendType != null) {
+            ClassDecl parent = context.get(c.extendType.name) as ClassDecl;
+            if(parent != c) {
+                return getMember(parent, name);
+            }
+        }
+        for(DataType impl in c.impls) {
+            ClassDecl parent = context.get(impl.name) as ClassDecl;
+            if(parent != c) {
+                return getMember(parent, name);
+            }
+        }
+        for(DataType impl in c.mixins) {
+            ClassDecl parent = context.get(impl.name) as ClassDecl;
+            if(parent != c) {
+                return getMember(parent, name);
+            }
+        }
+        return null;
+    }
+    void genFieldOrEnumExpression(FieldOrEnumExpression exp, Integer depth, Xp xp) {
+        if(exp.on != null){
+            genExp(exp.on, depth, (x){});
+            genExp(exp.on, depth, xp);
+            
+            if(exp.checkNull) {
+                xp('?->');
+            } else if(exp.notNull) {
+                xp('!->');
+            } else {
+                if(exp.on is FieldOrEnumExpression 
+                    && (ParserUtil.isTypeName((exp.on as FieldOrEnumExpression).name))){
+                    xp('_');
+                } else {
+                    xp('->');
+                }
+            }
+        } else {
+            DataType type = scope.get(exp.name);
+            if(type == null && instanceClass != null){
+                ClassMember cm = getMember(instanceClass, exp.name);
+                if(cm != null) {
+                    if(cm.static) {
+                        xp('___');
+                        xp(instanceClass.name);
+                        xp('->');
+                    } else {
+                        xp('this->');
+                    }
+                }
+            }
+        }
+        Boolean shouldCast = scope.casts.containsKey(exp.name);
+        ClassDecl castType = null;
+        if(shouldCast){
+            castType = computeCastType(exp);
+            if(castType == null){
+                shouldCast = false;
+            }
+        }
+        if(shouldCast) {
+            xp('((');
+            xp(castType.name);
+            xp('*)');
+        }
+        if(ParserUtil.isTypeName(exp.name) && exp.name != exp.name.toUpperCase()){
+            xp(exp.name);
+        } else {
+            xp(variable(exp.name));
+        }
+        if(shouldCast) {
+            xp(')');
+        }
+        if(exp.isGetter) {
+            xp('()');
+        }
+    }
+
+    DataType fieldTypeFromScope(String name) {
+        Scope s = scope;
+        while(s != null){
+            DataType type = s.variables.get(name);
+            if(type != null) {
+                return type;
+            }
+            s= s.parent;
+        }
+        if(instanceClass != null){
+            ClassMember cm = instanceClass.members.firstWhere(m => m is FieldDecl && m.name == name);
+            if(cm != null) {
+                return (cm as FieldDecl).type;
+            }
+        }
+        return null;
+
+    }
+    DataType resolveType(ClassDecl c, DataType r) {
+        if(r == null ) {
+            return ofUnknownType();
+        }
+        if(c.generics != null) {
+            TypeParam genType = c.generics.params.firstWhere(p => p.name == r.name);
+            if(genType != null) {
+                if(genType.resolvedType != null) {
+                    return genType.resolvedType;
+                } else if(genType.extendType != null){
+                    return genType.extendType;
+                } 
+            }
+            D3ELogger.error('Unknown type in resolveType');
+        }
+        return r;
+    }
+
+    Boolean isGetter(ClassDecl type, String name) {
+        return type.members.any(m => m.name == name && m is MethodDecl && (m as MethodDecl).getter);
+    }
+    void genFnCallExpression(FnCallExpression exp, Integer depth, Xp xp) {
+        genExp(exp.on, depth, xp);
+        genMethodCall(exp.call, depth, xp);
+    }
+    void genForEachLoop(ForEachLoop exp, Integer depth, Xp xp) {
+        xp('for (');
+        if(exp.dataType != null) {
+            xp(dataTypeToString(exp.dataType));
+        } else {
+            xp('auto');
+        }
+        xp(' ');
+        xp(variable(exp.name));
+        xp(' : ');
+        genExp(exp.collection, depth, xp);
+        xp(') ');
+        genAsBlock(exp.body, depth, xp);
+        xp('\n');
+    }
+    void genForLoop(ForLoop exp, Integer depth, Xp xp) {
+        xp('for (');
+        exp.inits.forEach((i){
+            genExp(i, depth, xp);
+            if(i != exp.inits.last) {
+                xp(', ');
+            }
+        });
+        xp('; ');
+        genExp(exp.test, depth, xp);
+        xp('; ');
+        exp.resets.forEach((i){
+            genExp(i, depth, xp);
+            if(i != exp.resets.last) {
+                xp(', ');
+            }
+        });
+        xp(') ');
+        genAsBlock(exp.body, depth, xp);
+        xp('\n');
+    }
+    void genAsBlock(Expression exp, Integer depth, Xp xp,
+        {Scope localScope}
+        ) {
+        if(exp is Block) {
+            genBlock(exp as Block, depth, xp,
+            localScope: localScope);
+        } else {
+            if(localScope == null) {
+                localScope = Scope(parent: scope);
+            }
+            scope = localScope;
+            xp('{\n');
+            xp(tab(depth + 1));
+            genExp(exp, depth, xp);
+            xp(';\n');
+            xp(tab(depth));
+            xp('}');
+            scope = scope.parent;
+        }
+    }
+    void genIfStatement(IfStatement exp, Integer depth, Xp xp) {
+        xp('if (');
+        genExp(exp.test, depth, xp);
+        xp(') ');
+
+        Scope scope = Scope(parent: scope);
+        if(exp.test is TypeCastOrCheckExpression){
+            TypeCastOrCheckExpression check = exp.test as TypeCastOrCheckExpression;
+            if(check.exp is FieldOrEnumExpression) {
+                FieldOrEnumExpression fe = check.exp as FieldOrEnumExpression;
+                if(fe.on == null) {
+                    scope.casts.set(fe.name, check.dataType.name);
+                    scope.add(fe.name, check.dataType);
+                }
+            }
+        }
+        genAsBlock(exp.thenStatement, depth, xp, 
+            localScope :scope,
+        );
+        if(exp.elseStatement != null) {
+            xp(' else ');
+            genAsBlock(exp.elseStatement, depth, xp);
+            if(exp.elseStatement is IfStatement) {
+
+            } else {
+                xp('\n');
+            }
+        } else {
+            xp('\n');
+        }
+    }
+    void genInlineMethodStatement(InlineMethodStatement exp, Integer depth, Xp xp) {
+        xp('InlineMethod');
+        exp.resolvedType = ofUnknownType();
+    }
+    void genLabelStatement(LabelStatement exp, Integer depth, Xp xp) {
+        xp(exp.name);
+        xp(':');
+        exp.resolvedType = ofUnknownType();
+    }
+    void genLambdaExpression(LambdaExpression exp, Integer depth, Xp xp) {
+        xp('[=] (');
+        // TODO make sure names and types exist for each param
+        exp.params.forEach((p){
+            if(p.type == null) {
+                xp('Unknown ');
+            } else {
+                xp(dataTypeToString(p.type));
+            }
+            xp(' ');
+            xp(p.name);
+            if(p != exp.params.last) {
+                xp(',');
+            }
+        });
+        xp(') ');
+        if(exp.expression != null) {
+            genAsBlock(exp.expression, depth, xp);
+        } else {
+            genBlock(exp.body, depth, xp);
+        }
+    }
+    void genLiteralExpression(LiteralExpression exp, Integer depth, Xp xp) {
+        switch(exp.type) {
+            case TypeBoolean: {
+                xp(exp.value);
+            }
+            case TypeString: {
+                xp('__s("');
+                xp(exp.value);
+                xp('")');
+            }
+            case TypeDouble: {
+                xp(exp.value);
+            }
+            case TypeInteger: {
+                xp(exp.value);
+            }
+        }
+    }
+    void genMethodCall(MethodCall exp, Integer depth, Xp xp) {
+        ClassDecl onType = null;
+        if(exp.on != null){
+            genExp(exp.on, depth, xp);
+            Boolean isStaticCall = false;
+            if(exp.checkNull) {
+                xp('?->');
+            } else if(exp.notNull) {
+                xp('!->');
+            } else {
+                if(isStaticCall) {
+                    xp('Type->');
+                } else {
+                    xp('->__type->');
+                }
+            }
+        } else {
+            DataType fieldType = scope.get(exp.name);
+            if(fieldType == null && instanceClass != null){
+                ClassMember cm = getMember(instanceClass, exp.name);
+                if(cm != null) {
+                    if(cm.static) {
+                        xp('___');
+                        xp(instanceClass.name);
+                        xp('->');
+                    } else {
+                        xp('this->');
+                    }
+                }
+            }
+        }
+        Boolean isConstructor = false;
+        if(exp.name != null && exp.name.isNotEmpty) {
+            String name = variable(exp.name);
+            if(ParserUtil.isTypeName(name)){
+                xp('new_');
+                xp(exp.name);
+                isConstructor = true;
+            } else {
+                xp(variable(exp.name));
+            }
+        }
+        xp('(');
+        if(isConstructor) {
+            xp('___');
+            xp(exp.name);
+            xp('->__make()');
+        }
+        if(isConstructor && exp.positionArgs.isNotEmpty) {
+            xp(', ');
+        }
+        exp.positionArgs.forEach((a){
+            genExp(a.arg, depth, xp);
+            if(a != exp.positionArgs.last) {
+                xp(', ');
+            }
+        });
+        if(exp.namedArgs.isNotEmpty) {
+            if(exp.positionArgs.isNotEmpty || isConstructor) {
+                xp(', ');
+            }
+        }
+        exp.namedArgs.forEach((a){
+            genExp(a.value, depth, xp);
+            if(a != exp.namedArgs.last) {
+                xp(', ');
+            }
+        });
+        xp(')');
+        
+    }
+    void genNullExpression(NullExpression exp, Integer depth, Xp xp) {
+        xp('nullptr');
+        exp.resolvedType = nullType;
+    }
+    void genParExpression(ParExpression exp, Integer depth, Xp xp) {
+        xp('(');
+        genExp(exp.exp, depth, xp);
+        xp(')');
+        exp.resolvedType = exp.exp.resolvedType;
+    }
+    void genPostfixExpression(PostfixExpression exp, Integer depth, Xp xp) {
+        genExp(exp.on, depth, xp);
+        xp(exp.postfix);
+        exp.resolvedType = exp.on.resolvedType;
+    }
+    void genPrefixExpression(PrefixExpression exp, Integer depth, Xp xp) {
+        xp(exp.prefix);
+        genExp(exp.on, depth, xp);
+        exp.resolvedType = exp.on.resolvedType;
+    }
+    void genRethrowStatement(RethrowStatement exp, Integer depth, Xp xp) {
+        xp('throw');
+        exp.resolvedType = ofUnknownType();
+    }
+    void genThrowStatement(ThrowStatement exp, Integer depth, Xp xp) {
+        xp('throw ');
+        genExp(exp.exp, depth, xp);
+        exp.resolvedType = ofUnknownType();
+    }
+    void genReturn(Return exp, Integer depth, Xp xp) {
+        xp('return');
+        if(exp.expression != null) {
+            xp(' ');
+            genExp(exp.expression, depth, xp);
+        }
+    }
+    void genSwitchExpression(SwitchExpression exp, Integer depth, Xp xp) {
+        xp('SwitchExpNotSupported');
+    }
+    void genTerinaryExpression(TerinaryExpression exp, Integer depth, Xp xp) {
+        genExp(exp.condition, depth, xp);
+        xp('? ');
+        genExp(exp.ifTrue, depth, xp);
+        xp(' : ');
+        genExp(exp.ifFalse, depth, xp);
+        exp.resolvedType = commonType(exp.ifTrue.resolvedType, exp.ifFalse.resolvedType);
+    }
+    void genTypeCastOrCheckExpression(TypeCastOrCheckExpression exp, Integer depth, Xp xp) {
+        if(exp.check) {
+            if(exp.isNot) {
+                xp('!__is(');
+            } else {
+                xp('__is(');
+            }
+            genExp(exp.exp, depth, xp);
+            xp(', __');
+            xp(exp.dataType.name);
+            xp('Type)');
+            exp.resolvedType = booleanType;
+        } else {
+            xp('(');
+            xp(dataTypeToString(exp.dataType));
+            xp(')');
+            genExp(exp.exp, depth, xp);
+            xp('');
+            exp.resolvedType = exp.dataType;
+        }
+    }
+
+    void genWhileLoop(WhileLoop exp, Integer depth, Xp xp) {
+        xp('while (');
+        genExp(exp.test, depth, xp);
+        xp(') ');
+        genAsBlock(exp.body, depth, xp);
+        xp('\n');
+    }
+    void genYieldExpression(YieldExpression exp, Integer depth, Xp xp) {
+        xp('yield ');
+        genExp(exp.exp, depth, xp);
+    }
+
+    void genTryCatchStatement(TryCatcheStatment exp, Integer depth, Xp xp) {
+        xp('try ');
+        genExp(exp.body, depth, xp);
+        exp.catchParts.forEach((c) {
+            xp(' catch (');
+            xp(dataTypeToString(c.onType));
+            xp(' ');
+            xp(c.exp);
+            xp(') ');
+            genExp(c.body, depth, xp);
+        });
+        if(exp.finallyBody != null) {
+            xp(' finally ');
+            genExp(exp.finallyBody, depth, xp);
+        }
+    }
+
+
+    DataType getFieldType(ClassDecl c, String name){
+        ClassMember member = getMember(c, name);
+        if(member is FieldDecl) {
+            return (member as FieldDecl).type;
+        }
+        return null;
+    }
+
+    void genTypeDef(Typedef t) {
+
+    }
+
+    void genFieldDecl(FieldDecl f, String prefix, Boolean extern, Integer depth, Xp xp) {
+        while(depth > 0) {
+            xp('    ');
+            depth--;
+        }
+        if(extern) {
+            xp('extern ');
+        }
+        // if(f.final) {
+        //     s += 'final ';
+        // }
+        // if(f.const) {
+        //     hp('const ');
+        // }
+        Boolean skipName = false;
+        if(f.type == null) {
+            xp('auto ');
+        } else {
+            if(f.type is FunctionType){
+                skipName = true;
+            }
+            xp(dataTypeToString(f.type, name: f.name));
+        }
+        if(!skipName) {
+            xp(' ');
+            if(prefix != null){
+                xp(prefix);
+                xp('_');
+            }
+            xp(f.name);
+        }
+        xp(';\n');
+    }
+
+    DataType getListValueType(ClassDecl cls) {
+        ValueType listImpl = cls.impls.firstWhere(i => i.name =='List') as ValueType;
+        if(listImpl != null) {
+            DataType valueType = listImpl.args.isNotEmpty? listImpl.args.get(0): null;
+            if(valueType == null || valueType.name.length == 1){
+                D3ELogger.error('We need to resolve the List ValueType Further');
+            } else {
+                return valueType;
+            }
+        }
+        return null;
+    }
+
+}

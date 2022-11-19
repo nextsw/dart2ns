@@ -1,3 +1,9 @@
-class NullExpression extends Expression {
+server class NullExpression extends Expression {
     
+    void resolve(ResolveContext context) {
+        resolvedType = context.nullType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        
+    }
 }

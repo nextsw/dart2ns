@@ -1,4 +1,4 @@
-class Comment {
+server class Comment {
     String comment;
     CommentType type;
     Comment(this.comment, this.type);

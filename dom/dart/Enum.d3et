@@ -1,4 +1,36 @@
-class Enum extends TopDecl {
+server class Enum extends TopDecl {
     List<String> values = [];
     Enum(String name):super(name, TopDeclType.Enum, '');
+    ClassDecl cls;
+
+    void collectUsedTypes(){
+
+    }
+
+    void resolve(ResolveContext context) {
+        if(cls == null) {
+            cls = toClassDecl();
+        }
+    }
+
+    ClassDecl toClassDecl(){
+        cls = ClassDecl(false, this.name);
+        for(String v in values) {
+            FieldDecl field = FieldDecl(
+                name: v,
+                static: true,
+                type: ValueType(name),
+            );
+            cls.members.add(field);
+        }
+        ValueType valuesType = ValueType('List');
+        valuesType.args.add(ValueType(name));
+        FieldDecl valuesField = FieldDecl(
+            name: 'values',
+            static: true,
+            type: valuesType,
+        );
+        cls.members.add(valuesField);
+        return cls;
+    }
 }

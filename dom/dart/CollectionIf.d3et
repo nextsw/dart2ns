@@ -1,6 +1,22 @@
-class CollectionIf extends ArrayItem {
+server class CollectionIf extends ArrayItem {
     Expression test;
     ArrayItem thenItem;
     ArrayItem elseItem;
     CollectionIf({this.test, this.thenItem, this.elseItem});
+
+
+    void resolve(ResolveContext context) {
+        test.resolve(context);
+        thenItem.resolve(context);
+        if(elseItem != null) {
+            elseItem.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        test.collectUsedTypes(types);
+        thenItem.collectUsedTypes(types);
+        if(elseItem != null) {
+            elseItem.collectUsedTypes(types);
+        }
+    }
 }

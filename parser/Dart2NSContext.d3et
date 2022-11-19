@@ -27,6 +27,14 @@ server class Dart2NSContext {
 	}
 
     void add(TopDecl obj) {
+        obj.lib = current;
+        if(obj.name == null) {
+            return;
+        }
+        TopDecl existing = objects.get(obj.name);
+        if(existing != null) {
+            D3ELogger.error('Another object exists with same name:' + obj.name);
+        }
         objects.set(obj.name, obj);
     }
     TopDecl get(String name) {
@@ -76,6 +84,10 @@ server class Dart2NSContext {
 
     void _pop() {
         current = stack.removeLast();
+    }
+
+    void addPartOf(String partOf) {
+        current.partOf = partOf;
     }
 
     Boolean loadPart(String path) {

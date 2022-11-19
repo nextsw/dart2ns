@@ -1,4 +1,11 @@
 abstract class DataType {
     String name;
     Boolean optional = false;
+
+    void collectUsedTypes(Set<String> types);
+
+    String toString(){
+        return name;
+    }
+
 }

@@ -1,7 +1,39 @@
-class LambdaExpression extends Expression {
+server class LambdaExpression extends Expression {
     List<Param> params = [];
     Expression expression;
     Block body;
     ASyncType asyncType = ASyncType.NONE;
     LambdaExpression({this.params});
+
+
+    void resolve(ResolveContext context) {
+        context.scope = Scope(parent: context.scope);
+        for(Param p in params){
+            if(p.type != null) {
+                context.scope.add(p.name, p.type);
+            }
+        }
+        if(expression != null) {
+            expression.resolve(context);
+        }
+        if(body != null) {
+            body.resolve(context);
+        }
+        // TODO
+        resolvedType = context.ofUnknownType();
+        context.scope = context.scope.parent;
+    }
+    void collectUsedTypes(Set<String> types) {
+        for(Param p in params) {
+            if(p.type != null) {
+                p.type.collectUsedTypes(types);
+            }
+        }
+        if(expression != null){
+            expression.collectUsedTypes(types);
+        }
+        if(body != null) {
+            body.collectUsedTypes(types);
+        }
+    }
 }

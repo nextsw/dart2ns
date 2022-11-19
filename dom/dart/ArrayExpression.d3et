@@ -1,6 +1,31 @@
-class ArrayExpression extends Expression{
+server class ArrayExpression extends Expression{
     DataType enforceType;
     DataType valueType;
     List<ArrayItem> values = [];
     ArrayType type;
+
+
+    void resolve(ResolveContext context) {
+        for(ArrayItem item in values){
+            item.resolve(context);
+        }
+        if(enforceType != null) {
+            resolvedType = enforceType;
+        } else if(values.isNotEmpty){
+            resolvedType = values.first.resolvedType;
+        } else {
+            resolvedType = ValueType('List');
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        for(ArrayItem item in values){
+            item.collectUsedTypes(types);
+        }
+        if(enforceType != null) {
+            enforceType.collectUsedTypes(types);
+        }
+        if(valueType != null) {
+            valueType.collectUsedTypes(types);
+        }
+    }
 }

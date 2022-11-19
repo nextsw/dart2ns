@@ -1,6 +1,22 @@
-class IfStatement extends Statement {
+server class IfStatement extends Statement {
     Expression test;
     Statement thenStatement;
     Statement elseStatement;
     IfStatement({this.test, this.thenStatement, this.elseStatement});
+
+
+    void resolve(ResolveContext context) {
+        test.resolve(context);
+        thenStatement.resolve(context);
+        if(elseStatement != null) {
+            elseStatement.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        test.collectUsedTypes(types);
+        thenStatement.collectUsedTypes(types);
+        if(elseStatement != null){
+            elseStatement.collectUsedTypes(types);
+        }
+    }
 }

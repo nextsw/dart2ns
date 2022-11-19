@@ -1,4 +1,9 @@
-abstract class Expression {
+abstract server class Expression {
     List<Comment> comments = [];   
-    DataType resolvedType; 
+    DataType resolvedType;
+
+    Boolean hasAwait;
+
+    void resolve(ResolveContext conext);
+    void collectUsedTypes(Set<String> types);
 }

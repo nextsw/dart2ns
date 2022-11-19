@@ -1,3 +1,6 @@
-class RethrowStatement extends Statement {
-    
+server class RethrowStatement extends Statement {
+    void resolve(ResolveContext context) {
+    }
+    void collectUsedTypes(Set<String> types) {
+    }
 }

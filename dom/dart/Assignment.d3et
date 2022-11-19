@@ -1,6 +1,17 @@
-class Assignment extends Statement {
+server class Assignment extends Statement {
     String op;
     Expression left;
     Expression right;
     Assignment({this.op, this.left, this.right});
+
+
+    void resolve(ResolveContext context) {
+        left.resolve(context);
+        right.resolve(context);
+        resolvedType = left.resolvedType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        left.collectUsedTypes(types);
+        right.collectUsedTypes(types);
+    }
 }

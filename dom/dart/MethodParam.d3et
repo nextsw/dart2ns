@@ -1,4 +1,4 @@
-class MethodParam {
+server class MethodParam {
     List<Comment> beforeComments = [];
     String thisToken;
     Expression defaultValue;

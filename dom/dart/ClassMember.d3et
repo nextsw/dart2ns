@@ -1,4 +1,5 @@
-abstract class ClassMember extends TopDecl{
+abstract server class ClassMember extends TopDecl{
     List<Comment> comments = [];
+    Boolean static;
     ClassMember(String name, TopDeclType type, String path) : super(name, type, path);
 }

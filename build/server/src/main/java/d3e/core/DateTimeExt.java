@@ -228,6 +228,6 @@ public class DateTimeExt {
 	}
 	
 	public static Duration minus(LocalDateTime _this, LocalDateTime other) {
-		return Duration.between(_this, other);
+		return Duration.between(other, _this);
 	}
 }

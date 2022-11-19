@@ -13,4 +13,13 @@ public class Typedef extends TopDecl {
     this.type = type;
     this.fnType = fnType;
   }
+
+  public void collectUsedTypes() {
+    if (this.type != null) {
+      this.usedTypes.add(this.type.name);
+    }
+    this.fnType.collectUsedTypes(this.usedTypes);
+  }
+
+  public void resolve(ResolveContext context) {}
 }

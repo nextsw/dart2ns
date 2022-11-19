@@ -1,4 +1,12 @@
-class ParExpression extends Expression {
+server class ParExpression extends Expression {
     Expression exp;
     ParExpression({this.exp});
+
+    void resolve(ResolveContext context) {
+        exp.resolve(context);
+        resolvedType = exp.resolvedType;
+    }
+    void collectUsedTypes(Set<String> types) {
+        exp.collectUsedTypes(types);
+    }
 }

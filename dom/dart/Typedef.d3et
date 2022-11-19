@@ -1,6 +1,18 @@
-class Typedef extends TopDecl {
+server class Typedef extends TopDecl {
     DefType type;
     FunctionType fnType;
     List<Annotation> annotations = [];
     Typedef(this.type, this.fnType) : super(fnType.name, TopDeclType.Typedef, '');
+
+
+    void collectUsedTypes(){
+        if(type != null) {
+            usedTypes.add(type.name);
+        }
+        fnType.collectUsedTypes(usedTypes);
+    }
+
+    void resolve(ResolveContext context) {
+
+    }
 }

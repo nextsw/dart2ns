@@ -33,6 +33,14 @@ public class Dart2NSContext {
   }
 
   public void add(TopDecl obj) {
+    obj.lib = this.current;
+    if (obj.name == null) {
+      return;
+    }
+    TopDecl existing = this.objects.get(obj.name);
+    if (existing != null) {
+      D3ELogger.error("Another object exists with same name:" + obj.name);
+    }
     MapExt.set(this.objects, obj.name, obj);
   }
 
@@ -88,6 +96,10 @@ public class Dart2NSContext {
 
   public void _pop() {
     this.current = ListExt.removeLast(this.stack);
+  }
+
+  public void addPartOf(String partOf) {
+    this.current.partOf = partOf;
   }
 
   public boolean loadPart(String path) {

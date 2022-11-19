@@ -1,5 +1,15 @@
-class WhileLoop extends Statement {
+server class WhileLoop extends Statement {
     Statement body;
     Expression test;
     WhileLoop({this.body, this.test});
+
+
+    void resolve(ResolveContext context) {
+        test.resolve(context);
+        body.resolve(context);
+    }
+    void collectUsedTypes(Set<String> types) {
+        test.collectUsedTypes(types);
+        body.collectUsedTypes(types);
+    }
 }

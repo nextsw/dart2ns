@@ -1,5 +1,9 @@
-class DefType extends DataType {
+server class DefType extends DataType {
     String in;
     TypeParams params;
     DefType(this.name, this.optional);
+
+    void collectUsedTypes(Set<String> types){
+        
+    }
 }

@@ -8,10 +8,12 @@ import classes.CommentType;
 import classes.ConnectionStatus;
 import classes.DBResult;
 import classes.DBResultStatus;
+import classes.GradientType;
 import classes.IconType;
 import classes.ImageFrom;
 import classes.LiteralType;
 import classes.LoginResult;
+import classes.MemberFilter;
 import classes.MutateResultStatus;
 import classes.ReportOutAttribute;
 import classes.ReportOutCell;
@@ -52,6 +54,7 @@ public class ModelSchema extends AbstractModelSchema {
     addEnum(MutateResultStatus.class, SchemaConstants.MutateResultStatus);
     addEnum(ChangeEventType.class, SchemaConstants.ChangeEventType);
     addEnum(ColumnWidthType.class, SchemaConstants.ColumnWidthType);
+    addEnum(GradientType.class, SchemaConstants.GradientType);
     addEnum(TrackSizeType.class, SchemaConstants.TrackSizeType);
     addEnum(IconType.class, SchemaConstants.IconType);
     addEnum(ImageFrom.class, SchemaConstants.ImageFrom);
@@ -60,6 +63,7 @@ public class ModelSchema extends AbstractModelSchema {
     addEnum(ArrayType.class, SchemaConstants.ArrayType);
     addEnum(CommentType.class, SchemaConstants.CommentType);
     addEnum(LiteralType.class, SchemaConstants.LiteralType);
+    addEnum(MemberFilter.class, SchemaConstants.MemberFilter);
     addEnum(TopDeclType.class, SchemaConstants.TopDeclType);
     addEnum(TypeKind.class, SchemaConstants.TypeKind);
   }

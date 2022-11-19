@@ -1,4 +1,14 @@
-class AwaitExpression extends Statement {
+server class AwaitExpression extends Statement {
     Expression exp;
     AwaitExpression(this.exp);
+
+   
+    void resolve(ResolveContext context) {
+        exp.resolve(context);
+        resolvedType = exp.resolvedType;
+        exp.resolvedType = context.subType(exp.resolvedType);
+    }
+    void collectUsedTypes(Set<String> types) {
+        exp.collectUsedTypes(types);
+    } 
 }

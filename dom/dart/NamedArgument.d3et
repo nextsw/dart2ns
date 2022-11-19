@@ -1,4 +1,4 @@
-class NamedArgument {
+server class NamedArgument {
     String name;
     List<Comment> beforeComments = [];
     List<Comment> afterComments = [];

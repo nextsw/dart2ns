@@ -9,5 +9,17 @@ server class Scope {
     void add(String name, DataType type){
         variables.set(name, type);
     }
+    
+    DataType get(String name) {
+        DataType ret = variables.get(name);
+
+        if(ret != null){
+            return ret;
+        }
+        if(parent != null){
+            return parent.get(name);
+        }
+        return ret;
+    }
 
 }

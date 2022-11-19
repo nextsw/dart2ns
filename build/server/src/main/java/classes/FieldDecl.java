@@ -7,7 +7,6 @@ public class FieldDecl extends ClassMember {
   public String name;
   public DataType type;
   public Expression value;
-  public boolean staticValue = false;
   public boolean finalValue = false;
   public boolean constValue = false;
   public boolean external = false;
@@ -34,5 +33,25 @@ public class FieldDecl extends ClassMember {
     this.staticValue = staticValue;
     this.type = type;
     this.value = value;
+  }
+
+  public void collectUsedTypes() {
+    if (this.type != null) {
+      this.type.collectUsedTypes(this.usedTypes);
+    }
+  }
+
+  public void resolve(ResolveContext context) {
+    if (this.value != null) {
+      this.value.resolve(context);
+      if (this.type == null) {
+        this.type = this.value.resolvedType;
+      }
+    }
+    context.scope.add(this.name, this.type);
+  }
+
+  public String toString() {
+    return this.name;
   }
 }

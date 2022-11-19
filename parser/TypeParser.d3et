@@ -88,9 +88,12 @@ server class TypeParser {
             if(isKey(this.peekTok, 'of')) {
                 next();
                 next();
+                List<String> str= [];
                 while(tok.kind != TypeKind.Semicolon) {
+                    str.add(tok.lit);
                     next();
                 }
+                context.addPartOf(str.join(''));
                 next();
                 return true;
             }
@@ -557,6 +560,7 @@ server class TypeParser {
         Boolean isConstructor = (tok.lit == className)
             && (peekTok.kind == TypeKind.Lpar
                 || peekTok.kind == TypeKind.Dot);
+        String factoryName = null;
         if(!isFactory && !isConstructor) {
             if((isConst || isFinal) && peekTok.kind == TypeKind.Assign) {
             } else {
@@ -623,7 +627,7 @@ server class TypeParser {
             }
             if(tok.kind == TypeKind.Dot) {
                 check(TypeKind.Dot);
-                name = checkName();
+                factoryName = checkName();
             }
         } else {
             if (name == 'set' && tok.kind == TypeKind.Name) {
@@ -702,6 +706,7 @@ server class TypeParser {
             setter: isSet,
             getter: isGet,
             factory: isFactory,
+            factoryName: factoryName,
             params: params,
             init: init,
             returnType: type,
@@ -2034,6 +2039,7 @@ server class TypeParser {
             while(tok.kind ==TypeKind.String) {
                 exp.str += tok.lit;
                 next();
+                eatComments();
             }
         }
 
@@ -2067,8 +2073,8 @@ server class TypeParser {
                 restore();
             } else {
                 drop();
+                return callExpr(name, typeArgs: args);
             }
-            return callExpr(name, typeArgs: args);
         }
         if (this.tok.kind == TypeKind.Lpar) {
             return callExpr(name);
@@ -2080,9 +2086,11 @@ server class TypeParser {
 
     MethodCall callExpr(String name, {List<DataType> typeArgs}) {
         TypeToken start = this.tok;
+        String onTypeName = null;
         if(this.tok.kind == TypeKind.Dot) {
             // Call on Type
             next();
+            onTypeName = name;
             name = checkName();
         }
         if(tok.kind != TypeKind.Lpar) {
@@ -2093,6 +2101,7 @@ server class TypeParser {
         MethodCall mCall = MethodCall(
             name: name,
             typeArgs: typeArgs,
+            onTypeName: onTypeName,
         );
         while (true) {
             List<Comment> comments = eatComments();

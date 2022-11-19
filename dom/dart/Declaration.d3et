@@ -1,8 +1,38 @@
-class Declaration extends Statement {
+server class Declaration extends Statement {
     DataType type;
     List<NameAndValue> names = [];
     Boolean isFinal;
     Boolean isConst;
     Boolean isLate;
     Declaration({this.type, this.names, this.isFinal, this.isLate, this.isConst});
+
+    void collectUsedTypes(Set<String> types){
+        
+        names.forEach((n){
+            if(n.value != null) {
+                n.value.collectUsedTypes(types);
+            }
+        });
+    }
+
+    void resolve(ResolveContext context) {
+        resolvedType = null;
+        if(type != null){
+            resolvedType = type;
+        }
+        Boolean haveType = type != null && type.name != 'var';
+        names.forEach((n){
+            if(n.value != null) {
+                n.value.resolve(context);
+                resolvedType = n.value.resolvedType;
+            }
+            context.scope.add(n.name, haveType? type : resolvedType);
+        });
+        if(!haveType) {
+            resolvedType = resolvedType ?? context.ofUnknownType();
+            type = resolvedType;
+        } else {
+            resolvedType = type;
+        }
+    }
 }

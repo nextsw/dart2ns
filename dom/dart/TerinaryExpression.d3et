@@ -1,6 +1,19 @@
-class TerinaryExpression extends Statement {
+server class TerinaryExpression extends Statement {
     Expression condition;
     Expression ifTrue;
     Expression ifFalse;
     TerinaryExpression({this.condition, this.ifTrue, this.ifFalse});
+
+
+    void resolve(ResolveContext context) {
+        condition.resolve(context);
+        ifTrue.resolve(context);
+        ifFalse.resolve(context);
+        resolvedType = context.commonType(ifTrue.resolvedType, ifFalse.resolvedType);
+    }
+    void collectUsedTypes(Set<String> types) {
+        condition.collectUsedTypes(types);
+        ifTrue.collectUsedTypes(types);
+        ifFalse.collectUsedTypes(types);
+    }
 }

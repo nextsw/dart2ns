@@ -1,5 +1,7 @@
 package classes;
 
+import java.util.Set;
+
 public class DefType extends DataType {
   public String in;
   public TypeParams params;
@@ -8,4 +10,6 @@ public class DefType extends DataType {
     this.name = name;
     this.optional = optional;
   }
+
+  public void collectUsedTypes(Set<String> types) {}
 }

@@ -1,6 +1,42 @@
-class BinaryExpression extends Expression {
+server class BinaryExpression extends Expression {
     String op;
     Expression left;
     Expression right;
     BinaryExpression({this.op, this.left, this.right});
+
+
+    void resolve(ResolveContext context) {
+        left.resolve(context);
+        // Create new scope if needed
+        Boolean newScope = false;
+        if(op == '&&'){
+            Expression check = left;
+            if(check is ParExpression) {
+                check= (check as ParExpression).exp;
+            }
+            if(left is TypeCastOrCheckExpression){
+                TypeCastOrCheckExpression typeCheck = check as TypeCastOrCheckExpression;
+                if(typeCheck.check && typeCheck.exp is FieldOrEnumExpression){
+                    FieldOrEnumExpression fe = typeCheck.exp as FieldOrEnumExpression;
+                    if(fe.on == null) {
+                        context.scope = Scope(parent: context.scope);
+                        context.scope.add(fe.name, typeCheck.dataType);
+                        newScope = true;
+                    }
+                }
+            }
+        }
+        right.resolve(context);
+        if(newScope){
+            context.scope = context.scope.parent;
+        }
+        resolvedType = switch(op) {
+            case '??': context.commonType(left.resolvedType, right.resolvedType)
+            default: left.resolvedType
+        };
+    }
+    void collectUsedTypes(Set<String> types) {
+        left.collectUsedTypes(types);
+        right.collectUsedTypes(types);
+    }
 }

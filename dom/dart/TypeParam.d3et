@@ -1,4 +1,4 @@
-class TypeParam {
+server class TypeParam {
     String name;
     DataType extendType;
     DataType resolvedType;

@@ -1,4 +1,4 @@
-class CatchPart {
+server class CatchPart {
     String exp;
     Block body;
     String stackTrace;

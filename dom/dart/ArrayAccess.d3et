@@ -1,7 +1,37 @@
-class ArrayAccess extends Expression {
+server class ArrayAccess extends Expression {
     Expression on;
     Expression index;
     Boolean checkNull = false;
     Boolean notNull = false;
     ArrayAccess({this.on, this.index, this.checkNull, this.notNull});
+
+    void resolve(ResolveContext context) {
+        on.resolve(context);
+        index.resolve(context);
+        if(on.resolvedType.name == 'List') {
+            resolvedType = (on.resolvedType as ValueType).args.first ?? context.objectType;
+        } else {
+            // We need to find the index method.
+            TopDecl top = context.get(on.resolvedType.name);
+            if(top is ClassDecl) {
+                ClassDecl cls = top as ClassDecl;
+                MethodDecl indexMethod = context.getMember(cls, '[]') as MethodDecl;
+                if(indexMethod == null) {
+                    resolvedType = context.ofUnknownType();
+                    D3ELogger.error('Can not find [] operator in : ' + cls.name);
+                } else  if(indexMethod.returnType.name.length == 1){
+                    resolvedType = context.getListValueType(cls) ?? context.ofUnknownType();
+                } else {
+                    resolvedType = indexMethod.returnType;
+                }
+            } else {
+                resolvedType = context.ofUnknownType();
+                D3ELogger.error('It must be Class');
+            }
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        on.collectUsedTypes(types);
+        index.collectUsedTypes(types);
+    }
 }

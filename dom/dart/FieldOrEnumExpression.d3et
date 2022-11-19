@@ -1,7 +1,158 @@
-class FieldOrEnumExpression extends Statement {
+server class FieldOrEnumExpression extends Statement {
     String name;
     Expression on;
     Boolean checkNull;
     Boolean notNull;
+    Boolean isGetter;
+    ClassMember resolvedMember;
+
+    List<String> primitives = [
+        'int',
+        'bool',
+        'double',
+        'num',
+    ];
     FieldOrEnumExpression({this.on, this.name, this.checkNull, this.notNull});
+
+
+    void resolve(ResolveContext context) {
+        ClassDecl onType = null;
+        Boolean onDynamic = false;
+        if(on!= null) {
+            on.resolve(context);
+            TopDecl decl = context.get(on.resolvedType.name);
+            if(decl is ClassDecl) {
+                onType = decl as ClassDecl;
+            } else if(on.resolvedType == context.typeType) {
+                if(!(on is FieldOrEnumExpression)){
+                    D3ELogger.error('Mist be FE Exp');
+                    resolvedType = context.ofUnknownType();
+                    return;
+                }
+                String typeName = (on as FieldOrEnumExpression).name;
+                TopDecl top = context.get(typeName);
+                if(top is ClassDecl){
+                    onType = top as ClassDecl;
+                } else if(top is Enum) {
+                    onType = (top as Enum).toClassDecl();
+                }
+                // D3ELogger.error('Resolved Type is not Class in FEExp');
+            } else if(on.resolvedType == context.libraryType) {
+                if(!(on is FieldOrEnumExpression)){
+                    D3ELogger.error('Mist be FE Exp');
+                    resolvedType = context.ofUnknownType();
+                    return;
+                }
+                String importName = (on as FieldOrEnumExpression).name;
+                Library libToCheck = context.instanceClass.lib;
+                if(context.instanceClass.lib.partOf != null) {
+                    libToCheck = libToCheck.parent;
+                }
+                Import import = libToCheck.imports.firstWhere(i => i.name == importName);
+                TopDecl topCm = import.lib.get(name);
+                if(topCm is ClassMember) {
+                    resolveUsingClassMember(context, topCm as ClassMember, onType);
+                    return;
+                } else {
+                    D3ELogger.error('It must be ClassMember');
+                }
+            } else if (on.resolvedType.name == 'dynamic') {
+                onDynamic = true;
+            }
+        }
+        if(name == 'this') {
+            resolvedType = ValueType(context.instanceClass.name);
+            return;
+        } 
+        DataType fieldType = context.fieldTypeFromScope(name);
+        if(onDynamic) {
+            resolvedType = context.objectType;
+            return;
+        }
+
+        if(fieldType == null && onType != null) {
+            ClassMember cm = context.getMember(onType, name);
+            resolveUsingClassMember(context, cm, onType);
+        } else if(fieldType != null) {
+            // this must be global field
+            resolvedType = fieldType;
+        } else {
+            if(context.method != null && !context.method.static){
+                ClassMember mem = context.getMember(context.instanceClass, name, filter: MemberFilter.FieldsAndGetters);
+                if(mem is FieldDecl){
+                    fieldType = (mem as FieldDecl).type;
+                    resolvedType = fieldType;
+                    resolvedMember = mem;
+                } else if(mem is MethodDecl) {
+                    fieldType = (mem as MethodDecl).returnType;
+                    resolvedType = fieldType;
+                    resolvedMember = mem;
+                }
+            }
+            if(fieldType == null) {
+                if(on == null && ParserUtil.isTypeName(name) || primitives.contains(name)){
+                    resolvedType = context.typeType;
+                } else {
+                    // Lets check if is a library import
+                    Library libToCheck = context.instanceClass.lib;
+                    if(context.instanceClass.lib.partOf != null) {
+                        libToCheck = libToCheck.parent;
+                    }
+                    Import import = libToCheck.imports.firstWhere(i => i.name == name);
+                    if(import != null) {
+                        resolvedType = context.libraryType;
+                        return;
+                    } 
+                    String cls = context.instanceClass?.name;
+                    String method = context.method?.name;
+                    D3ELogger.error('No field found: ' + name + ' in Cls: ' + cls +' Method: ' + method);
+                        
+                    resolvedType = context.ofUnknownType();
+
+                }
+            }
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        if(on != null) {
+            on.collectUsedTypes(types);
+        }
+    }
+
+    void resolveUsingClassMember(ResolveContext context, ClassMember cm, ClassDecl onType) {
+        if(cm is MethodDecl){
+            MethodDecl md = cm as MethodDecl;
+            if(md.getter) {
+                isGetter = true;
+                if(onType != null) {
+                    resolvedType = context.resolveType(onType, md.returnType);
+                } else {
+                    resolvedType = md.returnType;
+                }
+                resolvedMember = cm;
+            } else {
+                resolvedType = context.ofUnknownType();
+            }
+        } else {
+            FieldDecl field = cm as FieldDecl;
+            if(field != null) {
+                if(onType != null) {
+                    resolvedType = context.resolveType(onType, field.type);
+                } else {
+                    resolvedType = field.type;
+                }
+                resolvedMember = cm;
+            } else {
+                String cls = context.instanceClass?.name;
+                String method = context.method?.name;
+                D3ELogger.error('No field found: ' + name + ' in ' + onType.name + ' Cls: ' + cls +' Method: ' + method);
+                resolvedType = context.ofUnknownType();
+            }
+        }
+    }
+
+    String toString(){
+        return on == null? on.toString() : '' + name;
+    }
+    
 }

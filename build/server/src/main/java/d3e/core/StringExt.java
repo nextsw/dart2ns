@@ -156,7 +156,7 @@ public class StringExt {
 	}
 
 	public static String times(String on, long times) {
-		StringBuilder sb = new StringBuilder(on);
+		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < times; i++)
 			sb.append(on);
 		return sb.toString();

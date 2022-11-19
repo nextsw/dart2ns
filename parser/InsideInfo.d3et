@@ -1,4 +1,4 @@
-class InsideInfo {
+server class InsideInfo {
     Boolean insideString;
     Boolean isMultiLine;
     String quote;

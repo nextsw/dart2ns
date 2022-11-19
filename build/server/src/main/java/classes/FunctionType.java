@@ -2,6 +2,7 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
+import java.util.Set;
 
 public class FunctionType extends DataType {
   public DataType returnType;
@@ -27,5 +28,22 @@ public class FunctionType extends DataType {
       res = res + "()";
     }
     return res;
+  }
+
+  public void collectUsedTypes(Set<String> types) {
+    if (this.returnType != null) {
+      this.returnType.collectUsedTypes(types);
+    }
+    if (this.params != null) {
+      for (MethodParam m : this.params.positionalParams) {
+        m.dataType.collectUsedTypes(types);
+      }
+      for (MethodParam m : this.params.optionalParams) {
+        m.dataType.collectUsedTypes(types);
+      }
+      for (MethodParam m : this.params.namedParams) {
+        m.dataType.collectUsedTypes(types);
+      }
+    }
   }
 }

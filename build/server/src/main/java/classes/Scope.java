@@ -17,4 +17,15 @@ public class Scope {
   public void add(String name, DataType type) {
     MapExt.set(this.variables, name, type);
   }
+
+  public DataType get(String name) {
+    DataType ret = this.variables.get(name);
+    if (ret != null) {
+      return ret;
+    }
+    if (this.parent != null) {
+      return this.parent.get(name);
+    }
+    return ret;
+  }
 }

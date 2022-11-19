@@ -33,8 +33,8 @@ public class DurationExt {
 
 	private static java.time.Duration value;
 
-	public static Duration Duration(long days, long hours, long minutes, long seconds, long milliseconds,
-			long microseconds) {
+	public static Duration Duration(long days, long hours, long microseconds, long milliseconds, long minutes, long seconds
+			) {
 		value = java.time.Duration.ofNanos(getNanoSeconds(days, hours, minutes, seconds, milliseconds, microseconds));
 		return value;
 	}

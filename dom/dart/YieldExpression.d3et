@@ -1,5 +1,17 @@
-class YieldExpression extends Statement {
+server class YieldExpression extends Statement {
     Expression exp;
     Boolean pointer;
     YieldExpression(this.exp, this.pointer);
+
+
+    void resolve(ResolveContext context) {
+        if(exp!= null) {
+            exp.resolve(context);
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        if(exp != null) {
+            exp.collectUsedTypes(types);
+        }
+    }
 }

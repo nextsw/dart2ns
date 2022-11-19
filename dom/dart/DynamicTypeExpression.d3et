@@ -1,4 +1,12 @@
-class DynamicTypeExpression extends Expression {
+server class DynamicTypeExpression extends Expression {
     String name;
     
+
+
+    void resolve(ResolveContext context) {
+
+    }
+    void collectUsedTypes(Set<String> types) {
+        
+    }
 }

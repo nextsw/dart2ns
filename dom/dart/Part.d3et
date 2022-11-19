@@ -1,4 +1,4 @@
-class Part {
+server class Part {
     String path;
     Library parent;
     Library lib;

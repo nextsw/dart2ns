@@ -1,5 +1,23 @@
-class FnCallExpression extends Statement {
+server class FnCallExpression extends Statement {
     Expression on;
     MethodCall call;
     FnCallExpression({this.on, this.call});
+
+
+    void resolve(ResolveContext context) {
+        on.resolve(context);
+        call.resolve(context);
+        DataType onType = on.resolvedType;
+        if(onType is FunctionType) {
+            FunctionType ft = onType as FunctionType;
+            resolvedType = ft.returnType;
+        } else {
+            D3ELogger.error('We should not be calling non function types');
+            resolvedType = context.ofUnknownType();
+        }
+    }
+    void collectUsedTypes(Set<String> types) {
+        on.collectUsedTypes(types);
+        call.collectUsedTypes(types);
+    }
 }

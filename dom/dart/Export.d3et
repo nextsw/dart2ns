@@ -1,4 +1,4 @@
-class Export {
+server class Export {
     String path;
     Library parent;
     Library lib;

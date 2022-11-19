@@ -1,4 +1,4 @@
-class Param {
+server class Param {
     String name;
     DataType type;
     Param({this.name, this.type});
