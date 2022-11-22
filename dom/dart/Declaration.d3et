@@ -6,7 +6,7 @@ server class Declaration extends Statement {
     Boolean isLate;
     Declaration({this.type, this.names, this.isFinal, this.isLate, this.isConst});
 
-    void collectUsedTypes(Set<String> types){
+    void collectUsedTypes(List<DataType> types){
         
         names.forEach((n){
             if(n.value != null) {
@@ -21,18 +21,26 @@ server class Declaration extends Statement {
             resolvedType = type;
         }
         Boolean haveType = type != null && type.name != 'var';
-        names.forEach((n){
+        for(NameAndValue n in names){
             if(n.value != null) {
                 n.value.resolve(context);
                 resolvedType = n.value.resolvedType;
             }
             context.scope.add(n.name, haveType? type : resolvedType);
-        });
+        }
         if(!haveType) {
             resolvedType = resolvedType ?? context.ofUnknownType();
             type = resolvedType;
         } else {
             resolvedType = type;
+        }
+    }
+
+    void simplify(Simplifier s) {
+        for(NameAndValue n in names){
+            if(n.value != null) {
+                n.value.simplify(s);
+            }
         }
     }
 }

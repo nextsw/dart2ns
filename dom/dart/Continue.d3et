@@ -2,11 +2,15 @@ server class Continue extends Statement {
     String label;
     Continue(this.label);
 
-    void collectUsedTypes(Set<String> types){
+    void collectUsedTypes(List<DataType> types){
 
     }
 
     void resolve(ResolveContext context) {
+        
+    }
+
+    void simplify(Simplifier s){
         
     }
 }

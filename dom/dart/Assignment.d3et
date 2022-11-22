@@ -10,8 +10,31 @@ server class Assignment extends Statement {
         right.resolve(context);
         resolvedType = left.resolvedType;
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         left.collectUsedTypes(types);
         right.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        if(op == '??=') {
+            left.simplify(s);
+            IfStatement ifs = IfStatement(
+                test: BinaryExpression(
+                    op: '==',
+                    left: left,
+                    right: NullExpression(),
+                ),
+                thenStatement: Assignment(
+                    op: '=',
+                    left: left,
+                    right: this.right,
+                ),
+            );
+            s.add(ifs);
+            s.markDelete();
+        } else {
+            left.simplify(s);
+            right.simplify(s);
+        }
     }
 }

@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class ForLoop extends Statement {
   public Expression body;
@@ -42,7 +41,7 @@ public class ForLoop extends Statement {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.inits.forEach(
         (i) -> {
           i.collectUsedTypes(types);
@@ -60,5 +59,20 @@ public class ForLoop extends Statement {
     if (this.body != null) {
       this.body.collectUsedTypes(types);
     }
+  }
+
+  public void simplify(Simplifier s) {
+    /*
+    test = s.makeSimple(test);
+    */
+    if (this.body == null) {
+      this.body = new Block();
+    }
+    if (!(this.body instanceof Block)) {
+      Block b = new Block();
+      b.statements.add(((Statement) this.body));
+      this.body = b;
+    }
+    this.body.simplify(s);
   }
 }

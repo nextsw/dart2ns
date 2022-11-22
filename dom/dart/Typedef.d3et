@@ -2,17 +2,20 @@ server class Typedef extends TopDecl {
     DefType type;
     FunctionType fnType;
     List<Annotation> annotations = [];
-    Typedef(this.type, this.fnType) : super(fnType.name, TopDeclType.Typedef, '');
+    Typedef(this.name, this.type, this.fnType) : super(name, TopDeclType.Typedef, '');
 
 
     void collectUsedTypes(){
         if(type != null) {
-            usedTypes.add(type.name);
+            usedTypes.add(type);
         }
-        fnType.collectUsedTypes(usedTypes);
+        usedTypes.add(fnType);
     }
 
     void resolve(ResolveContext context) {
 
     }
+    void simplify(Simplifier s){
+    }
+
 }

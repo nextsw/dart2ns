@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class TypeCastOrCheckExpression extends Statement {
   public boolean check = false;
@@ -25,8 +25,12 @@ public class TypeCastOrCheckExpression extends Statement {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.exp.collectUsedTypes(types);
-    types.add(this.dataType.name);
+    types.add(this.dataType);
+  }
+
+  public void simplify(Simplifier s) {
+    this.exp = s.makeSimple(this.exp);
   }
 }

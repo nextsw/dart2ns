@@ -21,21 +21,27 @@ server class FieldDecl extends ClassMember {
 
     void collectUsedTypes(){
         if(type != null) {
-            type.collectUsedTypes(usedTypes);
+            usedTypes.add(type);
         }
     }
 
     void resolve(ResolveContext context){
         if(value != null) {
             value.resolve(context);
-            if(type == null){
+            if(type == null || type.name == 'var'){
                 type = value.resolvedType;
             }
         }
-        context.scope.add(name, type);
+        if(context.scope != null) {
+            context.scope.add(name, type);
+        }
     }
 
     String toString(){
         return name;
     }
+
+    void simplify(Simplifier s){
+    }
+
 }

@@ -14,8 +14,12 @@ server class TypeCastOrCheckExpression extends Statement {
             resolvedType = dataType;
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         exp.collectUsedTypes(types);
-        types.add(dataType.name);
+        types.add(dataType);
+    }
+
+    void simplify(Simplifier s) {
+        exp = s.makeSimple(exp);
     }
 }

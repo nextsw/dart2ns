@@ -33,4 +33,7 @@ server class Enum extends TopDecl {
         cls.members.add(valuesField);
         return cls;
     }
+
+    void simplify(Simplifier s){
+    }
 }

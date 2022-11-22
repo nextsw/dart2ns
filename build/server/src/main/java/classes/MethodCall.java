@@ -4,7 +4,6 @@ import d3e.core.D3ELogger;
 import d3e.core.ListExt;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public class MethodCall extends Statement {
   public String name;
@@ -44,25 +43,25 @@ public class MethodCall extends Statement {
           return;
         }
         String typeName = (((FieldOrEnumExpression) this.on)).name;
-        TopDecl top = context.get(typeName);
+        TopDecl top = context.currentLib.get(typeName);
         if (top instanceof ClassDecl) {
           onType = ((ClassDecl) top);
         } else if (top instanceof Enum) {
           onType = (((Enum) top)).toClassDecl();
         }
       } else if (this.on.resolvedType instanceof ValueType) {
-        TopDecl top = context.get(this.on.resolvedType.name);
+        TopDecl top = context.currentLib.get(this.on.resolvedType.name);
         if (top instanceof ClassDecl) {
           onType = ((ClassDecl) top);
         }
       }
     } else {
       if (context.instanceClass != null
-          && context.getMember(context.instanceClass, this.name, null) != null) {
+          && context.getMember(context.instanceClass, this.name, null, false) != null) {
         onType = context.instanceClass;
       }
       if (this.onTypeName != null) {
-        TopDecl top = context.get(this.onTypeName);
+        TopDecl top = context.currentLib.get(this.onTypeName);
         if (top instanceof ClassDecl) {
           onType = ((ClassDecl) top);
         }
@@ -108,29 +107,24 @@ public class MethodCall extends Statement {
         return;
       }
       String importName = (((FieldOrEnumExpression) this.on)).name;
-      Library libToCheck = context.instanceClass.lib;
-      if (context.instanceClass.lib.partOf != null) {
-        libToCheck = libToCheck.parent;
-      }
-      Import importValue =
-          ListExt.firstWhere(
-              libToCheck.imports,
-              (i) -> {
-                return Objects.equals(i.name, importName);
-              },
-              null);
-      TopDecl topCm = importValue.lib.get(this.name);
+      Library libToCheck = context.currentLib;
+      TopDecl topCm = libToCheck.get(this.name);
       if (topCm instanceof MethodDecl) {
         MethodDecl md = ((MethodDecl) topCm);
         this.resolvedType = md.returnType;
+        this.resolvedMethod = md;
+      } else if (topCm instanceof ClassDecl) {
+        ClassDecl cls = ((ClassDecl) topCm);
+        ClassMember cm = context.getMember(cls, this.name, null, false);
+        if (cm instanceof MethodDecl) {
+          this.resolvedMethod = ((MethodDecl) cm);
+        }
+        this.resolvedType = new ValueType(cls.name, false);
       } else {
-        /*
-         Error
-        */
         this.resolvedType = context.ofUnknownType();
       }
     } else {
-      TopDecl td = context.get(this.name);
+      TopDecl td = context.currentLib.get(this.name);
       if (td instanceof MethodDecl) {
         MethodDecl md = ((MethodDecl) td);
         this.resolvedType = md.returnType;
@@ -140,13 +134,54 @@ public class MethodCall extends Statement {
         */
       } else if (td instanceof ClassDecl) {
         this.resolvedType = new ValueType(this.name, false);
+      } else if (Objects.equals(this.name, "assert")) {
+        this.resolvedType = context.statementType;
       } else {
+        var value$ = context.instanceClass == null ? null : context.instanceClass.name;
+        String cls = value$;
+        var value$1 = context.method == null ? null : context.method.name;
+        String method = value$1;
+        var value$2 = onType == null ? null : onType.name;
+        String inType = value$2;
+        D3ELogger.error(
+            "No method found: "
+                + this.name
+                + " in "
+                + inType
+                + " Cls: "
+                + cls
+                + " Method: "
+                + method);
         this.resolvedType = context.ofUnknownType();
       }
     }
+    if (this.resolvedMethod != null && ListExt.isNotEmpty(this.namedArgs)) {
+      for (long x = ListExt.length(this.positionArgs);
+          x < ListExt.length(this.resolvedMethod.params);
+          x++) {
+        MethodParam param = ListExt.get(this.resolvedMethod.params, x);
+        NamedArgument arg =
+            ListExt.firstWhere(
+                this.namedArgs,
+                (n) -> {
+                  return Objects.equals(n.name, param.name);
+                },
+                null);
+        if (arg == null) {
+          Expression value$ = param.defaultValue;
+          if (value$ == null) {
+            value$ = makeDefaultValue(param.dataType);
+          }
+          this.positionArgs.add(new Argument(ListExt.List(), value$));
+        } else {
+          this.positionArgs.add(new Argument(ListExt.List(), arg.value));
+        }
+      }
+      this.namedArgs.clear();
+    }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     if (this.on != null) {
       this.on.collectUsedTypes(types);
     }
@@ -155,6 +190,43 @@ public class MethodCall extends Statement {
     }
     for (NamedArgument arg : this.namedArgs) {
       arg.value.collectUsedTypes(types);
+    }
+  }
+
+  public void simplify(Simplifier s) {
+    if (this.checkNull) {
+      TerinaryExpression ter =
+          new TerinaryExpression(
+              new BinaryExpression(this.on, "==", new NullExpression()),
+              this,
+              new NullExpression());
+      this.checkNull = false;
+      s.add(ter);
+      s.markDelete();
+    } else {
+      this.on = s.makeSimple(this.on);
+      for (Argument arg : this.positionArgs) {
+        arg.arg = s.makeSimple(arg.arg);
+      }
+      for (NamedArgument arg : this.namedArgs) {
+        arg.value = s.makeSimple(arg.value);
+      }
+    }
+  }
+
+  public Expression makeDefaultValue(DataType type) {
+    if (type == null) {
+      return new NullExpression();
+    } else if (Objects.equals(type.name, "int")) {
+      return new LiteralExpression(false, LiteralType.TypeInteger, "0");
+    } else if (Objects.equals(type.name, "double")) {
+      return new LiteralExpression(false, LiteralType.TypeDouble, "0.0");
+    } else if (Objects.equals(type.name, "num")) {
+      return new LiteralExpression(false, LiteralType.TypeInteger, "0");
+    } else if (Objects.equals(type.name, "bool")) {
+      return new LiteralExpression(false, LiteralType.TypeBoolean, "false");
+    } else {
+      return new NullExpression();
     }
   }
 }

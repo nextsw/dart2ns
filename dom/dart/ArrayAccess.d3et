@@ -30,8 +30,13 @@ server class ArrayAccess extends Expression {
             }
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         on.collectUsedTypes(types);
         index.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        on = s.makeSimple(on);
+        index = s.makeSimple(index);
     }
 }

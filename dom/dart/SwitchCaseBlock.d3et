@@ -11,7 +11,7 @@ server class SwitchCaseBlock {
             d.resolve(context);
         });
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         tests.forEach((c) {
             c.collectUsedTypes(types);
         });

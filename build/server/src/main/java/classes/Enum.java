@@ -43,4 +43,6 @@ public class Enum extends TopDecl {
     this.cls.members.add(valuesField);
     return this.cls;
   }
+
+  public void simplify(Simplifier s) {}
 }

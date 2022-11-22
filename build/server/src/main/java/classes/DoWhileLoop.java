@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class DoWhileLoop extends Statement {
   public Block body;
@@ -16,8 +16,13 @@ public class DoWhileLoop extends Statement {
     this.body.resolve(context);
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.test.collectUsedTypes(types);
     this.body.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.test = s.makeSimple(this.test);
+    this.body.simplify(s);
   }
 }

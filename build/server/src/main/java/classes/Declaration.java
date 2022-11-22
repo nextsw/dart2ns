@@ -3,7 +3,6 @@ package classes;
 import d3e.core.ListExt;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public class Declaration extends Statement {
   public DataType type;
@@ -21,7 +20,7 @@ public class Declaration extends Statement {
     this.type = type;
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.names.forEach(
         (n) -> {
           if (n.value != null) {
@@ -36,14 +35,13 @@ public class Declaration extends Statement {
       this.resolvedType = this.type;
     }
     boolean haveType = this.type != null && !(Objects.equals(this.type.name, "var"));
-    this.names.forEach(
-        (n) -> {
-          if (n.value != null) {
-            n.value.resolve(context);
-            this.resolvedType = n.value.resolvedType;
-          }
-          context.scope.add(n.name, haveType ? this.type : this.resolvedType);
-        });
+    for (NameAndValue n : this.names) {
+      if (n.value != null) {
+        n.value.resolve(context);
+        this.resolvedType = n.value.resolvedType;
+      }
+      context.scope.add(n.name, haveType ? this.type : this.resolvedType);
+    }
     if (!haveType) {
       DataType value$ = this.resolvedType;
       if (value$ == null) {
@@ -53,6 +51,14 @@ public class Declaration extends Statement {
       this.type = this.resolvedType;
     } else {
       this.resolvedType = this.type;
+    }
+  }
+
+  public void simplify(Simplifier s) {
+    for (NameAndValue n : this.names) {
+      if (n.value != null) {
+        n.value.simplify(s);
+      }
     }
   }
 }

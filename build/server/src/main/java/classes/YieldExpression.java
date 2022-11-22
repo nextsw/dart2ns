@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class YieldExpression extends Statement {
   public Expression exp;
@@ -17,9 +17,13 @@ public class YieldExpression extends Statement {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     if (this.exp != null) {
       this.exp.collectUsedTypes(types);
     }
+  }
+
+  public void simplify(Simplifier s) {
+    this.exp.simplify(s);
   }
 }

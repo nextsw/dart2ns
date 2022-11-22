@@ -11,8 +11,10 @@ public abstract class ResolveContext {
   public DataType stringType = new ValueType("String", false);
   public DataType typeType = new ValueType("__Type", false);
   public DataType libraryType = new ValueType("__Library", false);
+  public DataType statementType = new ValueType("__Statement", false);
   public DataType dynamicType = new ValueType("dynamic", false);
   public ClassDecl instanceClass;
+  public Library currentLib;
   public MethodDecl method;
   public Scope scope;
 
@@ -22,7 +24,8 @@ public abstract class ResolveContext {
 
   public abstract DataType resolveType(ClassDecl onType, DataType type);
 
-  public abstract ClassMember getMember(ClassDecl onType, String name, MemberFilter filter);
+  public abstract ClassMember getMember(
+      ClassDecl onType, String name, MemberFilter filter, boolean noSuperCons);
 
   public abstract DataType commonType(DataType first, DataType second);
 

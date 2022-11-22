@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class ArrayExpression extends Expression {
   public DataType enforceType;
@@ -25,15 +24,21 @@ public class ArrayExpression extends Expression {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     for (ArrayItem item : this.values) {
       item.collectUsedTypes(types);
     }
     if (this.enforceType != null) {
-      this.enforceType.collectUsedTypes(types);
+      types.add(this.enforceType);
     }
     if (this.valueType != null) {
-      this.valueType.collectUsedTypes(types);
+      types.add(this.valueType);
+    }
+  }
+
+  public void simplify(Simplifier s) {
+    for (ArrayItem item : this.values) {
+      item.simplify(s);
     }
   }
 }

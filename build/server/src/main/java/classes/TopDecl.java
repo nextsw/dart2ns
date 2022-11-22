@@ -1,8 +1,7 @@
 package classes;
 
-import d3e.core.SetExt;
+import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public abstract class TopDecl {
   public TopDeclType type;
@@ -11,7 +10,8 @@ public abstract class TopDecl {
   public List<GenError> errors;
   public List<Annotation> annotations;
   public Library lib;
-  public Set<String> usedTypes = SetExt.Set();
+  private String _packagePath;
+  public List<DataType> usedTypes = ListExt.List(0l);
 
   public TopDecl(String name, TopDeclType type, String path) {
     this.name = name;
@@ -21,5 +21,9 @@ public abstract class TopDecl {
 
   public abstract void collectUsedTypes();
 
-  public abstract void resolve(ResolveContext context);
+  public String getPackagePath() {
+    return this.lib.packagePath + "lib";
+  }
+
+  public abstract void simplify(Simplifier s);
 }

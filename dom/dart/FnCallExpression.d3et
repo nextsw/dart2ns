@@ -16,8 +16,12 @@ server class FnCallExpression extends Statement {
             resolvedType = context.ofUnknownType();
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         on.collectUsedTypes(types);
         call.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        on = s.makeSimple(on);
     }
 }

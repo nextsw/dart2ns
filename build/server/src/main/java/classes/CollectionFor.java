@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class CollectionFor extends ArrayItem {
   public Statement stmt;
@@ -16,8 +16,12 @@ public class CollectionFor extends ArrayItem {
     this.value.resolve(context);
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.stmt.collectUsedTypes(types);
     this.value.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.stmt.simplify(s);
   }
 }

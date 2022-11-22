@@ -1,4 +1,4 @@
-server class BinaryExpression extends Expression {
+server class BinaryExpression extends Statement {
     String op;
     Expression left;
     Expression right;
@@ -35,8 +35,22 @@ server class BinaryExpression extends Expression {
             default: left.resolvedType
         };
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         left.collectUsedTypes(types);
         right.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        if(op == '??=') {
+            s.add(Assignment(
+                op: op,
+                left: left,
+                right: right,
+            ));
+            s.markDelete();
+        } else {
+            left = s.makeSimple(left);
+            right = s.makeSimple(right);
+        }
     }
 }

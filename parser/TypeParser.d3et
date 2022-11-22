@@ -172,7 +172,7 @@ server class TypeParser {
         if(isKey(tok, 'hide')) {
             next();
             while(tok.kind != TypeKind.Semicolon) {
-                imp.show.add(tok.lit);
+                imp.hide.add(tok.lit);
                 next();
             }
         }
@@ -259,7 +259,7 @@ server class TypeParser {
             fnType = readType(false) as FunctionType;
         }
         check(TypeKind.Semicolon);
-        Typedef def = Typedef(type, fnType);
+        Typedef def = Typedef(fnType.name ?? type.name, type, fnType);
         def.annotations = annotations;
         return def;
     }
@@ -338,6 +338,10 @@ server class TypeParser {
                 break;
             }
             MethodParam param = readParam(constructor);
+            if(param.name == null) {
+                param.name = param.dataType.name;
+                param.dataType = null;
+            }
             param.beforeComments = comments;
             params.add(param);
             if (tok.kind == TypeKind.Comma) {
@@ -419,7 +423,7 @@ server class TypeParser {
             params = readMethodParams(false);
         }
         FunctionType fnType = FunctionType(
-            params: params,
+            params: params?.toFixedParams() ?? [],
             typeArgs: args,
             returnType: type
         );
@@ -1231,7 +1235,11 @@ server class TypeParser {
             check(TypeKind.Rpar);
             Expression block = null;
             if (!forCollection) {
-                block = readStatement();
+                if(tok.kind != TypeKind.Semicolon){
+                    block = readStatement();
+                } else {
+                    next();
+                }
             }
             return ForLoop(
                 body: block,
@@ -1447,6 +1455,9 @@ server class TypeParser {
                 }
             } else if (TypeToken.isInfix(tok.kind)) {
                 node = infixExpr(node);
+            } else if (this.tok.kind == TypeKind.Not && peekTok.kind == TypeKind.Dot) {
+                next();
+                node = dotExpr(node, false, true);
             } else if (this.tok.kind == TypeKind.Inc 
                 || this.tok.kind == TypeKind.Dec 
                 || this.tok.kind == TypeKind.Not) {
@@ -1475,13 +1486,6 @@ server class TypeParser {
                     node = indexExpr(node, checkNull:true);
                 } else {
                     return ternaryExpr(node);
-                }
-            } else if (this.tok.kind == TypeKind.Not) {
-                next();
-                if (tok.kind == Dot){
-                    node = dotExpr(node, false, true);
-                } else {
-                    error('Not sure what should happen here');
                 }
             } else {
                 return node;
@@ -1729,7 +1733,7 @@ server class TypeParser {
             MethodParams params = readMethodParams(false);
             ValueType returnType = ValueType('void');
             FunctionType fnType = FunctionType(
-                params: params, 
+                params: params?.toFixedParams() ?? [], 
                 returnType: returnType,
                 typeArgs: type.args
             );
@@ -1744,6 +1748,7 @@ server class TypeParser {
     }
 
     DefType readDefType() {
+        eatComments();
 	    if (this.tok.kind != TypeKind.Name) {
 	      return null;
 	    }

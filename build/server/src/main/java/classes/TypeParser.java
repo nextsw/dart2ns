@@ -176,7 +176,7 @@ public class TypeParser {
     if (isKey(this.tok, "hide")) {
       next();
       while (this.tok.kind != TypeKind.Semicolon) {
-        imp.show.add(this.tok.lit);
+        imp.hide.add(this.tok.lit);
         next();
       }
     }
@@ -263,7 +263,11 @@ public class TypeParser {
       fnType = ((FunctionType) readType(false));
     }
     check(TypeKind.Semicolon);
-    Typedef def = new Typedef(type, fnType);
+    String value$ = fnType.name;
+    if (value$ == null) {
+      value$ = type.name;
+    }
+    Typedef def = new Typedef(value$, type, fnType);
     def.annotations = annotations;
     return def;
   }
@@ -341,6 +345,10 @@ public class TypeParser {
         break;
       }
       MethodParam param = readParam(constructor);
+      if (param.name == null) {
+        param.name = param.dataType.name;
+        param.dataType = null;
+      }
       param.beforeComments = comments;
       params.add(param);
       if (this.tok.kind == TypeKind.Comma) {
@@ -420,7 +428,12 @@ public class TypeParser {
     if (this.tok.kind == TypeKind.Lpar) {
       params = readMethodParams(false);
     }
-    FunctionType fnType = new FunctionType(false, params, type, args);
+    var value$1 = params == null ? null : params.toFixedParams();
+    List<MethodParam> value$ = value$1;
+    if (value$ == null) {
+      value$ = ListExt.asList();
+    }
+    FunctionType fnType = new FunctionType(false, value$, type, args);
     if (this.tok.kind == TypeKind.Question) {
       fnType.optional = true;
       next();
@@ -1221,7 +1234,11 @@ public class TypeParser {
       check(TypeKind.Rpar);
       Expression block = null;
       if (!forCollection) {
-        block = readStatement(ListExt.List(), false, false);
+        if (this.tok.kind != TypeKind.Semicolon) {
+          block = readStatement(ListExt.List(), false, false);
+        } else {
+          next();
+        }
       }
       return new ForLoop(block, decl, inits, resets, exp);
     }
@@ -1436,6 +1453,9 @@ public class TypeParser {
         }
       } else if (TypeToken.isInfix(this.tok.kind)) {
         node = infixExpr(node);
+      } else if (this.tok.kind == TypeKind.Not && this.peekTok.kind == TypeKind.Dot) {
+        next();
+        node = dotExpr(node, false, true);
       } else if (this.tok.kind == TypeKind.Inc
           || this.tok.kind == TypeKind.Dec
           || this.tok.kind == TypeKind.Not) {
@@ -1461,13 +1481,6 @@ public class TypeParser {
           node = indexExpr(node, true, false);
         } else {
           return ternaryExpr(node);
-        }
-      } else if (this.tok.kind == TypeKind.Not) {
-        next();
-        if (this.tok.kind == TypeKind.Dot) {
-          node = dotExpr(node, false, true);
-        } else {
-          error("Not sure what should happen here");
         }
       } else {
         return node;
@@ -1688,7 +1701,12 @@ public class TypeParser {
     if (acceptFnWithNoRet && !isTypeName(name) && this.tok.kind == TypeKind.Lpar) {
       MethodParams params = readMethodParams(false);
       ValueType returnType = new ValueType("void", false);
-      FunctionType fnType = new FunctionType(false, params, returnType, type.args);
+      var value$1 = params == null ? null : params.toFixedParams();
+      List<MethodParam> value$ = value$1;
+      if (value$ == null) {
+        value$ = ListExt.asList();
+      }
+      FunctionType fnType = new FunctionType(false, value$, returnType, type.args);
       result = fnType;
     }
     if (this.tok.kind == TypeKind.Question && isBeside(this.prevTok, this.tok)) {
@@ -1699,6 +1717,7 @@ public class TypeParser {
   }
 
   public DefType readDefType() {
+    eatComments();
     if (this.tok.kind != TypeKind.Name) {
       return null;
     }

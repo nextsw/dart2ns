@@ -1,7 +1,7 @@
 package classes;
 
 import d3e.core.D3ELogger;
-import java.util.Set;
+import java.util.List;
 
 public class FnCallExpression extends Statement {
   public Expression on;
@@ -25,8 +25,12 @@ public class FnCallExpression extends Statement {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.on.collectUsedTypes(types);
     this.call.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.on = s.makeSimple(this.on);
   }
 }

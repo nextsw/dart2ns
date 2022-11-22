@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class LabelStatement extends Statement {
   public String name;
@@ -11,5 +11,7 @@ public class LabelStatement extends Statement {
 
   public void resolve(ResolveContext context) {}
 
-  public void collectUsedTypes(Set<String> types) {}
+  public void collectUsedTypes(List<DataType> types) {}
+
+  public void simplify(Simplifier s) {}
 }

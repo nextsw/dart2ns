@@ -9,9 +9,26 @@ server class Block extends Statement {
         }
         context.scope = context.scope.parent;
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         for(Statement stmt in statements) {
             stmt.collectUsedTypes(types);
+        }
+    }
+
+    void simplify(Simplifier s){
+        for(Integer x = 0; x < statements. length; x++) {
+            Statement st = statements.get(x);
+            s.push();
+            st.simplify(s);
+            SimplifierResult res = s.pop();
+            List<Statement> temp = res.list;
+            if(res.deleted) {
+                statements.removeAt(x);
+            }
+            if(temp.isNotEmpty){
+                statements.insertAll(x, temp);
+                x--;
+            }
         }
     }
 }

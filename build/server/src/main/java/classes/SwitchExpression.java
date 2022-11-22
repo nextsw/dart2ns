@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class SwitchExpression extends Expression {
   public Expression on;
@@ -32,7 +31,7 @@ public class SwitchExpression extends Expression {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.on.collectUsedTypes(types);
     this.cases.forEach(
         (c) -> {
@@ -40,6 +39,17 @@ public class SwitchExpression extends Expression {
         });
     if (this.onElse != null) {
       this.onElse.collectUsedTypes(types);
+    }
+  }
+
+  public void simplify(Simplifier s) {
+    this.on = s.makeSimple(this.on);
+    this.cases.forEach(
+        (c) -> {
+          c.result = s.makeSimple(c.result);
+        });
+    if (this.onElse != null) {
+      this.onElse = s.makeSimple(this.onElse);
     }
   }
 }

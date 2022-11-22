@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class SwitchCaseBlock {
   public List<Expression> tests = ListExt.asList();
@@ -22,7 +21,7 @@ public class SwitchCaseBlock {
         });
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.tests.forEach(
         (c) -> {
           c.collectUsedTypes(types);

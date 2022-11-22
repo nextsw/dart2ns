@@ -31,14 +31,14 @@ server class MethodCall extends Statement {
                     return;
                 }
                 String typeName = (on as FieldOrEnumExpression).name;
-                TopDecl top = context.get(typeName);
+                TopDecl top = context.currentLib.get(typeName);
                 if(top is ClassDecl){
                     onType = top as ClassDecl;
                 } else if(top is Enum) {
                     onType = (top as Enum).toClassDecl();
                 }
             } else  if(on.resolvedType is ValueType) {
-                TopDecl top = context.get(on.resolvedType.name);
+                TopDecl top = context.currentLib.get(on.resolvedType.name);
                 if(top is ClassDecl) {
                     onType = top as ClassDecl;
                 }
@@ -49,7 +49,7 @@ server class MethodCall extends Statement {
                 onType = context.instanceClass;
             }
             if(onTypeName != null) {
-                TopDecl top = context.get(onTypeName);
+                TopDecl top = context.currentLib.get(onTypeName);
                 if(top is ClassDecl){
                     onType = top as ClassDecl;
                 }
@@ -84,21 +84,24 @@ server class MethodCall extends Statement {
                 return;
             }
             String importName = (on as FieldOrEnumExpression).name;
-            Library libToCheck = context.instanceClass.lib;
-            if(context.instanceClass.lib.partOf != null) {
-                libToCheck = libToCheck.parent;
-            }
-            Import import = libToCheck.imports.firstWhere(i => i.name == importName);
-            TopDecl topCm = import.lib.get(name);
+            Library libToCheck = context.currentLib;
+            TopDecl topCm = libToCheck.get(name);
             if(topCm is MethodDecl) {
                 MethodDecl md = topCm as MethodDecl;
                 resolvedType = md.returnType;
+                resolvedMethod = md;
+            } else if(topCm is ClassDecl){
+                ClassDecl cls = topCm as ClassDecl;
+                ClassMember cm = context.getMember(cls, name);
+                if(cm is MethodDecl) {
+                    resolvedMethod = cm as MethodDecl;
+                }
+                resolvedType = ValueType(cls.name);
             } else {
-                // Error
                 resolvedType = context.ofUnknownType();
             }
         } else {
-            TopDecl td = context.get(name);
+            TopDecl td = context.currentLib.get(name);
             if(td is MethodDecl) {
                 MethodDecl md = td as MethodDecl;
                 resolvedType = md.returnType;
@@ -106,12 +109,34 @@ server class MethodCall extends Statement {
                 //TODO need to resolve on method type generics
             } else if(td is ClassDecl){
                 resolvedType = ValueType(name);
+            } else if(name == 'assert'){
+                resolvedType = context.statementType;
             } else {
+                String cls = context.instanceClass?.name;
+                String method = context.method?.name;
+                String inType = onType?.name;
+                D3ELogger.error('No method found: ' + name + ' in ' + inType + ' Cls: ' + cls +' Method: ' + method);
                 resolvedType = context.ofUnknownType();
             }
         }
+        if(resolvedMethod != null && this.namedArgs.isNotEmpty) {
+            for(Integer x = this.positionArgs.length; x < resolvedMethod.params.length; x++) {
+                MethodParam param  = resolvedMethod.params.get(x);
+                NamedArgument arg = namedArgs.firstWhere(n => n.name == param.name);
+                if(arg == null) {
+                    positionArgs.add(Argument(
+                        arg: param.defaultValue ?? makeDefaultValue(param.dataType),
+                    ));
+                } else {
+                    positionArgs.add(Argument(
+                        arg: arg.value,
+                    ));
+                }
+            }
+            namedArgs.clear();
+        }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         if(on != null) {
             on.collectUsedTypes(types);
         }
@@ -120,6 +145,59 @@ server class MethodCall extends Statement {
         }
         for(NamedArgument arg in namedArgs) {
             arg.value.collectUsedTypes(types);
+        }
+    }
+
+    void simplify(Simplifier s) {
+        if(checkNull) {
+            TerinaryExpression ter = TerinaryExpression(
+                condition: BinaryExpression(
+                    op: '==',
+                    left: on,
+                    right: NullExpression(),
+                ),
+                ifTrue: NullExpression(),
+                ifFalse: this,
+            );
+            checkNull = false;
+            s.add(ter);
+            s.markDelete();
+        } else {
+            on = s.makeSimple(on);
+            for(Argument arg in positionArgs) {
+                arg.arg = s.makeSimple(arg.arg);
+            }
+            for(NamedArgument arg in namedArgs) {
+                arg.value = s.makeSimple(arg.value);
+            }
+        }
+    }
+
+    Expression makeDefaultValue(DataType type){
+        if(type == null) {
+            return NullExpression();
+        } else if(type.name == 'int') {
+            return LiteralExpression(
+                type: LiteralType.TypeInteger,
+                value: '0',
+            );
+        } else if(type.name == 'double') {
+            return LiteralExpression(
+                type: LiteralType.TypeDouble,
+                value: '0.0',
+            );
+        } else if(type.name == 'num') {
+            return LiteralExpression(
+                type: LiteralType.TypeInteger,
+                value: '0',
+            );
+        } else if(type.name == 'bool') {
+            return LiteralExpression(
+                type: LiteralType.TypeBoolean,
+                value: 'false',
+            );
+        } else {
+            return NullExpression();
         }
     }
 }

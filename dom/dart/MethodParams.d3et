@@ -3,7 +3,18 @@ server class MethodParams {
     List<MethodParam> namedParams = [];
     List<MethodParam> positionalParams = [];
 
+
     String toString(){
         return positionalParams.toString() + optionalParams.toString() + namedParams.toString();
+    }
+    Boolean get isEmpty{
+        return optionalParams.isEmpty && namedParams.isEmpty && positionalParams.isEmpty;
+    } 
+
+    List<MethodParam> toFixedParams() {
+        positionalParams.addAll(optionalParams);
+        namedParams.sort((a,b) => a.name.compareTo(b.name));
+        positionalParams.addAll(namedParams);
+        return positionalParams;
     }
 }

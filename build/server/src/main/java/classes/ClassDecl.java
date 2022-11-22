@@ -1,8 +1,7 @@
 package classes;
 
-import d3e.core.IterableExt;
+import d3e.core.D3ELogger;
 import d3e.core.ListExt;
-import d3e.core.SetExt;
 import d3e.core.StringExt;
 import java.util.List;
 
@@ -24,50 +23,32 @@ public class ClassDecl extends TopDecl {
   }
 
   public void collectUsedTypes() {
-    SetExt.addAll(
-        this.usedTypes,
-        IterableExt.toList(
-            ListExt.map(
-                this.impls,
-                (i) -> {
-                  return i.name;
-                }),
-            false));
+    ListExt.addAll(this.usedTypes, this.impls);
     if (this.extendType != null) {
-      this.usedTypes.add(this.extendType.name);
+      this.usedTypes.add(this.extendType);
     }
     for (ClassMember cm : this.members) {
       if (cm instanceof FieldDecl) {
         FieldDecl fd = ((FieldDecl) cm);
         if (fd.type != null) {
-          fd.type.collectUsedTypes(this.usedTypes);
+          this.usedTypes.add(fd.type);
         }
       } else if (cm instanceof MethodDecl) {
         MethodDecl md = ((MethodDecl) cm);
         if (md.returnType != null) {
-          md.returnType.collectUsedTypes(this.usedTypes);
+          this.usedTypes.add(md.returnType);
         }
-        if (md.params != null) {
-          for (MethodParam m : md.params.positionalParams) {
-            if (m.dataType != null) {
-              m.dataType.collectUsedTypes(this.usedTypes);
-            }
+        for (MethodParam m : md.params) {
+          if (m.dataType != null) {
+            this.usedTypes.add(m.dataType);
           }
         }
       }
     }
-    SetExt.addAll(
-        this.usedTypes,
-        IterableExt.toList(
-            ListExt.map(
-                this.impls,
-                (i) -> {
-                  return i.name;
-                }),
-            false));
   }
 
-  public void resolve(ResolveContext context) {
+  public void resolveFields(ResolveContext context) {
+    D3ELogger.info("Resolving Class: " + this.name);
     context.instanceClass = this;
     context.scope = new Scope(context.scope, null);
     for (ClassMember cm :
@@ -76,13 +57,32 @@ public class ClassDecl extends TopDecl {
             (m) -> {
               return m instanceof FieldDecl;
             })) {
-      cm.resolve(context);
-    }
-    for (ClassMember cm : this.members) {
-      cm.resolve(context);
+      (((FieldDecl) cm)).resolve(context);
     }
     context.scope = context.scope.parent;
     context.instanceClass = null;
+  }
+
+  public void resolveMethods(ResolveContext context) {
+    D3ELogger.info("Resolving Class: " + this.name);
+    context.instanceClass = this;
+    context.scope = new Scope(context.scope, null);
+    for (ClassMember cm :
+        ListExt.where(
+            this.members,
+            (m) -> {
+              return m instanceof MethodDecl;
+            })) {
+      (((MethodDecl) cm)).resolve(context);
+    }
+    context.scope = context.scope.parent;
+    context.instanceClass = null;
+  }
+
+  public void simplify(Simplifier s) {
+    for (ClassMember cm : this.members) {
+      cm.simplify(s);
+    }
   }
 
   public String getPackagePath() {

@@ -246,17 +246,14 @@ public class CppGen implements Gen {
       xp.apply(dataTypeToString(f.returnType, false, null));
     }
     xp.apply("(");
-    if (f.params != null) {
-      List<MethodParam> params = sortMethodParams(f.params);
-      xp.apply(
-          IterableExt.join(
-              ListExt.map(
-                  params,
-                  (p) -> {
-                    return paramToString(p);
-                  }),
-              ", "));
-    }
+    xp.apply(
+        IterableExt.join(
+            ListExt.map(
+                f.params,
+                (p) -> {
+                  return paramToString(p);
+                }),
+            ", "));
     xp.apply(")>");
   }
 
@@ -465,17 +462,15 @@ public class CppGen implements Gen {
       hp("Cls");
     }
     hp("(");
-    if (m.params != null) {
-      if (c != null) {
-        updateSuperAndParams(m, c);
-      }
-      genMethodParams(
-          m.params,
-          c,
-          (x) -> {
-            hp(x);
-          });
+    if (c != null) {
+      updateSuperAndParams(m, c);
     }
+    genMethodParams(
+        m.params,
+        c,
+        (x) -> {
+          hp(x);
+        });
     hp(")");
     if (m.body == null && m.init == null && m.exp == null) {
       if (isConstructor || c == null) {
@@ -537,14 +532,12 @@ public class CppGen implements Gen {
     }
     cp("(");
     this.scope = new Scope(null, c);
-    if (m.params != null) {
-      genMethodParams(
-          m.params,
-          c,
-          (x) -> {
-            cp(x);
-          });
-    }
+    genMethodParams(
+        m.params,
+        c,
+        (x) -> {
+          cp(x);
+        });
     cp(")");
     if (isConstructor) {
       if (m.init != null) {
@@ -644,7 +637,7 @@ public class CppGen implements Gen {
     }
     MethodParam param =
         ListExt.firstWhere(
-            md.params.positionalParams,
+            md.params,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -654,7 +647,7 @@ public class CppGen implements Gen {
     }
     param =
         ListExt.firstWhere(
-            md.params.optionalParams,
+            md.params,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -664,7 +657,7 @@ public class CppGen implements Gen {
     }
     param =
         ListExt.firstWhere(
-            md.params.namedParams,
+            md.params,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -689,34 +682,15 @@ public class CppGen implements Gen {
       }
     }
     long x = 0l;
-    for (MethodParam p : md.params.positionalParams) {
+    for (MethodParam p : md.params) {
       if (Objects.equals(p.thisToken, "this")) {
         p.dataType = getFieldType(c, p.name);
       } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
         superPosParams.add(p);
-        MethodParam superParam = getParamAtIndex(superCon.params, x);
+        MethodParam superParam = ListExt.get(superCon.params, x);
         p.dataType = superParam.dataType;
       }
       x++;
-    }
-    for (MethodParam p : md.params.optionalParams) {
-      if (Objects.equals(p.thisToken, "this")) {
-        p.dataType = getFieldType(c, p.name);
-      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
-        superPosParams.add(p);
-        MethodParam superParam = getParamAtIndex(superCon.params, x);
-        p.dataType = superParam.dataType;
-      }
-      x++;
-    }
-    for (MethodParam p : md.params.namedParams) {
-      if (Objects.equals(p.thisToken, "this")) {
-        p.dataType = getFieldType(c, p.name);
-      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
-        superNamedParams.add(p);
-        MethodParam superParam = getParamByName(superCon.params, p.name);
-        p.dataType = superParam.dataType;
-      }
     }
     if (superPosParams.isEmpty() || superNamedParams.isEmpty()) {
       return;
@@ -784,9 +758,7 @@ public class CppGen implements Gen {
         null);
   }
 
-  public void genMethodParams(MethodParams mp, ClassDecl c, Xp xp) {
-    List<MethodParam> thisParams = ListExt.asList();
-    List<MethodParam> params = sortMethodParams(mp);
+  public void genMethodParams(List<MethodParam> params, ClassDecl c, Xp xp) {
     params.forEach(
         (p) -> {
           if (p.dataType == null) {
@@ -1777,7 +1749,9 @@ public class CppGen implements Gen {
       if (cm instanceof MethodDecl) {
         MethodDecl md = ((MethodDecl) cm);
         if (md.getter) {
-          xp.apply("()");
+          xp.apply("(");
+          genExp(exp.on, depth, xp);
+          xp.apply(")");
           exp.resolvedType = resolveType(onType, md.returnType);
         } else {
           exp.resolvedType = ofUnknownType();
@@ -2082,23 +2056,23 @@ public class CppGen implements Gen {
       }
     }
     xp.apply("(");
-    exp.positionArgs.forEach(
-        (a) -> {
-          genExp(a.arg, depth, xp);
-          if (!(Objects.equals(a, ListExt.last(exp.positionArgs)))) {
-            xp.apply(", ");
-          }
-        });
-    if (ListExt.isNotEmpty(exp.positionArgs) && ListExt.isNotEmpty(exp.namedArgs)) {
+    boolean needComma = false;
+    for (Argument a : exp.positionArgs) {
+      needComma = true;
+      genExp(a.arg, depth, xp);
+      if (!(Objects.equals(a, ListExt.last(exp.positionArgs)))) {
+        xp.apply(", ");
+      }
+    }
+    if (needComma && ListExt.isNotEmpty(exp.namedArgs)) {
       xp.apply(", ");
     }
-    exp.namedArgs.forEach(
-        (a) -> {
-          genExp(a.value, depth, xp);
-          if (!(Objects.equals(a, ListExt.last(exp.namedArgs)))) {
-            xp.apply(", ");
-          }
-        });
+    for (NamedArgument a : exp.namedArgs) {
+      genExp(a.value, depth, xp);
+      if (!(Objects.equals(a, ListExt.last(exp.namedArgs)))) {
+        xp.apply(", ");
+      }
+    }
     xp.apply(")");
     if (onType != null) {
       ClassMember cm =

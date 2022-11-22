@@ -6,7 +6,11 @@ server class ParExpression extends Expression {
         exp.resolve(context);
         resolvedType = exp.resolvedType;
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         exp.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        exp.simplify(s);
     }
 }

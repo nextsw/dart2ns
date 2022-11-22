@@ -1,8 +1,9 @@
 server class FunctionType extends DataType{
     DataType returnType;
-    MethodParams params;
+    List<MethodParam> params = [];
     List<DataType> typeArgs = [];
     FunctionType({this.returnType, this.params, this.optional, this.typeArgs});
+    String signature;
     String toString(){
         String res = returnType != null ? returnType.toString() : 'void';
         if(this.typeArgs.isNotEmpty) {
@@ -21,15 +22,34 @@ server class FunctionType extends DataType{
             returnType.collectUsedTypes(types);
         }
         if(params != null) {
-            for(MethodParam m in params.positionalParams){
-                m.dataType.collectUsedTypes(types);
-            }
-            for(MethodParam m in params.optionalParams){
-                m.dataType.collectUsedTypes(types);
-            }
-            for(MethodParam m in params.namedParams){
+            for(MethodParam m in params){
                 m.dataType.collectUsedTypes(types);
             }
         }
+    }
+
+    String computeSignature() {
+        StringBuffer sb = StringBuffer();
+        sb.write('__fn_');
+        if(params != null) {
+            for(MethodParam m in params){
+                if(m.dataType.name == null || m.dataType.name.length == 1) {
+                    sb.write('Object');
+                } else {
+                    sb.write(m.dataType.name);
+                }
+                sb.write('_');
+            }
+        }
+        if(returnType != null && returnType.name != null) {
+            if(returnType.name.length == 1) {
+                sb.write('Object');
+            } else {
+                sb.write(returnType.name);
+            }
+        } else {
+            sb.write('void');
+        }
+        return sb.toString();
     }
 }

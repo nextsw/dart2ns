@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class LiteralExpression extends Expression {
   public String value;
@@ -41,5 +41,7 @@ public class LiteralExpression extends Expression {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {}
+  public void collectUsedTypes(List<DataType> types) {}
+
+  public void simplify(Simplifier s) {}
 }

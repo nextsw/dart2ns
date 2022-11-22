@@ -1,0 +1,4 @@
+server class SimplifierResult {
+    Boolean deleted;
+    List<Statement> list = [];
+}

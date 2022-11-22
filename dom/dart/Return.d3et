@@ -6,9 +6,13 @@ server class Return extends Statement {
             expression.resolve(context);
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         if(expression != null) {
             expression.collectUsedTypes(types);
         }
+    }
+
+    void simplify(Simplifier s) {
+        expression = s.makeSimple(expression);
     }
 }

@@ -19,14 +19,20 @@ server class LambdaExpression extends Expression {
         if(body != null) {
             body.resolve(context);
         }
-        // TODO
-        resolvedType = context.ofUnknownType();
+        List<MethodParam> mp = params.map(p => MethodParam(
+            name: p.name,
+            dataType: p.type,
+        )).toList();
+        resolvedType = FunctionType(
+            returnType: body != null? ValueType('void') : expression.resolvedType,
+            params: mp,
+        );
         context.scope = context.scope.parent;
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         for(Param p in params) {
             if(p.type != null) {
-                p.type.collectUsedTypes(types);
+                types.add(p.type);
             }
         }
         if(expression != null){
@@ -34,6 +40,15 @@ server class LambdaExpression extends Expression {
         }
         if(body != null) {
             body.collectUsedTypes(types);
+        }
+    }
+
+    void simplify(Simplifier s) {
+        if(expression != null) {
+            expression.simplify(s);
+        }
+        if(body != null) {
+            body.simplify(s);
         }
     }
 }

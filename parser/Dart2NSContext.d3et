@@ -116,8 +116,16 @@ server class Dart2NSContext {
     void _parse(String path) {
         D3ELogger.info('Parsing : ' + path);
         String content = FileUtils.readContent(path);
+        if(content.isEmpty){
+            D3ELogger.error('Can not read file: ' + path);
+            return;
+        }
         List<TopDecl> list = TypeParser.parse(this, content);
-        current.objects.addAll(list);
+        if(current.partOf != null) {
+            current.parent.objects.addAll(list);
+        } else {
+            current.objects.addAll(list);
+        }
     }
 
     static String join(String base, String sub) {
@@ -145,11 +153,15 @@ server class Dart2NSContext {
         List<String> split = path.split(':');
         String base = flutterHome +'bin/cache/pkg/sky_engine/lib/';
         String sub = split[1];
-        if(sub.startsWith('_')){
-            sub = sub.substring(1);
+        String fileName = sub;
+        if(fileName.startsWith('_')){
+            fileName = sub.substring(1);
         }
-        String fullPath = base + sub + '/' + sub + '.dart';
-        String packagePath = 'dart/' + sub + '/' + sub;
+        if(sub == '_internal') {
+            sub = 'internal';
+        }
+        String fullPath = base + sub + '/' + fileName + '.dart';
+        String packagePath = 'dart/' + sub + '/' + fileName;
         return Library(
             fullPath: fullPath,
             packagePath: packagePath,

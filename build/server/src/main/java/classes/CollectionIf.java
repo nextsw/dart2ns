@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class CollectionIf extends ArrayItem {
   public Expression test;
@@ -21,11 +21,19 @@ public class CollectionIf extends ArrayItem {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.test.collectUsedTypes(types);
     this.thenItem.collectUsedTypes(types);
     if (this.elseItem != null) {
       this.elseItem.collectUsedTypes(types);
     }
+  }
+
+  public void simplify(Simplifier s) {
+    this.test = s.makeSimple(this.test);
+    /*
+     thenItem = s.makeSimple(thenItem);
+     elseItem = s.makeSimple(elseItem);
+    */
   }
 }

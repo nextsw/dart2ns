@@ -8,18 +8,21 @@ public class Typedef extends TopDecl {
   public FunctionType fnType;
   public List<Annotation> annotations = ListExt.asList();
 
-  public Typedef(DefType type, FunctionType fnType) {
-    super(fnType.name, TopDeclType.Typedef, "");
+  public Typedef(String name, DefType type, FunctionType fnType) {
+    super(name, TopDeclType.Typedef, "");
+    this.name = name;
     this.type = type;
     this.fnType = fnType;
   }
 
   public void collectUsedTypes() {
     if (this.type != null) {
-      this.usedTypes.add(this.type.name);
+      this.usedTypes.add(this.type);
     }
-    this.fnType.collectUsedTypes(this.usedTypes);
+    this.usedTypes.add(this.fnType);
   }
 
   public void resolve(ResolveContext context) {}
+
+  public void simplify(Simplifier s) {}
 }

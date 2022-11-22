@@ -11,14 +11,30 @@ server class ForEachLoop extends Statement {
         if(body != null) {
             body.resolve(context);
         }
+        if(dataType == null || dataType.name =='var') {
+            dataType = context.subType(collection.resolvedType);
+        }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         if(dataType != null){
-            dataType.collectUsedTypes(types);
+            types.add(dataType);
         }
         if(body != null) {
             body.collectUsedTypes(types);
         }
         collection.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        collection = s.makeSimple(collection);
+        if(body == null){
+            body = Block();
+        }
+        if(!(body is Block)){
+            Block b = Block();
+            b.statements.add(body as Statement);
+            body = b;
+        }
+        body.simplify(s);
     }
 }

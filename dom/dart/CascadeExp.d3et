@@ -8,7 +8,11 @@ server class CascadeExp extends Statement {
         on.resolve(context);
         resolvedType = on.resolvedType;
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         on.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        on = s.makeSimple(on);
     }
 }

@@ -21,13 +21,23 @@ server class SwitchExpression extends Expression {
             resolvedType = context.commonType(resolvedType, onElse.resolvedType);
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         on.collectUsedTypes(types);
         cases.forEach((c) {
             c.collectUsedTypes(types);
         });
         if(onElse != null) {
             onElse.collectUsedTypes(types);
+        }
+    }
+
+    void simplify(Simplifier s) {
+        on = s.makeSimple(on);
+        cases.forEach((c) {
+            c.result = s.makeSimple(c.result);
+        });
+        if(onElse != null) {
+            onElse = s.makeSimple(onElse);
         }
     }
 }

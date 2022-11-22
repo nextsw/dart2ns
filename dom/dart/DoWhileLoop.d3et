@@ -8,8 +8,13 @@ server class DoWhileLoop extends Statement {
         test.resolve(context);
         body.resolve(context);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         test.collectUsedTypes(types);
         body.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        test = s.makeSimple(test);
+        body.simplify(s);
     }
 }

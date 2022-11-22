@@ -212,12 +212,9 @@ server class CppGen implements Gen{
             xp(dataTypeToString(f.returnType));
         }
         xp('(');
-        if(f.params != null) {
-            List<MethodParam> params = sortMethodParams(f.params);
-            xp(params.map((p) {
-                return paramToString(p);
-            }).join(', '));
-        }
+        xp(f.params.map((p) {
+            return paramToString(p);
+        }).join(', '));
         xp(')>');
     }
 
@@ -378,12 +375,10 @@ server class CppGen implements Gen{
             hp('Cls');
         }
         hp('(');
-        if(m.params != null) {
-            if(c != null) {
-                updateSuperAndParams(m, c);
-            }
-            genMethodParams(m.params, c, x => hp(x));
+        if(c != null) {
+            updateSuperAndParams(m, c);
         }
+        genMethodParams(m.params, c, x => hp(x));
         hp(')');
         if(m.body == null && m.init == null && m.exp == null){
             if(isConstructor || c == null) {
@@ -442,9 +437,7 @@ server class CppGen implements Gen{
         cp('(');
         
         scope = Scope(thisType: c);
-        if(m.params != null) {
-            genMethodParams(m.params, c, x => cp(x));
-        }
+        genMethodParams(m.params, c, x => cp(x));
         cp(')');
         if(isConstructor) {
             if(m.init != null) {
@@ -506,15 +499,15 @@ server class CppGen implements Gen{
         if(md.params == null) {
             return null;
         }
-        MethodParam param = md.params.positionalParams.firstWhere(m => m.name == name);
+        MethodParam param = md.params.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
-        param = md.params.optionalParams.firstWhere(m => m.name == name);
+        param = md.params.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
-        param = md.params.namedParams.firstWhere(m => m.name == name);
+        param = md.params.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
@@ -535,34 +528,15 @@ server class CppGen implements Gen{
             }
         }
         Integer x = 0;
-        for(MethodParam p in md.params.positionalParams){
+        for(MethodParam p in md.params){
             if(p.thisToken == 'this') {
                 p.dataType = getFieldType(c, p.name);
             } else if (p.thisToken == 'super' && superCon != null) {
                 superPosParams.add(p);
-                MethodParam superParam = getParamAtIndex(superCon.params, x);
+                MethodParam superParam = superCon.params.get(x);
                 p.dataType = superParam.dataType;
             }
             x++;
-        }
-        for(MethodParam p in md.params.optionalParams){
-            if(p.thisToken == 'this') {
-                p.dataType = getFieldType(c, p.name);
-            } else if (p.thisToken == 'super' && superCon != null) {
-                superPosParams.add(p);
-                MethodParam superParam = getParamAtIndex(superCon.params, x);
-                p.dataType = superParam.dataType;
-            }
-            x++;
-        }
-        for(MethodParam p in md.params.namedParams){
-            if(p.thisToken == 'this') {
-                p.dataType = getFieldType(c, p.name);
-            } else if (p.thisToken == 'super' && superCon != null) {
-                superNamedParams.add(p);
-                MethodParam superParam = getParamByName(superCon.params, p.name);
-                p.dataType = superParam.dataType;
-            }
         }
         if(superPosParams.isEmpty || superNamedParams.isEmpty){
             return;
@@ -613,9 +587,7 @@ server class CppGen implements Gen{
         return m.namedParams.firstWhere(p => p.name == name);
     }
 
-    void genMethodParams(MethodParams mp, ClassDecl c, Xp xp) {
-        List<MethodParam> thisParams = [];
-        List<MethodParam> params = sortMethodParams(mp);
+    void genMethodParams(List<MethodParam> params, ClassDecl c, Xp xp) {
         params.forEach((p) {
             if(p.dataType == null) {
                 xp('Unknown');
@@ -1365,7 +1337,9 @@ server class CppGen implements Gen{
             if(cm is MethodDecl){
                 MethodDecl md = cm as MethodDecl;
                 if(md.getter) {
-                    xp('()');
+                    xp('(');
+                    genExp(exp.on, depth, xp);
+                    xp(')');
                     exp.resolvedType = resolveType(onType, md.returnType);
                 } else {
                     exp.resolvedType = ofUnknownType();
@@ -1623,21 +1597,23 @@ server class CppGen implements Gen{
             }
         }
         xp('(');
-        exp.positionArgs.forEach((a){
+        Boolean needComma = false;
+        for(Argument a in exp.positionArgs){
+            needComma = true;
             genExp(a.arg, depth, xp);
             if(a != exp.positionArgs.last) {
                 xp(', ');
             }
-        });
-        if(exp.positionArgs.isNotEmpty && exp.namedArgs.isNotEmpty) {
+        }
+        if(needComma && exp.namedArgs.isNotEmpty) {
             xp(', ');
         }
-        exp.namedArgs.forEach((a){
+        for(NamedArgument a in exp.namedArgs){
             genExp(a.value, depth, xp);
             if(a != exp.namedArgs.last) {
                 xp(', ');
             }
-        });
+        }
         xp(')');
         if(onType != null) {
             ClassMember cm = onType.members.firstWhere(m => m.name == exp.name);

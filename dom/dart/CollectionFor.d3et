@@ -8,8 +8,11 @@ server class CollectionFor extends ArrayItem {
         stmt.resolve(context);
         value.resolve(context);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         stmt.collectUsedTypes(types);
         value.collectUsedTypes(types);
+    }
+    void simplify(Simplifier s){
+        stmt.simplify(s);
     }
 }

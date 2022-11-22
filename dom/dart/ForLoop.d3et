@@ -24,7 +24,7 @@ server class ForLoop extends Statement {
             body.resolve(context);
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         inits.forEach((i){
             i.collectUsedTypes(types);
         });
@@ -40,5 +40,18 @@ server class ForLoop extends Statement {
         if(body != null) {
             body.collectUsedTypes(types);
         }
+    }
+
+    void simplify(Simplifier s) {
+        //test = s.makeSimple(test);
+        if(body == null){
+            body = Block();
+        }
+        if(!(body is Block)){
+            Block b = Block();
+            b.statements.add(body as Statement);
+            this.body = b;
+        }
+        body.simplify(s);
     }
 }

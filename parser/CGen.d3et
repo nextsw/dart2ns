@@ -1,4 +1,4 @@
-server class CGen extends ResolveContext implements Gen{
+server class CGen extends ResolveContext implements Gen {
     Dart2NSContext context;
     String base;
     List<String> cppLines = [];
@@ -70,15 +70,29 @@ server class CGen extends ResolveContext implements Gen{
     }
 
     void generate() {
+        List<DataType> types = [];
         for(Library lib in context.libs){
-            // List<TopDecl> subs = List();
-            // lib.subs(subs, Set());
-            List<ClassDecl> classes = lib.objects.where(m => m is ClassDecl).map(m => m as ClassDecl).toList();
-            for(ClassDecl cls in classes) {
-                genLibraryClass(cls);
-            }
-            genLibrary(lib);
+            lib.simplify(Simplifier());
         }
+        for(Library lib in context.libs){
+            lib.resolveFields(this);
+        }
+        
+        for(Library lib in context.libs){
+            lib.resolveMethods(this);
+            lib.collectUsedTypes(types);
+        }
+        
+        
+        // for(Library lib in context.libs){
+        //     // List<TopDecl> subs = List();
+        //     // lib.subs(subs, Set());
+        //     List<ClassDecl> classes = lib.objects.where(m => m is ClassDecl).map(m => m as ClassDecl).toList();
+        //     for(ClassDecl cls in classes) {
+        //         genLibraryClass(cls);
+        //     }
+        //     genLibrary(lib);
+        // }
     }
 
     void genLibrary(Library lib) {
@@ -88,7 +102,7 @@ server class CGen extends ResolveContext implements Gen{
         String upper = outPath.replaceAll('/', '_').toUpperCase();
         hpp('#ifndef ' + upper);
         hpp('#define ' + upper);
-        cpp('#include "' + nameOnly + '.h"');
+        cpp('#include "' + nameOnly + 'lib.h"');
         hpp('#include <base.h>');
 
         // lib.exports.forEach((e){
@@ -109,50 +123,60 @@ server class CGen extends ResolveContext implements Gen{
         //     }
         // });
         hpp('');
-        lib.objects.forEach((obj) {
-            obj.resolve(this);
-            obj.collectUsedTypes();
-        });
         List<TopDecl> objects = List.from(lib.objects);
-        objects.sort((a, b) => a == b? 0 : a.usedTypes.contains(b.name)? 1 : -1);
+        // objects.sort((a, b) => a == b? 0 : a.usedTypes.contains(b.name)? 1 : -1);
 
         Set<String> usedTypes = Set();
         // Collect parents used types too
         objects.forEach((obj) {
             if(obj is ClassDecl) {
-                ClassDecl cls = obj as ClassDecl;
-                collectUsedTypesRec(cls, usedTypes);
              } else {
-                usedTypes.addAll(obj.usedTypes);
+                for(DataType t in obj.usedTypes){
+                    if(t != null){
+                        t.collectUsedTypes(usedTypes);
+                    }
+                }
              }
         });
 
         usedTypes.removeAll(primitives);
         usedTypes.remove('void');
         usedTypes.remove('Object');
+        List<String> importPaths = [];
         for(String str in usedTypes) {
-            hp('CLASS(');
-            hp(str);
-            hl(')');
+            // Lets import those specific types
+            TopDecl top = context.get(str);
+            if(top != null) {
+                String p = top.packagePath;
+                if(!importPaths.contains(p)){
+                    importPaths.add(p);
+                }
+            }
+        }
+        for(String str in importPaths) {
+            hpp('#include <' + str +'.h>');
         }
 
         objects.forEach((obj) {
-            if(obj is ClassDecl) {
-                // hp('CLASS(__');
-                // hp(obj.name);
-                // hl('Type)');
-                // genClassDecl(obj as ClassDecl);
-            } else if(obj is Enum) {
+            if(obj is Enum) {
                 genEnum(obj as Enum);
-            } else if(obj is Typedef) {
+            }
+        });
+        objects.forEach((obj) {
+            if(obj is Typedef) {
                 genTypeDef(obj as Typedef);
-            } else if(obj is MethodDecl) {
-                genMethodDecl(null, obj as MethodDecl, 0);
-            } else if(obj is FieldDecl) {
+            }
+        });
+        objects.forEach((obj) {
+            if(obj is FieldDecl) {
                 genFieldDecl(obj as FieldDecl, null, true, 0, (x) => hp(x));
                 genFieldDecl(obj as FieldDecl, null, false, 0, (x) => cp(x));
-            } else {
-                D3ELogger.error('Unknown object type');
+            }
+        });
+        objects.forEach((obj) {
+            if(obj is MethodDecl) {
+                MethodDecl method = obj as MethodDecl;
+                genMethodDecl(null, method, 0);
             }
         });
         hpp('');
@@ -164,8 +188,9 @@ server class CGen extends ResolveContext implements Gen{
         // });
         hpp('');
         hpp('#endif');
-        FileUtils.writeFile(base + lib.packagePath + '.h', hppLines.join('\n'));
-        FileUtils.writeFile(base + lib.packagePath + '.c', cppLines.join('\n'));
+        cpp('');
+        FileUtils.writeFile(base + lib.packagePath + 'lib.h', hppLines.join('\n'));
+        FileUtils.writeFile(base + lib.packagePath + 'lib.c', cppLines.join('\n'));
         cppLines.clear();
         hppLines.clear();
     }
@@ -182,18 +207,42 @@ server class CGen extends ResolveContext implements Gen{
         hp(cls.name);
         hl(')');
         Set<String> usedTypes = Set();
-        collectUsedTypesRec(cls, usedTypes);
+        List<DataType> types = List();
+        collectUsedTypesRec(cls, types);
 
+        Set<String> fnTypeSignatures = Set();
+        List<FunctionType> fnTypes = List();
+        for(DataType t in types){
+            if(t is FunctionType) {
+                FunctionType ft = (t as FunctionType);
+                ft.signature = ft.computeSignature();
+                if(fnTypeSignatures.contains(ft.signature)){
+                    continue;
+                }
+                fnTypeSignatures.add(ft.signature);
+                fnTypes.add(ft);
+            }
+        }
+
+        for(DataType t in types){
+            usedTypes.add(t.name);
+        }
         usedTypes.removeAll(primitives);
         usedTypes.remove('void');
         usedTypes.remove('Object');
+        List<String> importPaths = [];
         for(String str in usedTypes) {
             // Lets import those specific types
             TopDecl top = context.get(str);
-            if(top != null && top is ClassDecl) {
-                ClassDecl usedCls = top as ClassDecl;
-                hpp('#include <' + usedCls.packagePath +'.h>');
+            if(top != null) {
+                String p = top.packagePath;
+                if(!importPaths.contains(p)){
+                    importPaths.add(p);
+                }
             }
+        }
+        for(String str in importPaths) {
+            hpp('#include <' + str +'.h>');
         }
         // lib.exports.forEach((e){
         //     String path = e.path;
@@ -213,10 +262,22 @@ server class CGen extends ResolveContext implements Gen{
         //     }
         // });
         hpp('');
-        cls.resolve(this);
+        // cls.resolve(this);
         hp('CLASS(__');
         hp(cls.name);
         hl('Type)');
+        for(FunctionType fnType in fnTypes){
+            hp('typedef struct ');
+            hp(fnType.signature);
+            hl(' {');
+            hl('    void* data;');
+            hp('    ');
+            functionTypeToString(fnType, 'call', x => hp(x));
+            hl(';');
+            hp('} ');
+            hp(fnType.signature);
+            hl(';');
+        }
         genClassDecl(cls);
         hp('extern __');
         hp(cls.name);
@@ -226,13 +287,14 @@ server class CGen extends ResolveContext implements Gen{
 
         hpp('');
         hpp('#endif');
+        cpp('');
         FileUtils.writeFile(base + path + '.h', hppLines.join('\n'));
         FileUtils.writeFile(base + path + '.c', cppLines.join('\n'));
         cppLines.clear();
         hppLines.clear();
     }
 
-    void collectUsedTypesRec(ClassDecl cls, Set<String> types){
+    void collectUsedTypesRec(ClassDecl cls, List<DataType> types){
         cls.collectUsedTypes();
         if(cls.extendType != null) {
             TopDecl top = context.get(cls.extendType.name);
@@ -285,21 +347,28 @@ server class CGen extends ResolveContext implements Gen{
 
     String valueTypeToString(ValueType v, {Boolean noPtr = false}) {
         String res = v.name;
-        if(res == 'dynamic') {
-            res = 'Object';
-        }
-        if(res.length == 1) {
-            res = 'void*';
+        TopDecl top = context.get(res);
+        if(res == 'auto' ) {
+            res = 'auto';
+        } else if(res == 'dynamic' || res == 'var' || res.length == 1) {
+            res = 'Object*';
+        } else if(top is Typedef || top is Enum) {
+            // No * in Typedef or enum
         } else if(!noPtr && !primitives.contains(res)) {
             res+='*';
-        }
-        if(res == 'var') {
-            res = 'auto';
         }
         return res;
     }
 
     void functionTypeToString(FunctionType f, String name, Xp xp) {
+        if(name == null) {
+            xp(f.signature);
+            return;
+        }
+        if((f.returnType == null || f.returnType.name == 'void') && name == null && (f.params == null || f.params.isEmpty)){
+            xp('__Function');
+            return;
+        }
         if(f.returnType == null) {
             xp('void ');
         } else {
@@ -310,17 +379,14 @@ server class CGen extends ResolveContext implements Gen{
             xp(name);
         }
         xp(')(');
-        if(f.params != null) {
-            List<MethodParam> params = sortMethodParams(f.params);
-            xp(params.map((p) {
-                return paramToString(p, skipName: true);
-            }).join(', '));
-        }
+        xp(f.params.map((p) {
+            return paramToString(p, skipName: true);
+        }).join(', '));
         xp(')');
     }
 
     String defTypeToString(DefType d) {
-        return 'DefType';
+        return d.name;
     }
     
 
@@ -329,7 +395,7 @@ server class CGen extends ResolveContext implements Gen{
             return valueTypeToString(d as ValueType, noPtr: noPtr);
         } else if(d is FunctionType) {
             List<String> res = [];
-            functionTypeToString(d as FunctionType, name, (x) => res.add(x));
+            functionTypeToString(d as FunctionType, null, (x) => res.add(x));
             return res.join('');
         } else if(d is DefType) {
             return defTypeToString(d as DefType);
@@ -354,11 +420,16 @@ server class CGen extends ResolveContext implements Gen{
         hp(c.name);
         hl('Type {');
         hl('    i32 id;');
+        if(c.extendType != null) {
+            hp('    __');
+            hp(c.extendType.name);
+            hl('Type* super;');
+        }
         declareClassFields(c, true);
         if(!c.isAbstract){
             hp('    ');
             hp(c.name);
-            hl('* (*make)();');
+            hl('* (*__make)();');
         }
         declareClassMethods(c, Set(), true);
         hp('} __');
@@ -417,7 +488,11 @@ server class CGen extends ResolveContext implements Gen{
         if(!isConstructor && added.contains(m.name)){
             return;
         }
-        added.add(m.name);
+        if(m.setter) {
+            added.add('__set_' + m.name);
+        } else {
+            added.add(m.name);
+        }
         hp(tab(1));
         if(m.returnType == null) {
             if(isConstructor) {
@@ -436,15 +511,22 @@ server class CGen extends ResolveContext implements Gen{
         }
         if(!ParserUtil.isNameChar(m.name)){
             hp('_');
-            if(m.params == null || m.params.positionalParams.isEmpty){
+            if(m.params.isEmpty){
                 hp('uminus');
             } else {
                 hp(operatorToName(m.name));
             }
         } else {
             if(isConstructor) {
-                hp('new');
+                if(m.factoryName != null) {
+                    hp(m.factoryName);
+                } else {
+                    hp('new');
+                }
             } else {
+                if(m.setter) {
+                    hp('__set_');
+                }
                 hp(variable(m.name));
             }
         }
@@ -452,33 +534,36 @@ server class CGen extends ResolveContext implements Gen{
             hp(')');
         }
         hp('(');
-        Boolean needThis = c != null && !m.static && !isConstructor;
-        if(needThis) {
+        Boolean needThis = c != null && !m.static;
+        Boolean needComma= false;
+        if(!m.factory && (needThis || isConstructor)) {
             hp(c.name);
-            hp('* this');
+            hp('* this ');
+            needComma = true;
         }
         if(m.params != null) {
             if(c != null) {
                 updateSuperAndParams(m, c);
             }
-            genMethodParams(m.params, c, needThis, x => hp(x));
+            genMethodParams(m.params, c, needComma, x => hp(x),);
         }
         hp(')');
         hl(';');
     }
 
     String paramToString(MethodParam p, {Boolean skipName}) {
+        if(p.name == '') {
+            p.name = p.dataType.name;
+            p.dataType = objectType;
+        }
         String out = '';
         if(p.dataType != null) {
-            if(p.dataType is FunctionType){
-                skipName = true;
-            }
-            out+= dataTypeToString(p.dataType, name: variable(p.name));
+            out+= dataTypeToString(p.dataType);
             if(scope != null) {
                 scope.add(p.name, p.dataType);
             }
         } else {
-            out += 'Unknown';
+            out += 'Object*';
             if(scope != null) {
                 scope.add(p.name, ofUnknownType());
             }
@@ -506,12 +591,13 @@ server class CGen extends ResolveContext implements Gen{
     }
 
     void genEnum(Enum e) {
-        hpp('');
-        hpp('enum '+ e.name + '{');
+        hpp('typedef enum '+ e.name + '{');
         e.values.forEach((v) {
             hpp('    ' + variable(v) + ',');
         });
-        hpp('} // end ' + e.name);
+        hp('} ');
+        hp(e.name);
+        hl(';');
     }
 
     String operatorToName(String op) {
@@ -570,15 +656,22 @@ server class CGen extends ResolveContext implements Gen{
         hp(' ');
         if(!ParserUtil.isNameChar(m.name)){
             hp('_');
-            if(m.params == null || m.params.positionalParams.isEmpty){
+            if(m.params.isEmpty){
                 hp('uminus');
             } else {
                 hp(operatorToName(m.name));
             }
         } else {
             if(isConstructor) {
-                hp('new');
+                if(m.factoryName != null){
+                    hp(m.factoryName);
+                } else {
+                    hp('new');
+                }
             } else {
+                if(m.setter) {
+                    hp('__set_');
+                }
                 hp(m.name);
             }
         }
@@ -588,15 +681,17 @@ server class CGen extends ResolveContext implements Gen{
         }
         hp('(');
         Boolean needThis = c != null && !m.static;
-        if(needThis || isConstructor) {
+        Boolean needComma = false;
+        if(!m.factory && (needThis || isConstructor)) {
             hp(c.name);
             hp('* this');
+            needComma = true;
         } 
         if(m.params != null) {
             if(c != null) {
                 updateSuperAndParams(m, c);
             }
-            genMethodParams(m.params, c, needThis, x => hp(x));
+            genMethodParams(m.params, c, needComma, x => hp(x));
         }
         hp(')');
         hl(';');
@@ -621,14 +716,18 @@ server class CGen extends ResolveContext implements Gen{
 
         if(!ParserUtil.isNameChar(m.name)){
             cp('_');
-            if(m.params == null || m.params.positionalParams.isEmpty){
+            if(m.params.isEmpty){
                 cp('uminus');
             } else {
                 cp(operatorToName(m.name));
             }
         } else {
             if(isConstructor) {
-                cp('new');
+                if(m.factoryName != null){
+                    cp(m.factoryName);
+                } else {
+                    cp('new');
+                }
             } else {
                 cp(m.name);
             }
@@ -638,42 +737,14 @@ server class CGen extends ResolveContext implements Gen{
             cp(c.name);
         }
         cp('(');
-        if(needThis || isConstructor) {
+        if(!m.factory && (needThis || isConstructor)) {
             cp(c.name);
             cp('* this ');
         }
         scope = Scope(thisType: c);
-        if(m.params != null) {
-            genMethodParams(m.params, c, needThis, x => cp(x));
-        }
+        genMethodParams(m.params, c, needComma, x => cp(x));
         cp(')');
-        if(isConstructor) {
-            if(m.init != null) {
-                cl(' {');
-                if((m.init as Block).statements.isNotEmpty) {
-                    cp(tab(1));
-                    genExp(m.init, 1, x => cp(x));
-                    cl('');
-                }
-            } else {
-                cl(' {');
-            }
-            if(m.body != null) {
-                cp(tab(1));
-                genBlock(m.body, 1, x => cp(x));
-                cl('');
-            }
-            cl('}');
-        } else if(m.body != null) {
-            cp(' ');
-            genBlock(m.body, 0, x => cp(x));
-        } else if(m.exp != null){
-            cl(' {');
-            cp('    return ');
-            genExp(m.exp, 1, x => cp(x));
-            cl(';');
-            cl('}');
-        }
+        genBlock(m.body, 0, x => cp(x));
         cpp('');
         tempCount = 0;
     }
@@ -688,15 +759,15 @@ server class CGen extends ResolveContext implements Gen{
         if(md.params == null) {
             return null;
         }
-        MethodParam param = md.params.positionalParams.firstWhere(m => m.name == name);
+        MethodParam param = md.params.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
-        param = md.params.optionalParams.firstWhere(m => m.name == name);
+        param = md.params.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
-        param = md.params.namedParams.firstWhere(m => m.name == name);
+        param = md.params.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
@@ -717,40 +788,15 @@ server class CGen extends ResolveContext implements Gen{
             }
         }
         Integer x = 0;
-        for(MethodParam p in md.params.positionalParams){
+        for(MethodParam p in md.params){
             if(p.thisToken == 'this') {
                 p.dataType = getFieldType(c, p.name);
             } else if (p.thisToken == 'super' && superCon != null) {
                 superPosParams.add(p);
-                MethodParam superParam = getParamAtIndex(superCon.params, x);
-                if(superParam != null) {
-                    p.dataType = superParam.dataType;
-                }
+                MethodParam superParam = superCon.params.length > x ? superCon.params.get(x) : null;
+                p.dataType = superParam?.dataType;
             }
             x++;
-        }
-        for(MethodParam p in md.params.optionalParams){
-            if(p.thisToken == 'this') {
-                p.dataType = getFieldType(c, p.name);
-            } else if (p.thisToken == 'super' && superCon != null) {
-                superPosParams.add(p);
-                MethodParam superParam = getParamAtIndex(superCon.params, x);
-                if(superParam != null) {
-                    p.dataType = superParam.dataType;
-                }
-            }
-            x++;
-        }
-        for(MethodParam p in md.params.namedParams){
-            if(p.thisToken == 'this') {
-                p.dataType = getFieldType(c, p.name);
-            } else if (p.thisToken == 'super' && superCon != null) {
-                superNamedParams.add(p);
-                MethodParam superParam = getParamByName(superCon.params, p.name);
-                if(superParam != null) {
-                    p.dataType = superParam.dataType;
-                }
-            }
         }
         if(superPosParams.isEmpty || superNamedParams.isEmpty){
             return;
@@ -789,13 +835,9 @@ server class CGen extends ResolveContext implements Gen{
         superCall.namedArgs.insertAll(0, namedArgs);
     }
 
-    MethodParam getParamAtIndex(MethodParams m, Integer i) {
-        if(i < m.positionalParams.length) {
-            return m.positionalParams.get(i);
-        }
-        i = i - m.positionalParams.length;
-        if(i < m.optionalParams.length) {
-            return m.optionalParams.get(i);
+    MethodParam getParamAtIndex(List<MethodParam> m, Integer i) {
+        if(i < m.length) {
+            return m.get(i);
         }
         return null;
     }
@@ -804,15 +846,13 @@ server class CGen extends ResolveContext implements Gen{
         return m.namedParams.firstWhere(p => p.name == name);
     }
 
-    void genMethodParams(MethodParams mp, ClassDecl c, Boolean addedParams, Xp xp) {
-        List<MethodParam> thisParams = [];
-        List<MethodParam> params = sortMethodParams(mp);
+    void genMethodParams(List<MethodParam> params, ClassDecl c, Boolean addedParams, Xp xp) {
         if(params.isNotEmpty && addedParams) {
             xp(', '); //for this*
         }
         params.forEach((p) {
             if(p.dataType == null) {
-                xp('Unknown');
+                xp('Object*');
                 if(scope != null) {
                     scope.add(p.name, ofUnknownType());
                 }
@@ -1278,9 +1318,15 @@ server class CGen extends ResolveContext implements Gen{
     
     void genBinaryExpression(BinaryExpression exp, Integer depth, Xp xp) {
         if(exp.op == '??') {
-            xp('__or(&');
+            xp('__or(');
             genExp(exp.left, depth, xp);
             xp(', ');
+            genExp(exp.right, depth, xp);
+            xp(')');
+        } else if(exp.op == '~/') {
+            xp('(i64)(');
+            genExp(exp.left, depth, xp);
+            xp(' / ');
             genExp(exp.right, depth, xp);
             xp(')');
         } else {
@@ -1312,8 +1358,10 @@ server class CGen extends ResolveContext implements Gen{
              || (s is ForLoop)
              || (s is ForEachLoop)
              || (s is Block)
+             || (s is TryCatcheStatment)
              || (s is IfStatement)){
                 // No need for semicolon
+                xp('\n');
             } else {
                 xp(';\n');
             }
@@ -1438,12 +1486,15 @@ server class CGen extends ResolveContext implements Gen{
         }
         return null;
     }
-    ClassMember getMember(ClassDecl c, String name, {MemberFilter filter}) {
+    ClassMember getMember(ClassDecl c, String name, {MemberFilter filter, Boolean noSuperCons}) {
         if(c == null) {
             return null;
         }
         ClassMember cm = c.members.firstWhere((m){
             if(m.name != name){
+                return false;
+            }
+            if(noSuperCons && m.name == c.name){
                 return false;
             }
             if(filter == null) {
@@ -1491,39 +1542,56 @@ server class CGen extends ResolveContext implements Gen{
         if(c.extendType != null) {
             ClassDecl parent = context.get(c.extendType.name) as ClassDecl;
             if(parent != c) {
-                return getMember(parent, name);
+                cm = getMember(parent, name, filter: filter, noSuperCons: true);
+            }
+            if(cm != null){
+                return cm;
             }
         }
         for(DataType impl in c.impls) {
             ClassDecl parent = context.get(impl.name) as ClassDecl;
             if(parent != c) {
-                return getMember(parent, name);
+                cm = getMember(parent, name, filter: filter, noSuperCons: true);
+            }
+            if(cm != null){
+                return cm;
             }
         }
         for(DataType impl in c.mixins) {
             ClassDecl parent = context.get(impl.name) as ClassDecl;
             if(parent != c) {
-                return getMember(parent, name);
+                cm = getMember(parent, name, filter: filter, noSuperCons: true);
+            }
+            if(cm != null){
+                return cm;
             }
         }
-        return null;
+        return cm;
     }
     void genFieldOrEnumExpression(FieldOrEnumExpression exp, Integer depth, Xp xp) {
+        if(exp.resolvedType is FunctionType && exp.on != null) {
+            FunctionType type = exp.resolvedType as FunctionType;
+            if(type.signature == null) {
+                type.signature = type.computeSignature();
+            }
+            xp('(');
+            xp(type.signature);
+            xp(')');
+            xp('{');
+        }
         if(exp.on != null){
             genExp(exp.on, depth, (x){});
+            if(exp.resolvedType is FunctionType) {
+                genExp(exp.on, depth, xp);
+                xp(', ');
+            }
             genExp(exp.on, depth, xp);
             
-            if(exp.checkNull) {
-                xp('?->');
-            } else if(exp.notNull) {
-                xp('!->');
+            if(exp.on is FieldOrEnumExpression 
+                && (ParserUtil.isTypeName((exp.on as FieldOrEnumExpression).name))){
+                xp('->');
             } else {
-                if(exp.on is FieldOrEnumExpression 
-                    && (ParserUtil.isTypeName((exp.on as FieldOrEnumExpression).name))){
-                    xp('_');
-                } else {
-                    xp('->');
-                }
+                xp('->');
             }
         } else {
             DataType type = scope.get(exp.name);
@@ -1548,21 +1616,40 @@ server class CGen extends ResolveContext implements Gen{
                 shouldCast = false;
             }
         }
+        if(exp.resolvedMember is MethodDecl && !exp.resolvedMember.static && exp.resolvedMember.lib == null) {
+            xp('__type->');
+        }
         if(shouldCast) {
             xp('((');
             xp(castType.name);
             xp('*)');
         }
         if(ParserUtil.isTypeName(exp.name) && exp.name != exp.name.toUpperCase()){
+            xp('___');
             xp(exp.name);
         } else {
-            xp(variable(exp.name));
+            if(exp.name == 'super') {
+                xp('this');
+            } else {
+                xp(variable(exp.name));
+            }
         }
         if(shouldCast) {
             xp(')');
         }
         if(exp.isGetter) {
-            xp('()');
+            xp('(');
+            if(!exp.resolvedMember.static) {
+                if(exp.on != null) {
+                    genExp(exp.on, depth, xp);
+                } else if(exp.resolvedMember.lib == null) {
+                    xp('this');
+                }
+            }
+            xp(')');
+        }
+        if(exp.resolvedType is FunctionType && exp.on != null) {
+            xp('}');
         }
     }
 
@@ -1710,7 +1797,7 @@ server class CGen extends ResolveContext implements Gen{
         // TODO make sure names and types exist for each param
         exp.params.forEach((p){
             if(p.type == null) {
-                xp('Unknown ');
+                xp('Object* ');
             } else {
                 xp(dataTypeToString(p.type));
             }
@@ -1747,16 +1834,22 @@ server class CGen extends ResolveContext implements Gen{
     }
     void genMethodCall(MethodCall exp, Integer depth, Xp xp) {
         ClassDecl onType = null;
+        Boolean isSuper = false;
         if(exp.on != null){
-            genExp(exp.on, depth, xp);
-            Boolean isStaticCall = false;
-            if(exp.checkNull) {
-                xp('?->');
-            } else if(exp.notNull) {
-                xp('!->');
+            if(exp.on is FieldOrEnumExpression && (exp.on as FieldOrEnumExpression).name =='super'){
+                xp('___');
+                if(instanceClass.extendType != null) {
+                    xp(instanceClass.extendType.name);
+                } else {
+                    xp('FromMixin');
+                }
+                xp('->');
+                isSuper = true;
             } else {
+                genExp(exp.on, depth, xp);
+                Boolean isStaticCall = exp.resolvedMethod != null && exp.resolvedMethod.static;
                 if(isStaticCall) {
-                    xp('Type->');
+                    xp('->');
                 } else {
                     xp('->__type->');
                 }
@@ -1771,41 +1864,73 @@ server class CGen extends ResolveContext implements Gen{
                         xp(instanceClass.name);
                         xp('->');
                     } else {
-                        xp('this->');
+                        xp('this->__type->');
                     }
                 }
             }
         }
         Boolean isConstructor = false;
         if(exp.name != null && exp.name.isNotEmpty) {
-            String name = variable(exp.name);
-            if(ParserUtil.isTypeName(name)){
-                xp('new_');
-                xp(exp.name);
-                isConstructor = true;
+            if(exp.on == null && exp.name == 'super') {
+                xp('___');
+                if(instanceClass.extendType != null) {
+                    xp(instanceClass.extendType.name);
+                } else {
+                    xp('FromMixin');
+                }
+                xp('->new');
+                isSuper = true;
             } else {
-                xp(variable(exp.name));
+                String name = variable(exp.name);
+                if(ParserUtil.isTypeName(name)){
+                    xp('new_');
+                    xp(exp.name);
+                    isConstructor = true;
+                } else {
+                    xp(variable(exp.name));
+                }
             }
         }
         xp('(');
+        Boolean needComma = false;
         if(isConstructor) {
             xp('___');
             xp(exp.name);
             xp('->__make()');
+            needComma = true;
+        } else if(isSuper) {
+            xp('(');
+            if(instanceClass.extendType != null) {
+                xp(instanceClass.extendType.name);
+            } else {
+                xp('FromMixin');
+            }
+            xp('*) this');
+            needComma = true;
+        } else if(exp.resolvedMethod != null && !exp.resolvedMethod.static) {
+            if(exp.resolvedMethod.lib != null) {
+                // library function
+            } else {
+                if(exp.on == null) {
+                    xp('this');
+                } else {
+                    genExp(exp.on, depth, xp);
+                }
+                needComma = true;
+            }
         }
-        if(isConstructor && exp.positionArgs.isNotEmpty) {
+        if(needComma && exp.positionArgs.isNotEmpty) {
             xp(', ');
         }
-        exp.positionArgs.forEach((a){
+        for(Argument a in exp.positionArgs){
+            needComma = true;
             genExp(a.arg, depth, xp);
             if(a != exp.positionArgs.last) {
                 xp(', ');
             }
-        });
-        if(exp.namedArgs.isNotEmpty) {
-            if(exp.positionArgs.isNotEmpty || isConstructor) {
-                xp(', ');
-            }
+        }
+        if(needComma && exp.namedArgs.isNotEmpty) {
+            xp(', ');
         }
         exp.namedArgs.forEach((a){
             genExp(a.value, depth, xp);
@@ -1837,13 +1962,12 @@ server class CGen extends ResolveContext implements Gen{
         exp.resolvedType = exp.on.resolvedType;
     }
     void genRethrowStatement(RethrowStatement exp, Integer depth, Xp xp) {
-        xp('throw');
-        exp.resolvedType = ofUnknownType();
+        xp('__rethrow()');
     }
     void genThrowStatement(ThrowStatement exp, Integer depth, Xp xp) {
-        xp('throw ');
+        xp('__throw(');
         genExp(exp.exp, depth, xp);
-        exp.resolvedType = ofUnknownType();
+        xp(')');
     }
     void genReturn(Return exp, Integer depth, Xp xp) {
         xp('return');
@@ -1898,18 +2022,42 @@ server class CGen extends ResolveContext implements Gen{
     }
 
     void genTryCatchStatement(TryCatcheStatment exp, Integer depth, Xp xp) {
-        xp('try ');
+        xp('if(__try())');
         genExp(exp.body, depth, xp);
         exp.catchParts.forEach((c) {
-            xp(' catch (');
-            xp(dataTypeToString(c.onType));
-            xp(' ');
-            xp(c.exp);
-            xp(') ');
-            genExp(c.body, depth, xp);
+            if(c.onType != null) {
+                xp(tab(depth));
+                xp(' else if(__on_catch(___');
+                xp(c.onType.name);
+                xp('->id) {\n');
+                xp(tab(depth+1));
+                xp(c.onType.name);
+                xp('* ');
+                xp(c.exp);
+                xp('= (');
+                xp(c.onType.name);
+                xp('*) __get_catch();\n');
+                xp(tab(depth+1));
+                genExp(c.body, depth, xp);
+                xp('\n');
+                xp(tab(depth));
+                xp('}');
+            } else {
+                xp(' else if(__on_catch(___Exception->id) {\n');
+                xp(tab(depth+1));
+                xp('Exception* ');
+                xp(c.exp);
+                xp('= (Exception*) __get_catch();\n');
+                xp(tab(depth+1));
+                genExp(c.body, depth + 1, xp);
+                xp('\n');
+                xp(tab(depth));
+                xp('}');
+
+            }
         });
         if(exp.finallyBody != null) {
-            xp(' finally ');
+            xp(' else ');
             genExp(exp.finallyBody, depth, xp);
         }
     }
@@ -1924,7 +2072,16 @@ server class CGen extends ResolveContext implements Gen{
     }
 
     void genTypeDef(Typedef t) {
-
+        hp('typedef struct ');
+        hp(t.name);
+        hl(' {');
+        hl('    void* data;');
+        hp('    ');
+        functionTypeToString(t.fnType, 'call', (x)=>hp(x));
+        hl(';');
+        hp('} ');
+        hp(t.name);
+        hl(';');
     }
 
     void genFieldDecl(FieldDecl f, String prefix, Boolean extern, Integer depth, Xp xp) {
@@ -1942,14 +2099,11 @@ server class CGen extends ResolveContext implements Gen{
         //     hp('const ');
         // }
         Boolean skipName = false;
-        if(f.type == null) {
-            xp('auto ');
-        } else {
-            if(f.type is FunctionType){
-                skipName = true;
-            }
-            xp(dataTypeToString(f.type, name: f.name));
+        DataType type = f.type;
+        if(type is FunctionType){
+            skipName = true;
         }
+        xp(dataTypeToString(type, name: f.name));
         if(!skipName) {
             xp(' ');
             if(prefix != null){
@@ -1973,5 +2127,7 @@ server class CGen extends ResolveContext implements Gen{
         }
         return null;
     }
+
+    
 
 }

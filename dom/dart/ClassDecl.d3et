@@ -12,44 +12,55 @@ server class ClassDecl extends TopDecl {
     ClassDecl(this.isMixin, String name) : super(name, TopDeclType.Class, '');
 
     void collectUsedTypes(){
-        usedTypes.addAll(impls.map(i => i.name).toList());
+        usedTypes.addAll(impls);
         if(extendType != null) {
-            usedTypes.add(extendType.name);
+            usedTypes.add(extendType);
         }
         for(ClassMember cm in members) {
             if(cm is FieldDecl) {
                 FieldDecl fd = cm as FieldDecl;
                 if(fd.type != null) {
-                    fd.type.collectUsedTypes(usedTypes);
+                    usedTypes.add(fd.type);
                 }
             } else if (cm is MethodDecl) {
                 MethodDecl md = cm as MethodDecl;
                 if(md.returnType != null) {
-                    md.returnType.collectUsedTypes(usedTypes);
+                    usedTypes.add(md.returnType);
                 }
-                if(md.params != null) {
-                    for(MethodParam m in md.params.positionalParams) {
-                        if(m.dataType != null) {
-                            m.dataType.collectUsedTypes(usedTypes);
-                        }
+                for(MethodParam m in md.params) {
+                    if(m.dataType != null) {
+                        usedTypes.add(m.dataType);
                     }
                 }
             }
         }
-        usedTypes.addAll(impls.map(i => i.name).toList());
     }
 
-    void resolve(ResolveContext context){
+    void resolveFields(ResolveContext context){
+        D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);
         for(ClassMember cm in members.where(m => m is FieldDecl)){
-            cm.resolve(context);
-        }
-        for(ClassMember cm in members){
-            cm.resolve(context);
+            (cm as FieldDecl).resolve(context);
         }
         context.scope = context.scope.parent;
         context.instanceClass = null;
+    }
+    void resolveMethods(ResolveContext context){
+        D3ELogger.info('Resolving Class: ' + name);
+        context.instanceClass = this;
+        context.scope = Scope(parent: context.scope);
+        for(ClassMember cm in members.where(m => m is MethodDecl)){
+            (cm as MethodDecl).resolve(context);
+        }
+        context.scope = context.scope.parent;
+        context.instanceClass = null;
+    }
+
+    void simplify(Simplifier s){
+        for(ClassMember cm in members){
+            cm.simplify(s);
+        }
     }
 
     String get packagePath {

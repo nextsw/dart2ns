@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class Block extends Statement {
   public List<Comment> afterComments = ListExt.asList();
@@ -18,9 +17,26 @@ public class Block extends Statement {
     context.scope = context.scope.parent;
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     for (Statement stmt : this.statements) {
       stmt.collectUsedTypes(types);
+    }
+  }
+
+  public void simplify(Simplifier s) {
+    for (long x = 0l; x < ListExt.length(this.statements); x++) {
+      Statement st = ListExt.get(this.statements, x);
+      s.push();
+      st.simplify(s);
+      SimplifierResult res = s.pop();
+      List<Statement> temp = res.list;
+      if (res.deleted) {
+        ListExt.removeAt(this.statements, x);
+      }
+      if (ListExt.isNotEmpty(temp)) {
+        ListExt.insertAll(this.statements, x, temp);
+        x--;
+      }
     }
   }
 }

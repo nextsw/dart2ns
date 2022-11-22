@@ -1,6 +1,7 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
+import java.util.Objects;
 
 public class ForEachLoop extends Statement {
   public Expression body;
@@ -20,15 +21,31 @@ public class ForEachLoop extends Statement {
     if (this.body != null) {
       this.body.resolve(context);
     }
+    if (this.dataType == null || Objects.equals(this.dataType.name, "var")) {
+      this.dataType = context.subType(this.collection.resolvedType, 0l);
+    }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     if (this.dataType != null) {
-      this.dataType.collectUsedTypes(types);
+      types.add(this.dataType);
     }
     if (this.body != null) {
       this.body.collectUsedTypes(types);
     }
     this.collection.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.collection = s.makeSimple(this.collection);
+    if (this.body == null) {
+      this.body = new Block();
+    }
+    if (!(this.body instanceof Block)) {
+      Block b = new Block();
+      b.statements.add(((Statement) this.body));
+      this.body = b;
+    }
+    this.body.simplify(s);
   }
 }

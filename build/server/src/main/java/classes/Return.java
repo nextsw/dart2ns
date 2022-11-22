@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class Return extends Statement {
   public Expression expression;
@@ -13,9 +13,13 @@ public class Return extends Statement {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     if (this.expression != null) {
       this.expression.collectUsedTypes(types);
     }
+  }
+
+  public void simplify(Simplifier s) {
+    this.expression = s.makeSimple(this.expression);
   }
 }

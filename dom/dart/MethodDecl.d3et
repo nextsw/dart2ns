@@ -1,7 +1,7 @@
 server class MethodDecl extends ClassMember{
     String name;
     List<Annotation> annotations = [];
-    MethodParams params;
+    List<MethodParam> params = [];
     DataType returnType;
     Boolean final;
     Boolean const;
@@ -18,7 +18,7 @@ server class MethodDecl extends ClassMember{
     String nativeString;
     MethodDecl({
         this.name, 
-        this.params, 
+        MethodParams params, 
         this.returnType,
         this.annotations,
         this.final, 
@@ -34,41 +34,63 @@ server class MethodDecl extends ClassMember{
         this.asyncType,
         this.exp,
         this.external,
-    }) : super(name, TopDeclType.Method, '');
+    }) : super(name, TopDeclType.Method, ''){
+        this.params = params?.toFixedParams() ?? [];
+    }
     String content;
 
     void resolve(ResolveContext context){
+        D3ELogger.info('Resolving Method: ' + name);
         MethodDecl prev = context.method;
         context.method = this;
         context.scope = Scope(parent: context.scope);
-        if(params != null) {
-            for(MethodParam p in context.sortMethodParams(params)){
-                if(p.dataType != null) {
-                    if(p.dataType.name != null && p.dataType.name.length == 1) {
-                        // Need to resolve the type...
-                        DataType paramType = resolveGegeric(context, p.dataType.name);
-                        context.scope.add(p.name, paramType);
-                    } else {
-                        context.scope.add(p.name, p.dataType);
-                    }
+        for(MethodParam p in params){
+            if(p.dataType != null) {
+                if(p.dataType.name != null && p.dataType.name.length == 1) {
+                    // Need to resolve the type...
+                    DataType paramType = resolveGegeric(context, p.dataType.name);
+                    context.scope.add(p.name, paramType);
+                } else {
+                    context.scope.add(p.name, p.dataType);
                 }
             }
         }
-        if(init != null) {
-            init.resolve(context);
-        }
-        if(body != null) {
-            body.resolve(context);
-        } else if(exp != null) {
+        body.resolve(context);
+        if(exp != null) {
             exp.resolve(context);
+            if(returnType == null){
+                returnType = exp.resolvedType;
+            }
         }
         context.scope = context.scope.parent;
         context.method = prev;
     }
 
-    void collectUsedTypes(){
+    void simplify(Simplifier s){
+        s.reset();
+        if(body == null) {
+            body = Block();
+        }
         if(init != null) {
-            init.collectUsedTypes(usedTypes);
+            body.statements.insert(0, init as Statement);
+            init = null;
+        }
+        if(exp != null) {
+            Return r = Return();
+            r.expression = exp;
+            body.statements.add(r);
+        }
+        body.simplify(s);
+    }
+
+    void collectUsedTypes(){
+        if(returnType != null){
+            usedTypes.add(returnType);
+        }
+        for(MethodParam p in params){
+            if(p.dataType != null) {
+                usedTypes.add(p.dataType);
+            }
         }
         if(body != null) {
             body.collectUsedTypes(usedTypes);
@@ -84,14 +106,22 @@ server class MethodDecl extends ClassMember{
     DataType resolveGegeric(ResolveContext context, String name) {
         if(generics != null) {
             TypeParam p = generics.params.firstWhere(x => x.name==name);
-            if(p != null && p.extendType != null) {
-                return p.extendType;
+            if(p != null) {
+                if(p.extendType != null) {
+                    return p.extendType;
+                } else {
+                    return context.objectType;
+                }
             }
         }
         if(context.instanceClass != null && context.instanceClass.generics != null) {
             TypeParam p = context.instanceClass.generics.params.firstWhere(x => x.name==name);
-            if(p != null && p.extendType != null) {
-                return p.extendType;
+            if(p != null) {
+                if(p.extendType != null) {
+                    return p.extendType;
+                } else {
+                    return context.objectType;
+                }
             }
         }
         return context.ofUnknownType();

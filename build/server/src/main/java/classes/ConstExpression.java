@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class ConstExpression extends Statement {
   public Expression exp;
@@ -22,7 +22,11 @@ public class ConstExpression extends Statement {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.exp.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.exp = s.makeSimple(this.exp);
   }
 }

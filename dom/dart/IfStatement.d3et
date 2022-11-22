@@ -12,11 +12,19 @@ server class IfStatement extends Statement {
             elseStatement.resolve(context);
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         test.collectUsedTypes(types);
         thenStatement.collectUsedTypes(types);
         if(elseStatement != null){
             elseStatement.collectUsedTypes(types);
+        }
+    }
+
+    void simplify(Simplifier s) {
+        test = s.makeSimple(test);
+        thenStatement.simplify(s);
+        if(elseStatement != null) {
+            elseStatement.simplify(s);
         }
     }
 }

@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class Symbol extends Expression {
   public String name;
@@ -13,5 +13,7 @@ public class Symbol extends Expression {
     this.resolvedType = context.objectType;
   }
 
-  public void collectUsedTypes(Set<String> types) {}
+  public void collectUsedTypes(List<DataType> types) {}
+
+  public void simplify(Simplifier s) {}
 }

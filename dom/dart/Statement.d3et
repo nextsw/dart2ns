@@ -1,3 +1,4 @@
 abstract server class Statement extends Expression {
     List<Comment> comments = [];
+    void simplify(Simplifier s);
 }

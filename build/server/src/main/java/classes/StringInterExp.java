@@ -1,8 +1,8 @@
 package classes;
 
+import d3e.core.IterableExt;
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class StringInterExp extends Expression {
   public String str;
@@ -19,9 +19,20 @@ public class StringInterExp extends Expression {
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     for (Expression exp : this.values) {
       exp.collectUsedTypes(types);
     }
+  }
+
+  public void simplify(Simplifier s) {
+    this.values =
+        IterableExt.toList(
+            ListExt.map(
+                this.values,
+                (v) -> {
+                  return s.makeSimple(v);
+                }),
+            false);
   }
 }

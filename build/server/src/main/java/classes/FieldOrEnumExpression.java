@@ -4,7 +4,6 @@ import d3e.core.D3ELogger;
 import d3e.core.ListExt;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public class FieldOrEnumExpression extends Statement {
   public String name;
@@ -27,9 +26,18 @@ public class FieldOrEnumExpression extends Statement {
     boolean onDynamic = false;
     if (this.on != null) {
       this.on.resolve(context);
-      TopDecl decl = context.get(this.on.resolvedType.name);
+      TopDecl decl = context.currentLib.get(this.on.resolvedType.name);
       if (decl instanceof ClassDecl) {
         onType = ((ClassDecl) decl);
+      } else if (decl instanceof Enum) {
+        Enum em = ((Enum) decl);
+        if (Objects.equals(this.name, "index")) {
+          this.resolvedType = context.integerType;
+          return;
+        } else if (Objects.equals(this.name, "name")) {
+          this.resolvedType = context.stringType;
+          return;
+        }
       } else if (Objects.equals(this.on.resolvedType, context.typeType)) {
         if (!(this.on instanceof FieldOrEnumExpression)) {
           D3ELogger.error("Mist be FE Exp");
@@ -37,7 +45,7 @@ public class FieldOrEnumExpression extends Statement {
           return;
         }
         String typeName = (((FieldOrEnumExpression) this.on)).name;
-        TopDecl top = context.get(typeName);
+        TopDecl top = context.currentLib.get(typeName);
         if (top instanceof ClassDecl) {
           onType = ((ClassDecl) top);
         } else if (top instanceof Enum) {
@@ -53,23 +61,14 @@ public class FieldOrEnumExpression extends Statement {
           return;
         }
         String importName = (((FieldOrEnumExpression) this.on)).name;
-        Library libToCheck = context.instanceClass.lib;
-        if (context.instanceClass.lib.partOf != null) {
-          libToCheck = libToCheck.parent;
-        }
-        Import importValue =
-            ListExt.firstWhere(
-                libToCheck.imports,
-                (i) -> {
-                  return Objects.equals(i.name, importName);
-                },
-                null);
-        TopDecl topCm = importValue.lib.get(this.name);
+        Library libToCheck = context.currentLib;
+        TopDecl topCm = libToCheck.get(this.name);
         if (topCm instanceof ClassMember) {
           resolveUsingClassMember(context, ((ClassMember) topCm), onType);
           return;
         } else {
-          D3ELogger.error("It must be ClassMember");
+          this.resolvedType = context.typeType;
+          return;
         }
       } else if (Objects.equals(this.on.resolvedType.name, "dynamic")) {
         onDynamic = true;
@@ -85,7 +84,7 @@ public class FieldOrEnumExpression extends Statement {
       return;
     }
     if (fieldType == null && onType != null) {
-      ClassMember cm = context.getMember(onType, this.name, null);
+      ClassMember cm = context.getMember(onType, this.name, null, false);
       resolveUsingClassMember(context, cm, onType);
     } else if (fieldType != null) {
       /*
@@ -93,58 +92,56 @@ public class FieldOrEnumExpression extends Statement {
       */
       this.resolvedType = fieldType;
     } else {
-      if (context.method != null && !context.method.staticValue) {
-        ClassMember mem =
-            context.getMember(context.instanceClass, this.name, MemberFilter.FieldsAndGetters);
-        if (mem instanceof FieldDecl) {
-          fieldType = (((FieldDecl) mem)).type;
-          this.resolvedType = fieldType;
-          this.resolvedMember = mem;
-        } else if (mem instanceof MethodDecl) {
-          fieldType = (((MethodDecl) mem)).returnType;
-          this.resolvedType = fieldType;
-          this.resolvedMember = mem;
+      if (this.on == null && ParserUtil.isTypeName(this.name)
+          || this.primitives.contains(this.name)) {
+        this.resolvedType = context.typeType;
+        return;
+      } else if (context.instanceClass != null) {
+        ClassMember mem = context.getMember(context.instanceClass, this.name, null, false);
+        if (mem != null) {
+          resolveUsingClassMember(context, mem, context.instanceClass);
+          fieldType = this.resolvedType;
+        }
+      }
+      if (fieldType == null && context.currentLib != null) {
+        /*
+         Lets check if is a library import
+        */
+        Library libToCheck = context.currentLib;
+        Import importValue =
+            ListExt.firstWhere(
+                libToCheck.imports,
+                (i) -> {
+                  return Objects.equals(i.name, this.name);
+                },
+                null);
+        if (importValue != null) {
+          this.resolvedType = context.libraryType;
+          fieldType = this.resolvedType;
+          return;
+        }
+        TopDecl top = libToCheck.get(this.name);
+        if ((top instanceof FieldDecl) || (top instanceof MethodDecl)) {
+          resolveUsingClassMember(context, ((ClassMember) top), null);
+          fieldType = this.resolvedType;
         }
       }
       if (fieldType == null) {
-        if (this.on == null && ParserUtil.isTypeName(this.name)
-            || this.primitives.contains(this.name)) {
-          this.resolvedType = context.typeType;
-        } else {
-          /*
-           Lets check if is a library import
-          */
-          Library libToCheck = context.instanceClass.lib;
-          if (context.instanceClass.lib.partOf != null) {
-            libToCheck = libToCheck.parent;
-          }
-          Import importValue =
-              ListExt.firstWhere(
-                  libToCheck.imports,
-                  (i) -> {
-                    return Objects.equals(i.name, this.name);
-                  },
-                  null);
-          if (importValue != null) {
-            this.resolvedType = context.libraryType;
-            return;
-          }
-          var value$ = context.instanceClass == null ? null : context.instanceClass.name;
-          String cls = value$;
-          var value$1 = context.method == null ? null : context.method.name;
-          String method = value$1;
-          D3ELogger.error(
-              "No field found: " + this.name + " in Cls: " + cls + " Method: " + method);
-          this.resolvedType = context.ofUnknownType();
-        }
+        var value$ = context.instanceClass == null ? null : context.instanceClass.name;
+        String cls = value$;
+        var value$1 = context.method == null ? null : context.method.name;
+        String method = value$1;
+        D3ELogger.error("No field found: " + this.name + " in Cls: " + cls + " Method: " + method);
+        this.resolvedType = context.ofUnknownType();
       }
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     if (this.on != null) {
       this.on.collectUsedTypes(types);
     }
+    types.add(this.resolvedType);
   }
 
   public void resolveUsingClassMember(ResolveContext context, ClassMember cm, ClassDecl onType) {
@@ -159,11 +156,15 @@ public class FieldOrEnumExpression extends Statement {
         }
         this.resolvedMember = cm;
       } else {
-        this.resolvedType = context.ofUnknownType();
+        this.resolvedType = new FunctionType(false, md.params, md.returnType, ListExt.List());
+        this.resolvedMember = cm;
       }
     } else {
       FieldDecl field = ((FieldDecl) cm);
       if (field != null) {
+        if (field.type == null) {
+          field.resolve(context);
+        }
         if (onType != null) {
           this.resolvedType = context.resolveType(onType, field.type);
         } else {
@@ -175,11 +176,13 @@ public class FieldOrEnumExpression extends Statement {
         String cls = value$;
         var value$1 = context.method == null ? null : context.method.name;
         String method = value$1;
+        var value$2 = onType == null ? null : onType.name;
+        String inType = value$2;
         D3ELogger.error(
             "No field found: "
                 + this.name
                 + " in "
-                + onType.name
+                + inType
                 + " Cls: "
                 + cls
                 + " Method: "
@@ -191,5 +194,19 @@ public class FieldOrEnumExpression extends Statement {
 
   public String toString() {
     return this.on == null ? this.on.toString() : "" + this.name;
+  }
+
+  public void simplify(Simplifier s) {
+    if (this.checkNull) {
+      TerinaryExpression ter =
+          new TerinaryExpression(
+              new BinaryExpression(this.on, "==", new NullExpression()),
+              new FieldOrEnumExpression(false, this.name, false, this.on),
+              new NullExpression());
+      s.add(ter);
+      s.markDelete();
+    } else {
+      this.on = s.makeSimple(this.on);
+    }
   }
 }

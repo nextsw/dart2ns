@@ -17,7 +17,11 @@ server class LiteralExpression extends Expression {
                 resolvedType = context.integerType;
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
+        
+    }
+
+    void simplify(Simplifier s) {
         
     }
 }

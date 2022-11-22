@@ -8,8 +8,18 @@ server class WhileLoop extends Statement {
         test.resolve(context);
         body.resolve(context);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         test.collectUsedTypes(types);
         body.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        test = s.makeSimple(test);
+        if(!(body is Block)) {
+            Block b = Block();
+            b.statements.add(body);
+            body = b;
+        }
+        body.simplify(s);
     }
 }

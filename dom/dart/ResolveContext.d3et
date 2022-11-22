@@ -7,9 +7,12 @@ abstract server class ResolveContext {
     DataType stringType = ValueType('String');
     DataType typeType = ValueType('__Type');
     DataType libraryType = ValueType('__Library');
+    DataType statementType = ValueType('__Statement');
     DataType dynamicType = ValueType('dynamic');
 
     ClassDecl instanceClass;
+
+    Library currentLib;
 
     MethodDecl method;
 
@@ -20,7 +23,7 @@ abstract server class ResolveContext {
 
     DataType fieldTypeFromScope(String name);
     DataType resolveType(ClassDecl onType, DataType type);
-    ClassMember getMember(ClassDecl onType, String name,{MemberFilter filter});
+    ClassMember getMember(ClassDecl onType, String name,{MemberFilter filter, Boolean noSuperCons});
     DataType commonType(DataType first, DataType second);
     DataType subType(DataType type, [Integer index]);
     List<MethodParam> sortMethodParams(MethodParams params);

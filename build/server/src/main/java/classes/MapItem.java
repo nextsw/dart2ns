@@ -1,7 +1,6 @@
 package classes;
 
 import java.util.List;
-import java.util.Set;
 
 public class MapItem extends ArrayItem {
   public Expression key;
@@ -18,8 +17,10 @@ public class MapItem extends ArrayItem {
     this.value.resolve(context);
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.key.collectUsedTypes(types);
     this.value.collectUsedTypes(types);
   }
+
+  public void simplify(Simplifier s) {}
 }

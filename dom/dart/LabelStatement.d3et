@@ -6,7 +6,11 @@ server class LabelStatement extends Statement {
 
     }
 
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
+        
+    }
+
+    void simplify(Simplifier s){
         
     }
 }

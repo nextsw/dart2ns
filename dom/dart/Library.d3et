@@ -13,7 +13,51 @@ server class Library {
     
 
     TopDecl get(String name) {
-        return objects.firstWhere(o => o.name == name);
+        if(name.startsWith('__')){
+            return null;
+        }
+        return _getInternal(name, Set(), true);
+    }
+    TopDecl _getInternal(String name, Set<Library> checked, Boolean checkImports) {
+        if(checked.contains(this)) {
+            return null;
+        }
+        D3ELogger.info('Checking for "'+ name +'" in ' + packagePath);
+        // checked.add(this);
+        TopDecl top = objects.firstWhere(o => o.name == name);
+        if(top == null) {
+            // Check in Exports
+            for(Export e in exports){
+                if(e.show.isNotEmpty && !e.show.contains(name)) {
+                    continue;
+                }
+                top = e.lib._getInternal(name, checked, false);
+                if(top != null && e.hide.contains(name)) {
+                    top = null;
+                }
+                if(top != null) {
+                    break;
+                }
+            }
+
+            if(checkImports) {
+                // Check in Imports 
+                for(Import e in imports){
+                    
+                    if(e.show.isNotEmpty && !e.show.contains(name)) {
+                        continue;
+                    }
+                    top = e.lib._getInternal(name, checked, false);
+                    if(top != null && e.hide.contains(name)) {
+                        top = null;
+                    }
+                    if(top != null) {
+                        break;
+                    }
+                }
+            }
+        }
+        return top;
     }
 
     void subs(List<TopDecl> libs, Set<Library> collected) {
@@ -45,6 +89,42 @@ server class Library {
             }
         }
         libs.addAll(objects);
+    }
+
+    void resolveFields(ResolveContext context) {
+        D3ELogger.info('Resolving fields in Library: ' + packagePath);
+        context.currentLib = this;
+        for(TopDecl obj in objects) {
+            if(obj is FieldDecl) {
+                (obj as FieldDecl).resolve(context);
+            } else if (obj is ClassDecl) {
+                (obj as ClassDecl).resolveFields(context);
+            }
+        }
+    }
+    void resolveMethods(ResolveContext context) {
+        D3ELogger.info('Resolving methods in Library: ' + packagePath);
+        context.currentLib = this;
+        for(TopDecl obj in objects) {
+            if(obj is MethodDecl) {
+                (obj as MethodDecl).resolve(context);
+            } else if (obj is ClassDecl) {
+                (obj as ClassDecl).resolveMethods(context);
+            }
+        }
+    }
+
+    void collectUsedTypes(List<DataType> list) {
+        for(TopDecl obj in objects) {
+            obj.collectUsedTypes();
+            list.addAll(obj.usedTypes);
+        }
+    }
+
+    void simplify(Simplifier s){
+        for(TopDecl obj in objects){
+            obj.simplify(s);
+        }
     }
 
 }

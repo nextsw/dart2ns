@@ -5,10 +5,15 @@ abstract server class TopDecl {
     List<GenError> errors;
     List<Annotation> annotations;
     Library lib;
+    String _packagePath;
 
-    Set<String> usedTypes = Set();
+    List<DataType> usedTypes = List();
     TopDecl(this.name, this.type, this.path);
 
     void collectUsedTypes();
-    void resolve(ResolveContext context);
+
+    String get packagePath {
+        return lib.packagePath+'lib';
+    }
+    void simplify(Simplifier s);
 }

@@ -70,28 +70,28 @@ public class CGen extends ResolveContext implements Gen {
   }
 
   public void generate() {
+    List<DataType> types = ListExt.asList();
     for (Library lib : this.context.libs) {
-      /*
-       List<TopDecl> subs = List();
-       lib.subs(subs, Set());
-      */
-      List<ClassDecl> classes =
-          IterableExt.toList(
-              ListExt.map(
-                  ListExt.where(
-                      lib.objects,
-                      (m) -> {
-                        return m instanceof ClassDecl;
-                      }),
-                  (m) -> {
-                    return ((ClassDecl) m);
-                  }),
-              false);
-      for (ClassDecl cls : classes) {
-        genLibraryClass(cls);
-      }
-      genLibrary(lib);
+      lib.simplify(new Simplifier());
     }
+    for (Library lib : this.context.libs) {
+      lib.resolveFields(this);
+    }
+    for (Library lib : this.context.libs) {
+      lib.resolveMethods(this);
+      lib.collectUsedTypes(types);
+    }
+    /*
+     for(Library lib in context.libs){
+         // List<TopDecl> subs = List();
+         // lib.subs(subs, Set());
+         List<ClassDecl> classes = lib.objects.where(m => m is ClassDecl).map(m => m as ClassDecl).toList();
+         for(ClassDecl cls in classes) {
+             genLibraryClass(cls);
+         }
+         genLibrary(lib);
+     }
+    */
   }
 
   public void genLibrary(Library lib) {
@@ -101,7 +101,7 @@ public class CGen extends ResolveContext implements Gen {
     String upper = StringExt.replaceAll(outPath, "/", "_").toUpperCase();
     hpp("#ifndef " + upper);
     hpp("#define " + upper);
-    cpp("#include \"" + nameOnly + ".h\"");
+    cpp("#include \"" + nameOnly + "lib.h\"");
     hpp("#include <base.h>");
     /*
      lib.exports.forEach((e){
@@ -123,17 +123,10 @@ public class CGen extends ResolveContext implements Gen {
      });
     */
     hpp("");
-    lib.objects.forEach(
-        (obj) -> {
-          obj.resolve(this);
-          obj.collectUsedTypes();
-        });
     List<TopDecl> objects = ListExt.from(lib.objects, false);
-    ListExt.sort(
-        objects,
-        (a, b) -> {
-          return Objects.equals(a, b) ? 0l : a.usedTypes.contains(b.name) ? 1l : -1l;
-        });
+    /*
+     objects.sort((a, b) => a == b? 0 : a.usedTypes.contains(b.name)? 1 : -1);
+    */
     Set<String> usedTypes = SetExt.Set();
     /*
      Collect parents used types too
@@ -141,36 +134,48 @@ public class CGen extends ResolveContext implements Gen {
     objects.forEach(
         (obj) -> {
           if (obj instanceof ClassDecl) {
-            ClassDecl cls = ((ClassDecl) obj);
-            collectUsedTypesRec(cls, usedTypes);
           } else {
-            SetExt.addAll(usedTypes, obj.usedTypes);
+            for (DataType t : obj.usedTypes) {
+              if (t != null) {
+                t.collectUsedTypes(usedTypes);
+              }
+            }
           }
         });
     SetExt.removeAll(usedTypes, this.primitives);
     usedTypes.remove("void");
     usedTypes.remove("Object");
+    List<String> importPaths = ListExt.asList();
     for (String str : usedTypes) {
-      hp("CLASS(");
-      hp(str);
-      hl(")");
+      /*
+       Lets import those specific types
+      */
+      TopDecl top = this.context.get(str);
+      if (top != null) {
+        String p = top.getPackagePath();
+        if (!importPaths.contains(p)) {
+          importPaths.add(p);
+        }
+      }
+    }
+    for (String str : importPaths) {
+      hpp("#include <" + str + ".h>");
     }
     objects.forEach(
         (obj) -> {
-          if (obj instanceof ClassDecl) {
-            /*
-             hp('CLASS(__');
-             hp(obj.name);
-             hl('Type)');
-             genClassDecl(obj as ClassDecl);
-            */
-          } else if (obj instanceof Enum) {
+          if (obj instanceof Enum) {
             genEnum(((Enum) obj));
-          } else if (obj instanceof Typedef) {
+          }
+        });
+    objects.forEach(
+        (obj) -> {
+          if (obj instanceof Typedef) {
             genTypeDef(((Typedef) obj));
-          } else if (obj instanceof MethodDecl) {
-            genMethodDecl(null, ((MethodDecl) obj), 0l);
-          } else if (obj instanceof FieldDecl) {
+          }
+        });
+    objects.forEach(
+        (obj) -> {
+          if (obj instanceof FieldDecl) {
             genFieldDecl(
                 ((FieldDecl) obj),
                 null,
@@ -187,8 +192,13 @@ public class CGen extends ResolveContext implements Gen {
                 (x) -> {
                   cp(x);
                 });
-          } else {
-            D3ELogger.error("Unknown object type");
+          }
+        });
+    objects.forEach(
+        (obj) -> {
+          if (obj instanceof MethodDecl) {
+            MethodDecl method = ((MethodDecl) obj);
+            genMethodDecl(null, method, 0l);
           }
         });
     hpp("");
@@ -202,8 +212,9 @@ public class CGen extends ResolveContext implements Gen {
     */
     hpp("");
     hpp("#endif");
-    FileUtils.writeFile(this.base + lib.packagePath + ".h", ListExt.join(this.hppLines, "\n"));
-    FileUtils.writeFile(this.base + lib.packagePath + ".c", ListExt.join(this.cppLines, "\n"));
+    cpp("");
+    FileUtils.writeFile(this.base + lib.packagePath + "lib.h", ListExt.join(this.hppLines, "\n"));
+    FileUtils.writeFile(this.base + lib.packagePath + "lib.c", ListExt.join(this.cppLines, "\n"));
     this.cppLines.clear();
     this.hppLines.clear();
   }
@@ -219,19 +230,42 @@ public class CGen extends ResolveContext implements Gen {
     hp(cls.name);
     hl(")");
     Set<String> usedTypes = SetExt.Set();
-    collectUsedTypesRec(cls, usedTypes);
+    List<DataType> types = ListExt.List(0l);
+    collectUsedTypesRec(cls, types);
+    Set<String> fnTypeSignatures = SetExt.Set();
+    List<FunctionType> fnTypes = ListExt.List(0l);
+    for (DataType t : types) {
+      if (t instanceof FunctionType) {
+        FunctionType ft = (((FunctionType) t));
+        ft.signature = ft.computeSignature();
+        if (fnTypeSignatures.contains(ft.signature)) {
+          continue;
+        }
+        fnTypeSignatures.add(ft.signature);
+        fnTypes.add(ft);
+      }
+    }
+    for (DataType t : types) {
+      usedTypes.add(t.name);
+    }
     SetExt.removeAll(usedTypes, this.primitives);
     usedTypes.remove("void");
     usedTypes.remove("Object");
+    List<String> importPaths = ListExt.asList();
     for (String str : usedTypes) {
       /*
        Lets import those specific types
       */
       TopDecl top = this.context.get(str);
-      if (top != null && top instanceof ClassDecl) {
-        ClassDecl usedCls = ((ClassDecl) top);
-        hpp("#include <" + usedCls.getPackagePath() + ".h>");
+      if (top != null) {
+        String p = top.getPackagePath();
+        if (!importPaths.contains(p)) {
+          importPaths.add(p);
+        }
       }
+    }
+    for (String str : importPaths) {
+      hpp("#include <" + str + ".h>");
     }
     /*
      lib.exports.forEach((e){
@@ -253,10 +287,29 @@ public class CGen extends ResolveContext implements Gen {
      });
     */
     hpp("");
-    cls.resolve(this);
+    /*
+     cls.resolve(this);
+    */
     hp("CLASS(__");
     hp(cls.name);
     hl("Type)");
+    for (FunctionType fnType : fnTypes) {
+      hp("typedef struct ");
+      hp(fnType.signature);
+      hl(" {");
+      hl("    void* data;");
+      hp("    ");
+      functionTypeToString(
+          fnType,
+          "call",
+          (x) -> {
+            hp(x);
+          });
+      hl(";");
+      hp("} ");
+      hp(fnType.signature);
+      hl(";");
+    }
     genClassDecl(cls);
     hp("extern __");
     hp(cls.name);
@@ -265,13 +318,14 @@ public class CGen extends ResolveContext implements Gen {
     hl(";");
     hpp("");
     hpp("#endif");
+    cpp("");
     FileUtils.writeFile(this.base + path + ".h", ListExt.join(this.hppLines, "\n"));
     FileUtils.writeFile(this.base + path + ".c", ListExt.join(this.cppLines, "\n"));
     this.cppLines.clear();
     this.hppLines.clear();
   }
 
-  public void collectUsedTypesRec(ClassDecl cls, Set<String> types) {
+  public void collectUsedTypesRec(ClassDecl cls, List<DataType> types) {
     cls.collectUsedTypes();
     if (cls.extendType != null) {
       TopDecl top = this.context.get(cls.extendType.name);
@@ -280,7 +334,7 @@ public class CGen extends ResolveContext implements Gen {
         collectUsedTypesRec(parent, types);
       }
     }
-    SetExt.addAll(types, cls.usedTypes);
+    ListExt.addAll(types, cls.usedTypes);
   }
 
   public void cpp(String line) {
@@ -331,21 +385,34 @@ public class CGen extends ResolveContext implements Gen {
 
   public String valueTypeToString(ValueType v, boolean noPtr) {
     String res = v.name;
-    if (Objects.equals(res, "dynamic")) {
-      res = "Object";
-    }
-    if (StringExt.length(res) == 1l) {
-      res = "void*";
+    TopDecl top = this.context.get(res);
+    if (Objects.equals(res, "auto")) {
+      res = "auto";
+    } else if (Objects.equals(res, "dynamic")
+        || Objects.equals(res, "var")
+        || StringExt.length(res) == 1l) {
+      res = "Object*";
+    } else if (top instanceof Typedef || top instanceof Enum) {
+      /*
+       No * in Typedef or enum
+      */
     } else if (!noPtr && !this.primitives.contains(res)) {
       res += "*";
-    }
-    if (Objects.equals(res, "var")) {
-      res = "auto";
     }
     return res;
   }
 
   public void functionTypeToString(FunctionType f, String name, Xp xp) {
+    if (name == null) {
+      xp.apply(f.signature);
+      return;
+    }
+    if ((f.returnType == null || Objects.equals(f.returnType.name, "void"))
+        && name == null
+        && (f.params == null || f.params.isEmpty())) {
+      xp.apply("__Function");
+      return;
+    }
     if (f.returnType == null) {
       xp.apply("void ");
     } else {
@@ -356,22 +423,19 @@ public class CGen extends ResolveContext implements Gen {
       xp.apply(name);
     }
     xp.apply(")(");
-    if (f.params != null) {
-      List<MethodParam> params = sortMethodParams(f.params);
-      xp.apply(
-          IterableExt.join(
-              ListExt.map(
-                  params,
-                  (p) -> {
-                    return paramToString(p, true);
-                  }),
-              ", "));
-    }
+    xp.apply(
+        IterableExt.join(
+            ListExt.map(
+                f.params,
+                (p) -> {
+                  return paramToString(p, true);
+                }),
+            ", "));
     xp.apply(")");
   }
 
   public String defTypeToString(DefType d) {
-    return "DefType";
+    return d.name;
   }
 
   public String dataTypeToString(DataType d, String name, boolean noPtr) {
@@ -381,7 +445,7 @@ public class CGen extends ResolveContext implements Gen {
       List<String> res = ListExt.asList();
       functionTypeToString(
           ((FunctionType) d),
-          name,
+          null,
           (x) -> {
             res.add(x);
           });
@@ -409,11 +473,16 @@ public class CGen extends ResolveContext implements Gen {
     hp(c.name);
     hl("Type {");
     hl("    i32 id;");
+    if (c.extendType != null) {
+      hp("    __");
+      hp(c.extendType.name);
+      hl("Type* super;");
+    }
     declareClassFields(c, true);
     if (!c.isAbstract) {
       hp("    ");
       hp(c.name);
-      hl("* (*make)();");
+      hl("* (*__make)();");
     }
     declareClassMethods(c, SetExt.Set(), true);
     hp("} __");
@@ -508,7 +577,11 @@ public class CGen extends ResolveContext implements Gen {
     if (!isConstructor && added.contains(m.name)) {
       return;
     }
-    added.add(m.name);
+    if (m.setter) {
+      added.add("__set_" + m.name);
+    } else {
+      added.add(m.name);
+    }
     hp(tab(1l));
     if (m.returnType == null) {
       if (isConstructor) {
@@ -527,15 +600,22 @@ public class CGen extends ResolveContext implements Gen {
     }
     if (!ParserUtil.isNameChar(m.name)) {
       hp("_");
-      if (m.params == null || m.params.positionalParams.isEmpty()) {
+      if (m.params.isEmpty()) {
         hp("uminus");
       } else {
         hp(operatorToName(m.name));
       }
     } else {
       if (isConstructor) {
-        hp("new");
+        if (m.factoryName != null) {
+          hp(m.factoryName);
+        } else {
+          hp("new");
+        }
       } else {
+        if (m.setter) {
+          hp("__set_");
+        }
         hp(variable(m.name));
       }
     }
@@ -543,10 +623,12 @@ public class CGen extends ResolveContext implements Gen {
       hp(")");
     }
     hp("(");
-    boolean needThis = c != null && !m.staticValue && !isConstructor;
-    if (needThis) {
+    boolean needThis = c != null && !m.staticValue;
+    boolean needComma = false;
+    if (!m.factory && (needThis || isConstructor)) {
       hp(c.name);
-      hp("* this");
+      hp("* this ");
+      needComma = true;
     }
     if (m.params != null) {
       if (c != null) {
@@ -555,7 +637,7 @@ public class CGen extends ResolveContext implements Gen {
       genMethodParams(
           m.params,
           c,
-          needThis,
+          needComma,
           (x) -> {
             hp(x);
           });
@@ -565,17 +647,18 @@ public class CGen extends ResolveContext implements Gen {
   }
 
   public String paramToString(MethodParam p, boolean skipName) {
+    if (Objects.equals(p.name, "")) {
+      p.name = p.dataType.name;
+      p.dataType = this.objectType;
+    }
     String out = "";
     if (p.dataType != null) {
-      if (p.dataType instanceof FunctionType) {
-        skipName = true;
-      }
-      out += dataTypeToString(p.dataType, variable(p.name), false);
+      out += dataTypeToString(p.dataType, null, false);
       if (this.scope != null) {
         this.scope.add(p.name, p.dataType);
       }
     } else {
-      out += "Unknown";
+      out += "Object*";
       if (this.scope != null) {
         this.scope.add(p.name, ofUnknownType());
       }
@@ -616,13 +699,14 @@ public class CGen extends ResolveContext implements Gen {
   }
 
   public void genEnum(Enum e) {
-    hpp("");
-    hpp("enum " + e.name + "{");
+    hpp("typedef enum " + e.name + "{");
     e.values.forEach(
         (v) -> {
           hpp("    " + variable(v) + ",");
         });
-    hpp("} // end " + e.name);
+    hp("} ");
+    hp(e.name);
+    hl(";");
   }
 
   public String operatorToName(String op) {
@@ -747,15 +831,22 @@ public class CGen extends ResolveContext implements Gen {
     hp(" ");
     if (!ParserUtil.isNameChar(m.name)) {
       hp("_");
-      if (m.params == null || m.params.positionalParams.isEmpty()) {
+      if (m.params.isEmpty()) {
         hp("uminus");
       } else {
         hp(operatorToName(m.name));
       }
     } else {
       if (isConstructor) {
-        hp("new");
+        if (m.factoryName != null) {
+          hp(m.factoryName);
+        } else {
+          hp("new");
+        }
       } else {
+        if (m.setter) {
+          hp("__set_");
+        }
         hp(m.name);
       }
     }
@@ -765,9 +856,11 @@ public class CGen extends ResolveContext implements Gen {
     }
     hp("(");
     boolean needThis = c != null && !m.staticValue;
-    if (needThis || isConstructor) {
+    boolean needComma = false;
+    if (!m.factory && (needThis || isConstructor)) {
       hp(c.name);
       hp("* this");
+      needComma = true;
     }
     if (m.params != null) {
       if (c != null) {
@@ -776,7 +869,7 @@ public class CGen extends ResolveContext implements Gen {
       genMethodParams(
           m.params,
           c,
-          needThis,
+          needComma,
           (x) -> {
             hp(x);
           });
@@ -802,14 +895,18 @@ public class CGen extends ResolveContext implements Gen {
     }
     if (!ParserUtil.isNameChar(m.name)) {
       cp("_");
-      if (m.params == null || m.params.positionalParams.isEmpty()) {
+      if (m.params.isEmpty()) {
         cp("uminus");
       } else {
         cp(operatorToName(m.name));
       }
     } else {
       if (isConstructor) {
-        cp("new");
+        if (m.factoryName != null) {
+          cp(m.factoryName);
+        } else {
+          cp("new");
+        }
       } else {
         cp(m.name);
       }
@@ -819,76 +916,32 @@ public class CGen extends ResolveContext implements Gen {
       cp(c.name);
     }
     cp("(");
-    if (needThis || isConstructor) {
+    if (!m.factory && (needThis || isConstructor)) {
       cp(c.name);
       cp("* this ");
     }
     this.scope = new Scope(null, c);
-    if (m.params != null) {
-      genMethodParams(
-          m.params,
-          c,
-          needThis,
-          (x) -> {
-            cp(x);
-          });
-    }
+    genMethodParams(
+        m.params,
+        c,
+        needComma,
+        (x) -> {
+          cp(x);
+        });
     cp(")");
-    if (isConstructor) {
-      if (m.init != null) {
-        cl(" {");
-        if (ListExt.isNotEmpty((((Block) m.init)).statements)) {
-          cp(tab(1l));
-          genExp(
-              m.init,
-              1l,
-              (x) -> {
-                cp(x);
-              });
-          cl("");
-        }
-      } else {
-        cl(" {");
-      }
-      if (m.body != null) {
-        cp(tab(1l));
-        genBlock(
-            m.body,
-            1l,
-            (x) -> {
-              cp(x);
-            },
-            null);
-        cl("");
-      }
-      cl("}");
-    } else if (m.body != null) {
-      cp(" ");
-      genBlock(
-          m.body,
-          0l,
-          (x) -> {
-            cp(x);
-          },
-          null);
-    } else if (m.exp != null) {
-      cl(" {");
-      cp("    return ");
-      genExp(
-          m.exp,
-          1l,
-          (x) -> {
-            cp(x);
-          });
-      cl(";");
-      cl("}");
-    }
+    genBlock(
+        m.body,
+        0l,
+        (x) -> {
+          cp(x);
+        },
+        null);
     cpp("");
     this.tempCount = 0l;
   }
 
   public DataType getSuperParamType(ClassDecl c, String name) {
-    ClassMember cm = getMember(c, c.name, null);
+    ClassMember cm = getMember(c, c.name, null, false);
     if (cm == null) {
       /*
        No constructor found
@@ -901,7 +954,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     MethodParam param =
         ListExt.firstWhere(
-            md.params.positionalParams,
+            md.params,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -911,7 +964,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     param =
         ListExt.firstWhere(
-            md.params.optionalParams,
+            md.params,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -921,7 +974,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     param =
         ListExt.firstWhere(
-            md.params.namedParams,
+            md.params,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -942,44 +995,21 @@ public class CGen extends ResolveContext implements Gen {
     if (c.extendType != null) {
       ClassDecl superCls = ((ClassDecl) this.context.get(c.extendType.name));
       if (superCls != null) {
-        superCon = ((MethodDecl) getMember(superCls, superCls.name, null));
+        superCon = ((MethodDecl) getMember(superCls, superCls.name, null, false));
       }
     }
     long x = 0l;
-    for (MethodParam p : md.params.positionalParams) {
+    for (MethodParam p : md.params) {
       if (Objects.equals(p.thisToken, "this")) {
         p.dataType = getFieldType(c, p.name);
       } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
         superPosParams.add(p);
-        MethodParam superParam = getParamAtIndex(superCon.params, x);
-        if (superParam != null) {
-          p.dataType = superParam.dataType;
-        }
+        MethodParam superParam =
+            ListExt.length(superCon.params) > x ? ListExt.get(superCon.params, x) : null;
+        var value$ = superParam == null ? null : superParam.dataType;
+        p.dataType = value$;
       }
       x++;
-    }
-    for (MethodParam p : md.params.optionalParams) {
-      if (Objects.equals(p.thisToken, "this")) {
-        p.dataType = getFieldType(c, p.name);
-      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
-        superPosParams.add(p);
-        MethodParam superParam = getParamAtIndex(superCon.params, x);
-        if (superParam != null) {
-          p.dataType = superParam.dataType;
-        }
-      }
-      x++;
-    }
-    for (MethodParam p : md.params.namedParams) {
-      if (Objects.equals(p.thisToken, "this")) {
-        p.dataType = getFieldType(c, p.name);
-      } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
-        superNamedParams.add(p);
-        MethodParam superParam = getParamByName(superCon.params, p.name);
-        if (superParam != null) {
-          p.dataType = superParam.dataType;
-        }
-      }
     }
     if (superPosParams.isEmpty() || superNamedParams.isEmpty()) {
       return;
@@ -1030,13 +1060,9 @@ public class CGen extends ResolveContext implements Gen {
     ListExt.insertAll(superCall.namedArgs, 0l, namedArgs);
   }
 
-  public MethodParam getParamAtIndex(MethodParams m, long i) {
-    if (i < ListExt.length(m.positionalParams)) {
-      return ListExt.get(m.positionalParams, i);
-    }
-    i = i - ListExt.length(m.positionalParams);
-    if (i < ListExt.length(m.optionalParams)) {
-      return ListExt.get(m.optionalParams, i);
+  public MethodParam getParamAtIndex(List<MethodParam> m, long i) {
+    if (i < ListExt.length(m)) {
+      return ListExt.get(m, i);
     }
     return null;
   }
@@ -1050,9 +1076,7 @@ public class CGen extends ResolveContext implements Gen {
         null);
   }
 
-  public void genMethodParams(MethodParams mp, ClassDecl c, boolean addedParams, Xp xp) {
-    List<MethodParam> thisParams = ListExt.asList();
-    List<MethodParam> params = sortMethodParams(mp);
+  public void genMethodParams(List<MethodParam> params, ClassDecl c, boolean addedParams, Xp xp) {
     if (ListExt.isNotEmpty(params) && addedParams) {
       xp.apply(", ");
       /*
@@ -1062,7 +1086,7 @@ public class CGen extends ResolveContext implements Gen {
     params.forEach(
         (p) -> {
           if (p.dataType == null) {
-            xp.apply("Unknown");
+            xp.apply("Object*");
             if (this.scope != null) {
               this.scope.add(p.name, ofUnknownType());
             }
@@ -1714,9 +1738,15 @@ public class CGen extends ResolveContext implements Gen {
 
   public void genBinaryExpression(BinaryExpression exp, long depth, Xp xp) {
     if (Objects.equals(exp.op, "??")) {
-      xp.apply("__or(&");
+      xp.apply("__or(");
       genExp(exp.left, depth, xp);
       xp.apply(", ");
+      genExp(exp.right, depth, xp);
+      xp.apply(")");
+    } else if (Objects.equals(exp.op, "~/")) {
+      xp.apply("(i64)(");
+      genExp(exp.left, depth, xp);
+      xp.apply(" / ");
       genExp(exp.right, depth, xp);
       xp.apply(")");
     } else {
@@ -1746,10 +1776,12 @@ public class CGen extends ResolveContext implements Gen {
               || (s instanceof ForLoop)
               || (s instanceof ForEachLoop)
               || (s instanceof Block)
+              || (s instanceof TryCatcheStatment)
               || (s instanceof IfStatement)) {
             /*
              No need for semicolon
             */
+            xp.apply("\n");
           } else {
             xp.apply(";\n");
           }
@@ -1914,7 +1946,7 @@ public class CGen extends ResolveContext implements Gen {
     return null;
   }
 
-  public ClassMember getMember(ClassDecl c, String name, MemberFilter filter) {
+  public ClassMember getMember(ClassDecl c, String name, MemberFilter filter, boolean noSuperCons) {
     if (c == null) {
       return null;
     }
@@ -1923,6 +1955,9 @@ public class CGen extends ResolveContext implements Gen {
             c.members,
             (m) -> {
               if (!(Objects.equals(m.name, name))) {
+                return false;
+              }
+              if (noSuperCons && Objects.equals(m.name, c.name)) {
                 return false;
               }
               if (filter == null) {
@@ -1989,44 +2024,61 @@ public class CGen extends ResolveContext implements Gen {
     if (c.extendType != null) {
       ClassDecl parent = ((ClassDecl) this.context.get(c.extendType.name));
       if (!(Objects.equals(parent, c))) {
-        return getMember(parent, name, null);
+        cm = getMember(parent, name, filter, true);
+      }
+      if (cm != null) {
+        return cm;
       }
     }
     for (DataType impl : c.impls) {
       ClassDecl parent = ((ClassDecl) this.context.get(impl.name));
       if (!(Objects.equals(parent, c))) {
-        return getMember(parent, name, null);
+        cm = getMember(parent, name, filter, true);
+      }
+      if (cm != null) {
+        return cm;
       }
     }
     for (DataType impl : c.mixins) {
       ClassDecl parent = ((ClassDecl) this.context.get(impl.name));
       if (!(Objects.equals(parent, c))) {
-        return getMember(parent, name, null);
+        cm = getMember(parent, name, filter, true);
+      }
+      if (cm != null) {
+        return cm;
       }
     }
-    return null;
+    return cm;
   }
 
   public void genFieldOrEnumExpression(FieldOrEnumExpression exp, long depth, Xp xp) {
+    if (exp.resolvedType instanceof FunctionType && exp.on != null) {
+      FunctionType type = ((FunctionType) exp.resolvedType);
+      if (type.signature == null) {
+        type.signature = type.computeSignature();
+      }
+      xp.apply("(");
+      xp.apply(type.signature);
+      xp.apply(")");
+      xp.apply("{");
+    }
     if (exp.on != null) {
       genExp(exp.on, depth, (x) -> {});
+      if (exp.resolvedType instanceof FunctionType) {
+        genExp(exp.on, depth, xp);
+        xp.apply(", ");
+      }
       genExp(exp.on, depth, xp);
-      if (exp.checkNull) {
-        xp.apply("?->");
-      } else if (exp.notNull) {
-        xp.apply("!->");
+      if (exp.on instanceof FieldOrEnumExpression
+          && (ParserUtil.isTypeName((((FieldOrEnumExpression) exp.on)).name))) {
+        xp.apply("->");
       } else {
-        if (exp.on instanceof FieldOrEnumExpression
-            && (ParserUtil.isTypeName((((FieldOrEnumExpression) exp.on)).name))) {
-          xp.apply("_");
-        } else {
-          xp.apply("->");
-        }
+        xp.apply("->");
       }
     } else {
       DataType type = this.scope.get(exp.name);
       if (type == null && this.instanceClass != null) {
-        ClassMember cm = getMember(this.instanceClass, exp.name, null);
+        ClassMember cm = getMember(this.instanceClass, exp.name, null, false);
         if (cm != null) {
           if (cm.staticValue) {
             xp.apply("___");
@@ -2046,21 +2098,42 @@ public class CGen extends ResolveContext implements Gen {
         shouldCast = false;
       }
     }
+    if (exp.resolvedMember instanceof MethodDecl
+        && !exp.resolvedMember.staticValue
+        && exp.resolvedMember.lib == null) {
+      xp.apply("__type->");
+    }
     if (shouldCast) {
       xp.apply("((");
       xp.apply(castType.name);
       xp.apply("*)");
     }
     if (ParserUtil.isTypeName(exp.name) && !(Objects.equals(exp.name, exp.name.toUpperCase()))) {
+      xp.apply("___");
       xp.apply(exp.name);
     } else {
-      xp.apply(variable(exp.name));
+      if (Objects.equals(exp.name, "super")) {
+        xp.apply("this");
+      } else {
+        xp.apply(variable(exp.name));
+      }
     }
     if (shouldCast) {
       xp.apply(")");
     }
     if (exp.isGetter) {
-      xp.apply("()");
+      xp.apply("(");
+      if (!exp.resolvedMember.staticValue) {
+        if (exp.on != null) {
+          genExp(exp.on, depth, xp);
+        } else if (exp.resolvedMember.lib == null) {
+          xp.apply("this");
+        }
+      }
+      xp.apply(")");
+    }
+    if (exp.resolvedType instanceof FunctionType && exp.on != null) {
+      xp.apply("}");
     }
   }
 
@@ -2232,7 +2305,7 @@ public class CGen extends ResolveContext implements Gen {
     exp.params.forEach(
         (p) -> {
           if (p.type == null) {
-            xp.apply("Unknown ");
+            xp.apply("Object* ");
           } else {
             xp.apply(dataTypeToString(p.type, null, false));
           }
@@ -2290,16 +2363,23 @@ public class CGen extends ResolveContext implements Gen {
 
   public void genMethodCall(MethodCall exp, long depth, Xp xp) {
     ClassDecl onType = null;
+    boolean isSuper = false;
     if (exp.on != null) {
-      genExp(exp.on, depth, xp);
-      boolean isStaticCall = false;
-      if (exp.checkNull) {
-        xp.apply("?->");
-      } else if (exp.notNull) {
-        xp.apply("!->");
+      if (exp.on instanceof FieldOrEnumExpression
+          && Objects.equals((((FieldOrEnumExpression) exp.on)).name, "super")) {
+        xp.apply("___");
+        if (this.instanceClass.extendType != null) {
+          xp.apply(this.instanceClass.extendType.name);
+        } else {
+          xp.apply("FromMixin");
+        }
+        xp.apply("->");
+        isSuper = true;
       } else {
+        genExp(exp.on, depth, xp);
+        boolean isStaticCall = exp.resolvedMethod != null && exp.resolvedMethod.staticValue;
         if (isStaticCall) {
-          xp.apply("Type->");
+          xp.apply("->");
         } else {
           xp.apply("->__type->");
         }
@@ -2307,49 +2387,82 @@ public class CGen extends ResolveContext implements Gen {
     } else {
       DataType fieldType = this.scope.get(exp.name);
       if (fieldType == null && this.instanceClass != null) {
-        ClassMember cm = getMember(this.instanceClass, exp.name, null);
+        ClassMember cm = getMember(this.instanceClass, exp.name, null, false);
         if (cm != null) {
           if (cm.staticValue) {
             xp.apply("___");
             xp.apply(this.instanceClass.name);
             xp.apply("->");
           } else {
-            xp.apply("this->");
+            xp.apply("this->__type->");
           }
         }
       }
     }
     boolean isConstructor = false;
     if (exp.name != null && StringExt.getIsNotEmpty(exp.name)) {
-      String name = variable(exp.name);
-      if (ParserUtil.isTypeName(name)) {
-        xp.apply("new_");
-        xp.apply(exp.name);
-        isConstructor = true;
+      if (exp.on == null && Objects.equals(exp.name, "super")) {
+        xp.apply("___");
+        if (this.instanceClass.extendType != null) {
+          xp.apply(this.instanceClass.extendType.name);
+        } else {
+          xp.apply("FromMixin");
+        }
+        xp.apply("->new");
+        isSuper = true;
       } else {
-        xp.apply(variable(exp.name));
+        String name = variable(exp.name);
+        if (ParserUtil.isTypeName(name)) {
+          xp.apply("new_");
+          xp.apply(exp.name);
+          isConstructor = true;
+        } else {
+          xp.apply(variable(exp.name));
+        }
       }
     }
     xp.apply("(");
+    boolean needComma = false;
     if (isConstructor) {
       xp.apply("___");
       xp.apply(exp.name);
       xp.apply("->__make()");
+      needComma = true;
+    } else if (isSuper) {
+      xp.apply("(");
+      if (this.instanceClass.extendType != null) {
+        xp.apply(this.instanceClass.extendType.name);
+      } else {
+        xp.apply("FromMixin");
+      }
+      xp.apply("*) this");
+      needComma = true;
+    } else if (exp.resolvedMethod != null && !exp.resolvedMethod.staticValue) {
+      if (exp.resolvedMethod.lib != null) {
+        /*
+         library function
+        */
+      } else {
+        if (exp.on == null) {
+          xp.apply("this");
+        } else {
+          genExp(exp.on, depth, xp);
+        }
+        needComma = true;
+      }
     }
-    if (isConstructor && ListExt.isNotEmpty(exp.positionArgs)) {
+    if (needComma && ListExt.isNotEmpty(exp.positionArgs)) {
       xp.apply(", ");
     }
-    exp.positionArgs.forEach(
-        (a) -> {
-          genExp(a.arg, depth, xp);
-          if (!(Objects.equals(a, ListExt.last(exp.positionArgs)))) {
-            xp.apply(", ");
-          }
-        });
-    if (ListExt.isNotEmpty(exp.namedArgs)) {
-      if (ListExt.isNotEmpty(exp.positionArgs) || isConstructor) {
+    for (Argument a : exp.positionArgs) {
+      needComma = true;
+      genExp(a.arg, depth, xp);
+      if (!(Objects.equals(a, ListExt.last(exp.positionArgs)))) {
         xp.apply(", ");
       }
+    }
+    if (needComma && ListExt.isNotEmpty(exp.namedArgs)) {
+      xp.apply(", ");
     }
     exp.namedArgs.forEach(
         (a) -> {
@@ -2386,14 +2499,13 @@ public class CGen extends ResolveContext implements Gen {
   }
 
   public void genRethrowStatement(RethrowStatement exp, long depth, Xp xp) {
-    xp.apply("throw");
-    exp.resolvedType = ofUnknownType();
+    xp.apply("__rethrow()");
   }
 
   public void genThrowStatement(ThrowStatement exp, long depth, Xp xp) {
-    xp.apply("throw ");
+    xp.apply("__throw(");
     genExp(exp.exp, depth, xp);
-    exp.resolvedType = ofUnknownType();
+    xp.apply(")");
   }
 
   public void genReturn(Return exp, long depth, Xp xp) {
@@ -2453,32 +2565,71 @@ public class CGen extends ResolveContext implements Gen {
   }
 
   public void genTryCatchStatement(TryCatcheStatment exp, long depth, Xp xp) {
-    xp.apply("try ");
+    xp.apply("if(__try())");
     genExp(exp.body, depth, xp);
     exp.catchParts.forEach(
         (c) -> {
-          xp.apply(" catch (");
-          xp.apply(dataTypeToString(c.onType, null, false));
-          xp.apply(" ");
-          xp.apply(c.exp);
-          xp.apply(") ");
-          genExp(c.body, depth, xp);
+          if (c.onType != null) {
+            xp.apply(tab(depth));
+            xp.apply(" else if(__on_catch(___");
+            xp.apply(c.onType.name);
+            xp.apply("->id) {\n");
+            xp.apply(tab(depth + 1l));
+            xp.apply(c.onType.name);
+            xp.apply("* ");
+            xp.apply(c.exp);
+            xp.apply("= (");
+            xp.apply(c.onType.name);
+            xp.apply("*) __get_catch();\n");
+            xp.apply(tab(depth + 1l));
+            genExp(c.body, depth, xp);
+            xp.apply("\n");
+            xp.apply(tab(depth));
+            xp.apply("}");
+          } else {
+            xp.apply(" else if(__on_catch(___Exception->id) {\n");
+            xp.apply(tab(depth + 1l));
+            xp.apply("Exception* ");
+            xp.apply(c.exp);
+            xp.apply("= (Exception*) __get_catch();\n");
+            xp.apply(tab(depth + 1l));
+            genExp(c.body, depth + 1l, xp);
+            xp.apply("\n");
+            xp.apply(tab(depth));
+            xp.apply("}");
+          }
         });
     if (exp.finallyBody != null) {
-      xp.apply(" finally ");
+      xp.apply(" else ");
       genExp(exp.finallyBody, depth, xp);
     }
   }
 
   public DataType getFieldType(ClassDecl c, String name) {
-    ClassMember member = getMember(c, name, null);
+    ClassMember member = getMember(c, name, null, false);
     if (member instanceof FieldDecl) {
       return (((FieldDecl) member)).type;
     }
     return null;
   }
 
-  public void genTypeDef(Typedef t) {}
+  public void genTypeDef(Typedef t) {
+    hp("typedef struct ");
+    hp(t.name);
+    hl(" {");
+    hl("    void* data;");
+    hp("    ");
+    functionTypeToString(
+        t.fnType,
+        "call",
+        (x) -> {
+          hp(x);
+        });
+    hl(";");
+    hp("} ");
+    hp(t.name);
+    hl(";");
+  }
 
   public void genFieldDecl(FieldDecl f, String prefix, boolean extern, long depth, Xp xp) {
     while (depth > 0l) {
@@ -2497,14 +2648,11 @@ public class CGen extends ResolveContext implements Gen {
      }
     */
     boolean skipName = false;
-    if (f.type == null) {
-      xp.apply("auto ");
-    } else {
-      if (f.type instanceof FunctionType) {
-        skipName = true;
-      }
-      xp.apply(dataTypeToString(f.type, f.name, false));
+    DataType type = f.type;
+    if (type instanceof FunctionType) {
+      skipName = true;
     }
+    xp.apply(dataTypeToString(type, f.name, false));
     if (!skipName) {
       xp.apply(" ");
       if (prefix != null) {

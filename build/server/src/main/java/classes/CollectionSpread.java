@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class CollectionSpread extends ArrayItem {
   public Expression values;
@@ -19,7 +18,11 @@ public class CollectionSpread extends ArrayItem {
     this.values.resolve(context);
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.values.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.values = s.makeSimple(this.values);
   }
 }

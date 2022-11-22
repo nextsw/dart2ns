@@ -8,7 +8,7 @@ server class CaseExpression {
         });
         result.resolve(context);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         tests.forEach((c) {
             c.collectUsedTypes(types);
         });

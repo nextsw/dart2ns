@@ -2,6 +2,7 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
+import java.util.Objects;
 
 public class FieldDecl extends ClassMember {
   public String name;
@@ -37,21 +38,25 @@ public class FieldDecl extends ClassMember {
 
   public void collectUsedTypes() {
     if (this.type != null) {
-      this.type.collectUsedTypes(this.usedTypes);
+      this.usedTypes.add(this.type);
     }
   }
 
   public void resolve(ResolveContext context) {
     if (this.value != null) {
       this.value.resolve(context);
-      if (this.type == null) {
+      if (this.type == null || Objects.equals(this.type.name, "var")) {
         this.type = this.value.resolvedType;
       }
     }
-    context.scope.add(this.name, this.type);
+    if (context.scope != null) {
+      context.scope.add(this.name, this.type);
+    }
   }
 
   public String toString() {
     return this.name;
   }
+
+  public void simplify(Simplifier s) {}
 }

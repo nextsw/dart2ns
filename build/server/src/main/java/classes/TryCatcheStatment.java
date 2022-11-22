@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class TryCatcheStatment extends Statement {
   public Block body;
@@ -21,11 +20,11 @@ public class TryCatcheStatment extends Statement {
       this.finallyBody.resolve(context);
     }
     for (CatchPart c : this.catchParts) {
-      this.body.resolve(context);
+      c.body.resolve(context);
     }
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.body.collectUsedTypes(types);
     if (this.finallyBody != null) {
       this.finallyBody.collectUsedTypes(types);
@@ -33,8 +32,18 @@ public class TryCatcheStatment extends Statement {
     for (CatchPart c : this.catchParts) {
       this.body.collectUsedTypes(types);
       if (c.onType != null) {
-        c.onType.collectUsedTypes(types);
+        types.add(c.onType);
       }
+    }
+  }
+
+  public void simplify(Simplifier s) {
+    this.body.simplify(s);
+    if (this.finallyBody != null) {
+      this.finallyBody.simplify(s);
+    }
+    for (CatchPart c : this.catchParts) {
+      c.body.simplify(s);
     }
   }
 }

@@ -8,7 +8,11 @@ server class CollectionSpread extends ArrayItem {
     void resolve(ResolveContext context) {
         values.resolve(context);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         values.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        values = s.makeSimple(values);
     }
 }

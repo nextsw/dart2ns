@@ -17,15 +17,21 @@ server class ArrayExpression extends Expression{
             resolvedType = ValueType('List');
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         for(ArrayItem item in values){
             item.collectUsedTypes(types);
         }
         if(enforceType != null) {
-            enforceType.collectUsedTypes(types);
+            types.add(enforceType);
         }
         if(valueType != null) {
-            valueType.collectUsedTypes(types);
+            types.add(valueType);
+        }
+    }
+
+    void simplify(Simplifier s) {
+        for(ArrayItem item in values){
+            item.simplify(s);
         }
     }
 }

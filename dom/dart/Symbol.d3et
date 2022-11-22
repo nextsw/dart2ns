@@ -6,7 +6,11 @@ server class Symbol extends Expression {
     void resolve(ResolveContext context) {
         resolvedType = context.objectType;
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
+        
+    }
+
+    void simplify(Simplifier s) {
         
     }
 }

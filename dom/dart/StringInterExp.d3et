@@ -10,9 +10,13 @@ server class StringInterExp extends Expression {
             exp.resolve(context);
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         for(Expression exp in values) {
             exp.collectUsedTypes(types);
         }
+    }
+
+    void simplify(Simplifier s) {
+        values = values.map(v => s.makeSimple(v)).toList();
     }
 }

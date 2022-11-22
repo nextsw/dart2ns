@@ -9,9 +9,13 @@ server class YieldExpression extends Statement {
             exp.resolve(context);
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         if(exp != null) {
             exp.collectUsedTypes(types);
         }
+    }
+
+    void simplify(Simplifier s) {
+        exp.simplify(s);
     }
 }

@@ -15,7 +15,11 @@ server class ConstExpression extends Statement {
             resolvedType = exp.resolvedType;
         }
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         exp.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        exp = s.makeSimple(exp);
     }
 } 

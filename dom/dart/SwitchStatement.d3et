@@ -14,13 +14,25 @@ server class SwitchStatement extends Statement {
             d.resolve(context);
         });
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         test.collectUsedTypes(types);
         cases.forEach((c) {
             c.collectUsedTypes(types);
         });
         defaults.forEach((d){
             d.collectUsedTypes(types);
+        });
+    }
+
+    void simplify(Simplifier s) {
+        test = s.makeSimple(test);
+        cases.forEach((c) {
+            for(Statement ss in c.statements){
+                ss.simplify(s);
+            }
+        });
+        defaults.forEach((d){
+            d.simplify(s);
         });
     }
 }

@@ -10,8 +10,12 @@ server class MapItem extends ArrayItem {
         key.resolve(context);
         value.resolve(context);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         key.collectUsedTypes(types);
         value.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        
     }
 }

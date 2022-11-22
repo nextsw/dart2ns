@@ -11,9 +11,15 @@ server class TerinaryExpression extends Statement {
         ifFalse.resolve(context);
         resolvedType = context.commonType(ifTrue.resolvedType, ifFalse.resolvedType);
     }
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         condition.collectUsedTypes(types);
         ifTrue.collectUsedTypes(types);
         ifFalse.collectUsedTypes(types);
+    }
+
+    void simplify(Simplifier s) {
+        condition = s.makeSimple(condition);
+        ifTrue = s.makeSimple(ifTrue);
+        ifFalse = s.makeSimple(ifFalse);
     }
 }

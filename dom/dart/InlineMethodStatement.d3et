@@ -6,8 +6,12 @@ server class InlineMethodStatement extends Statement {
         method.resolve(context);
     }
 
-    void collectUsedTypes(Set<String> types) {
+    void collectUsedTypes(List<DataType> types) {
         method.collectUsedTypes();
         types.addAll(method.usedTypes);
+    }
+
+    void simplify(Simplifier s){
+        method.simplify(s);
     }
 }

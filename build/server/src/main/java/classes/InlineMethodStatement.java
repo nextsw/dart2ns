@@ -1,7 +1,7 @@
 package classes;
 
-import d3e.core.SetExt;
-import java.util.Set;
+import d3e.core.ListExt;
+import java.util.List;
 
 public class InlineMethodStatement extends Statement {
   public MethodDecl method;
@@ -14,8 +14,12 @@ public class InlineMethodStatement extends Statement {
     this.method.resolve(context);
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.method.collectUsedTypes();
-    SetExt.addAll(types, this.method.usedTypes);
+    ListExt.addAll(types, this.method.usedTypes);
+  }
+
+  public void simplify(Simplifier s) {
+    this.method.simplify(s);
   }
 }

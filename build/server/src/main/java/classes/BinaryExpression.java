@@ -1,9 +1,9 @@
 package classes;
 
+import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
-public class BinaryExpression extends Expression {
+public class BinaryExpression extends Statement {
   public String op;
   public Expression left;
   public Expression right;
@@ -47,8 +47,18 @@ public class BinaryExpression extends Expression {
             : this.left.resolvedType;
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.left.collectUsedTypes(types);
     this.right.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    if (Objects.equals(this.op, "??=")) {
+      s.add(new Assignment(this.left, this.op, this.right));
+      s.markDelete();
+    } else {
+      this.left = s.makeSimple(this.left);
+      this.right = s.makeSimple(this.right);
+    }
   }
 }

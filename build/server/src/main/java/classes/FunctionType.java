@@ -1,16 +1,19 @@
 package classes;
 
 import d3e.core.ListExt;
+import d3e.core.StringBuilderExt;
+import d3e.core.StringExt;
 import java.util.List;
 import java.util.Set;
 
 public class FunctionType extends DataType {
   public DataType returnType;
-  public MethodParams params;
+  public List<MethodParam> params = ListExt.asList();
   public List<DataType> typeArgs = ListExt.asList();
+  public String signature;
 
   public FunctionType(
-      boolean optional, MethodParams params, DataType returnType, List<DataType> typeArgs) {
+      boolean optional, List<MethodParam> params, DataType returnType, List<DataType> typeArgs) {
     this.optional = optional;
     this.params = params;
     this.returnType = returnType;
@@ -35,15 +38,34 @@ public class FunctionType extends DataType {
       this.returnType.collectUsedTypes(types);
     }
     if (this.params != null) {
-      for (MethodParam m : this.params.positionalParams) {
-        m.dataType.collectUsedTypes(types);
-      }
-      for (MethodParam m : this.params.optionalParams) {
-        m.dataType.collectUsedTypes(types);
-      }
-      for (MethodParam m : this.params.namedParams) {
+      for (MethodParam m : this.params) {
         m.dataType.collectUsedTypes(types);
       }
     }
+  }
+
+  public String computeSignature() {
+    StringBuilder sb = StringBuilderExt.StringBuffer("");
+    StringBuilderExt.write(sb, "__fn_");
+    if (this.params != null) {
+      for (MethodParam m : this.params) {
+        if (m.dataType.name == null || StringExt.length(m.dataType.name) == 1l) {
+          StringBuilderExt.write(sb, "Object");
+        } else {
+          StringBuilderExt.write(sb, m.dataType.name);
+        }
+        StringBuilderExt.write(sb, "_");
+      }
+    }
+    if (this.returnType != null && this.returnType.name != null) {
+      if (StringExt.length(this.returnType.name) == 1l) {
+        StringBuilderExt.write(sb, "Object");
+      } else {
+        StringBuilderExt.write(sb, this.returnType.name);
+      }
+    } else {
+      StringBuilderExt.write(sb, "void");
+    }
+    return sb.toString();
   }
 }

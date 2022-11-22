@@ -1,6 +1,6 @@
 package classes;
 
-import java.util.Set;
+import java.util.List;
 
 public class TerinaryExpression extends Statement {
   public Expression condition;
@@ -20,9 +20,15 @@ public class TerinaryExpression extends Statement {
     this.resolvedType = context.commonType(this.ifTrue.resolvedType, this.ifFalse.resolvedType);
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.condition.collectUsedTypes(types);
     this.ifTrue.collectUsedTypes(types);
     this.ifFalse.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.condition = s.makeSimple(this.condition);
+    this.ifTrue = s.makeSimple(this.ifTrue);
+    this.ifFalse = s.makeSimple(this.ifFalse);
   }
 }

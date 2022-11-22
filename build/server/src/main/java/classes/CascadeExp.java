@@ -2,7 +2,6 @@ package classes;
 
 import d3e.core.ListExt;
 import java.util.List;
-import java.util.Set;
 
 public class CascadeExp extends Statement {
   public Expression on;
@@ -17,7 +16,11 @@ public class CascadeExp extends Statement {
     this.resolvedType = this.on.resolvedType;
   }
 
-  public void collectUsedTypes(Set<String> types) {
+  public void collectUsedTypes(List<DataType> types) {
     this.on.collectUsedTypes(types);
+  }
+
+  public void simplify(Simplifier s) {
+    this.on = s.makeSimple(this.on);
   }
 }

@@ -1,0 +1,54 @@
+server class Simplifier {
+    List<SimplifierResult> stack = [];
+    Integer tempCount = 0;
+
+    Expression makeSimple(Expression exp){
+        if(exp == null){
+            return exp;
+        }
+        if(exp is FieldOrEnumExpression) {
+            FieldOrEnumExpression fe = exp as FieldOrEnumExpression;
+            if(fe.on == null) {
+                return exp;
+            } else {
+                fe.on = makeSimple(fe.on);
+                String name = makeTempName();
+                Declaration d = Declaration(
+                    type: ValueType('auto'),
+                );
+                d.names.add(NameAndValue(name,fe));
+                stack.last.list.add(d);
+                return FieldOrEnumExpression(name: name);
+            }
+        } else {
+            exp.simplify(this);
+        }
+        return exp;
+    }
+
+    void push(){
+        stack.add(SimplifierResult());
+    }
+
+    SimplifierResult pop(){
+        return stack.removeLast();
+    }
+
+    String makeTempName(){
+        tempCount ++;
+        return '__t' + tempCount.toString();
+    }
+
+    void add(Statement s) {
+        stack.last.list.add(s);
+    }
+
+    void markDelete(){
+        stack.last.deleted = true;
+    }
+
+    void reset(){
+        tempCount = 0;
+    }
+
+}
