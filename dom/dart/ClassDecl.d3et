@@ -37,6 +37,9 @@ server class ClassDecl extends TopDecl {
     }
 
     void resolveFields(ResolveContext context){
+        for(ClassMember cm in members){
+            cm.cls = this;
+        }
         D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);

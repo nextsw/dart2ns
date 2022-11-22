@@ -1,5 +1,6 @@
 abstract server class ClassMember extends TopDecl{
     List<Comment> comments = [];
     Boolean static;
+    ClassDecl cls;
     ClassMember(String name, TopDeclType type, String path) : super(name, type, path);
 }

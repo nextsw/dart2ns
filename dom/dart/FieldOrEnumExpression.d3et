@@ -130,7 +130,7 @@ server class FieldOrEnumExpression extends Statement {
             if(md.getter) {
                 isGetter = true;
                 if(onType != null) {
-                    resolvedType = context.resolveType(onType, md.returnType);
+                    resolvedType = context.resolveType(onType, md.cls, md.returnType);
                 } else {
                     resolvedType = md.returnType;
                 }
@@ -149,7 +149,7 @@ server class FieldOrEnumExpression extends Statement {
                     field.resolve(context);
                 }
                 if(onType != null) {
-                    resolvedType = context.resolveType(onType, field.type);
+                    resolvedType = context.resolveType(onType, field.cls, field.type);
                 } else {
                     resolvedType = field.type;
                 }

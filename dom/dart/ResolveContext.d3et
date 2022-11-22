@@ -22,7 +22,7 @@ abstract server class ResolveContext {
     TopDecl get(String name);
 
     DataType fieldTypeFromScope(String name);
-    DataType resolveType(ClassDecl onType, DataType type);
+    DataType resolveType(ClassDecl onType, ClassDecl from, DataType type);
     ClassMember getMember(ClassDecl onType, String name,{MemberFilter filter, Boolean noSuperCons});
     DataType commonType(DataType first, DataType second);
     DataType subType(DataType type, [Integer index]);

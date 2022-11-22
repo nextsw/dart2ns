@@ -48,6 +48,9 @@ public class ClassDecl extends TopDecl {
   }
 
   public void resolveFields(ResolveContext context) {
+    for (ClassMember cm : this.members) {
+      cm.cls = this;
+    }
     D3ELogger.info("Resolving Class: " + this.name);
     context.instanceClass = this;
     context.scope = new Scope(context.scope, null);

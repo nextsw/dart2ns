@@ -1671,7 +1671,7 @@ server class CGen extends ResolveContext implements Gen {
         return null;
 
     }
-    DataType resolveType(ClassDecl c, DataType r) {
+    DataType resolveType(ClassDecl c, ClassDecl from, DataType r) {
         if(r == null ) {
             return ofUnknownType();
         }

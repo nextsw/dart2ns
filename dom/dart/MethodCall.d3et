@@ -70,7 +70,7 @@ server class MethodCall extends Statement {
                     //Assuming it is constuctor
                     resolvedType = ValueType(onType.name);
                 } else {
-                    resolvedType = context.resolveType(onType, md.returnType);
+                    resolvedType = context.resolveType(onType, md.cls, md.returnType);
                 }
                 resolvedMethod = md;
             } else {
