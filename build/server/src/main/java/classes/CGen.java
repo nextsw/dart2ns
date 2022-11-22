@@ -70,19 +70,16 @@ public class CGen extends ResolveContext implements Gen {
   }
 
   public void generate() {
-    for (Library lib :
-        ListExt.where(
-            this.context.libs,
-            (x) -> {
-              return x.parent == null;
-            })) {
-      List<TopDecl> subs = ListExt.List(0l);
-      lib.subs(subs, SetExt.Set());
+    for (Library lib : this.context.libs) {
+      /*
+       List<TopDecl> subs = List();
+       lib.subs(subs, Set());
+      */
       List<ClassDecl> classes =
           IterableExt.toList(
               ListExt.map(
                   ListExt.where(
-                      subs,
+                      lib.objects,
                       (m) -> {
                         return m instanceof ClassDecl;
                       }),
