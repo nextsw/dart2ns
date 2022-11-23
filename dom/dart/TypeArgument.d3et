@@ -1,3 +1,6 @@
 server class TypeArgument {
     String name;
+    PropType type;
+    PropType resolvedType;
+    TypeArgument({this.name, this.type});
 }

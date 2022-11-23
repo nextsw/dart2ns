@@ -1,0 +1,10 @@
+server class FormattingOptions {
+
+    Integer tabSize;
+
+    FormattingOptions(this.tabSize);
+
+    Integer getTabSize() {
+        return tabSize;
+    }
+}

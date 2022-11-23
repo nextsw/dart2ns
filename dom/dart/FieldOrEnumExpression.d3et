@@ -4,7 +4,12 @@ server class FieldOrEnumExpression extends Statement {
     Boolean checkNull;
     Boolean notNull;
     Boolean isGetter;
+    Boolean setter;
+    EvalType evalType = EvalType.ERROR;
     ClassMember resolvedMember;
+
+    ClassDecl fieldClass;
+    
 
     List<String> primitives = [
         'int',
@@ -187,6 +192,10 @@ server class FieldOrEnumExpression extends Statement {
         } else {
             on = s.makeSimple(on);
         }
+    }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(on);
     }
     
 }

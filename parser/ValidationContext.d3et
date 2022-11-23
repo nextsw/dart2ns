@@ -1,0 +1,76 @@
+// abstract server class ValidationContext {
+
+//     PropType bool();
+//     PropType object();
+
+//     void addError(Range range, String str);
+
+//     void addAttribute(String str, Object obj);
+
+//     Boolean hasLocalVar(String name);
+//     void addLocalVar(PropType type, String name);
+
+//     PropType typeOrObjectData(DataType type);
+//     PropType getType(String str);
+
+//     Boolean isAssignableFrom(PropType from, PropType to);
+
+//     PropType getElemenetType(PropType type);
+//     PropType elementTypeWithIndex(PropType type, Integer index);
+
+//     PropType typeOrObject(Expression exp);
+
+//     PropType elementType(PropType type);
+
+//     ValidationContext subWithType(PropType type);
+
+//     PropType list(PropType element);
+//     PropType set(PropType element);
+
+//     PropType getExpectedType();
+
+//     PropType findSuperType(List<PropType> types);
+
+//     LocalVar findLocalVar(String name);
+
+//     Boolean canCompare(PropType lt, PropType rt);
+
+//     MethodDecl findOperatorMethod(PropType lt, String op, PropType rt);
+
+//     FieldDecl getField(PropType type, String name, [Boolean isStatic]);
+
+//     ValidationContext createSharedSub();
+
+//     void set statement(Statement s);
+
+//     Object getAttribute(String attr);
+
+//     Boolean isBool(PropType type);
+
+//     PropType getCommonType(PropType a, PropType b);
+
+//     Boolean isCollection(PropType t);
+
+//     void addUsedType(PropType type);
+//     void addTypeUsage(PropType type);
+//     void addLambdaUsed(LocalVar localVar, Boolean someThing);
+//     PropType getDataType();
+
+//     void addWarn(Range range, String msg);
+//     void addMethodUsege(PropType type, MethodDecl method);
+//     MethodDecl findMethodByName(PropType type, String name, Boolean setter, Boolean getter);
+
+//     PropType resolveType(PropType on, PropType type, Map<String, PropType> typeArgument);
+
+//     PropType asLambdaType(MethodDecl method);
+
+//     PropType computeReturnType(Expression exp);
+
+//     PropType getLocalVarType(String name);
+
+//     void addFieldUsege(PropType type, FieldDecl field);
+
+//     PropType get nullType;
+//     PropType get voidType;
+    
+// }

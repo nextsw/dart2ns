@@ -12,4 +12,8 @@ server class ThrowStatement extends Statement {
     void simplify(Simplifier s) {
         exp = s.makeSimple(exp);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(exp);
+    }
 }

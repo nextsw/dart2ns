@@ -27,4 +27,10 @@ server class IfStatement extends Statement {
             elseStatement.simplify(s);
         }
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(test);
+        visitor.visit(thenStatement);
+        visitor.visit(elseStatement);
+    }
 }

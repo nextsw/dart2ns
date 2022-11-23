@@ -16,4 +16,6 @@ abstract server class TopDecl {
         return lib.packagePath+'lib';
     }
     void simplify(Simplifier s);
+
+    void visit(ExpressionVisitor visitor);
 }

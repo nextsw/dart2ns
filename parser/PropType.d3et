@@ -1,0 +1,25 @@
+server class PropType {
+    String name;
+    PropType extends;
+    List<TypeVariable> typeVars = [];
+    Boolean abstract;
+    Boolean types;
+    List<PropType> impls = [];
+    ClassDecl cls;
+    Enum enm;
+    Typedef typedef;
+    List<PropType> subs = [];
+    List<PropType> usedTypes = [];
+    Boolean typeDef;
+
+    PropType({this.name});
+
+    String toString(){
+        return FormateUtil.toStringPropType(this);
+    }
+
+    DataType toDataType(){
+        // TODO null;
+        return null;
+    }
+}

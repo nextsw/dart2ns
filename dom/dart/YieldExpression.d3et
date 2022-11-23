@@ -18,4 +18,8 @@ server class YieldExpression extends Statement {
     void simplify(Simplifier s) {
         exp.simplify(s);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(exp);
+    }
 }

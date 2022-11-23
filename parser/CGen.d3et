@@ -270,7 +270,7 @@ server class CGen extends ResolveContext implements Gen {
             hp('typedef struct ');
             hp(fnType.signature);
             hl(' {');
-            hl('    void* data;');
+            hl('    void* __data;');
             hp('    ');
             functionTypeToString(fnType, 'call', x => hp(x));
             hl(';');
@@ -935,8 +935,6 @@ server class CGen extends ResolveContext implements Gen {
             genDeclaration(exp as Declaration, depth, xp);
         } else if(exp is DoWhileLoop) {
             genDoWhileLoop(exp as DoWhileLoop, depth, xp);
-        } else if(exp is DynamicTypeExpression) {
-            genDynamicTypeExpression(exp as DynamicTypeExpression, depth, xp);
         } else if(exp is FnCallExpression) {
             genFnCallExpression(exp as FnCallExpression, depth, xp);
         } else if(exp is ForEachLoop) {
@@ -1457,9 +1455,6 @@ server class CGen extends ResolveContext implements Gen {
         xp(' while (');
         genExp(exp.test, depth, xp);
         xp(')');
-    }
-    void genDynamicTypeExpression(DynamicTypeExpression exp, Integer depth, Xp xp) {
-        xp('DynamicTypeExpression');
     }
 
     String getRecentCast(String name) {

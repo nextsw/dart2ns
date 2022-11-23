@@ -1,4 +1,6 @@
 abstract server class Statement extends Expression {
     List<Comment> comments = [];
+    List<LocalVar> finalVars = [];
+    PropType returnType;
     void simplify(Simplifier s);
 }

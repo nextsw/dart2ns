@@ -1,0 +1,3 @@
+server class ClassType extends PropType{
+    ClassType({String name}) : super(name: name);
+}

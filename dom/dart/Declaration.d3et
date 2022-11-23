@@ -43,4 +43,11 @@ server class Declaration extends Statement {
             }
         }
     }
+    void visit(ExpressionVisitor visitor) {
+        for(NameAndValue n in names){
+            if(n.value != null) {
+                visitor.visit(n.value);
+            }
+        }
+    }
 }

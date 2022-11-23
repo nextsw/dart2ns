@@ -2,6 +2,7 @@ server class BinaryExpression extends Statement {
     String op;
     Expression left;
     Expression right;
+    MethodDecl method;
     BinaryExpression({this.op, this.left, this.right});
 
 
@@ -44,7 +45,7 @@ server class BinaryExpression extends Statement {
         if(op == '??=') {
             s.add(Assignment(
                 op: op,
-                left: left,
+                left: left as FieldOrEnumExpression,
                 right: right,
             ));
             s.markDelete();
@@ -52,5 +53,9 @@ server class BinaryExpression extends Statement {
             left = s.makeSimple(left);
             right = s.makeSimple(right);
         }
+    }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(right);
+        visitor.visit(left);
     }
 }

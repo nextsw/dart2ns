@@ -1,6 +1,6 @@
 server class ValueType extends DataType {
     String in;
-    List<DataType> args = [];
+    List<ValueType> args = [];
     ValueType(this.name, [this.optional = false]);
 
     String toString(){

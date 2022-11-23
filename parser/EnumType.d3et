@@ -1,0 +1,3 @@
+server class EnumType extends ClassType {
+    EnumType({String name}) : super(name: name);
+}

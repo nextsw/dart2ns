@@ -15,4 +15,8 @@ server class CollectionSpread extends ArrayItem {
     void simplify(Simplifier s) {
         values = s.makeSimple(values);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(values);
+    }
 }

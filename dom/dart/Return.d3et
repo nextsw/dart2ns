@@ -15,4 +15,8 @@ server class Return extends Statement {
     void simplify(Simplifier s) {
         expression = s.makeSimple(expression);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(expression);
+    }
 }

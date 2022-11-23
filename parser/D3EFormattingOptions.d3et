@@ -1,0 +1,55 @@
+server class D3EFormattingOptions {
+
+    FormattingOptions _options;
+
+    Integer _depth;
+
+    String _tab;
+
+    factory D3EFormattingOptions.withDefault() {
+        return D3EFormattingOptions(null, '    ', 0);
+    }
+
+    factory D3EFormattingOptions.withOptions(FormattingOptions options) {
+        Integer tabSize = options.getTabSize();
+        String tab = '';
+        for (Integer x = 0; x < tabSize; x++) {
+            tab += ' ';
+        }
+        return D3EFormattingOptions(options, tab, 0);
+    }
+
+    D3EFormattingOptions(this._options, this._tab, this._depth);
+
+    D3EFormattingOptions inc() {
+        return D3EFormattingOptions(_options, _tab, _depth + 1);
+    }
+
+    D3EFormattingOptions dec() {
+        return D3EFormattingOptions(_options, _tab, _depth - 1);
+    }
+
+    void appendDepth(StringBuffer sb) {
+        for (Integer x = 0; x < _depth; x++) {
+            appendTab(sb);
+        }
+    }
+
+    void appendTab(StringBuffer sb) {
+        sb.write(_tab);
+    }
+
+    void appendCollection<T>(StringBuffer sb, List<T> coll, Consumer<T> each) {
+        appendCollectionWithSep(sb, coll, () => sb.write(', '), each);
+    }
+
+    void appendCollectionWithSep<T>(StringBuffer sb, List<T> coll, Runnable sep, Consumer<T> each) {
+        if (!coll.isEmpty) {
+            each(coll.first);
+            for (Integer i = 1; i < coll.length; i++) {
+                sep();
+                each(coll.get(i));
+            }
+        }
+    }
+}

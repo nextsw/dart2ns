@@ -1,0 +1,868 @@
+server class FormateUtil {
+
+    static String toStringExpression(Expression on) {
+        StringBuffer sb = StringBuffer();
+        D3EFormattingOptions options = D3EFormattingOptions.withDefault();
+        if(on is Block) {
+            FormateUtil.formateBlock(on as Block, sb, options.dec(), needBraces: false);
+        } else {
+            FormateUtil.formate(on, sb, options);
+        }
+        return sb.toString();
+    }
+
+    static String toStringNamedArgument(NamedArgument on) {
+        StringBuffer sb = StringBuffer();
+        FormateUtil.formateNamedArgument(on, sb, D3EFormattingOptions.withDefault());
+        return sb.toString();
+    }
+
+    static void formate(Expression on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on is ArrayAccess) {
+            formateArrayAccess(on as ArrayAccess, sb, options);
+        } else if (on is ArrayExpression) {
+            formateArrayExpression(on as ArrayExpression, sb, options);
+        } else if (on is BinaryExpression) {
+            formateBinaryExpression(on as BinaryExpression, sb, options);
+        } else if (on is FieldOrEnumExpression) {
+            FieldOrEnumExpression exp = on as FieldOrEnumExpression;
+            formateFieldOrEnumExpression(exp, sb, options);
+        } else if (on is LambdaExpression) {
+            formateLambdaExpression(on as LambdaExpression, sb, options);
+        } else if (on is LiteralExpression) {
+            formateLiteralExpression(on as LiteralExpression, sb, options);
+        } else if (on is NullExpression) {
+            formateNullExpression(on as NullExpression, sb, options);
+        } else if (on is ParExpression) {
+            formateParExpression(on as ParExpression, sb, options);
+        } else if (on is SwitchExpression) {
+            formateSwitchExpression(on as SwitchExpression, sb, options);
+        } else if (on is TerinaryExpression) {
+            formateTerinaryExpression(on as TerinaryExpression, sb, options);
+        } else if (on is TypeCastOrCheckExpression) {
+            formateTypeCastOrCheckExpression(on as TypeCastOrCheckExpression, sb, options);
+        } else if (on is CollectionIf) {
+            formateCollectionIf(on as CollectionIf, sb, options);
+        } else if (on is CollectionFor) {
+            formateCollectionFor(on as CollectionFor, sb, options);
+        } else if (on is CollectionSpread) {
+            formateCollectionSpread(on as CollectionSpread, sb, options);
+        } else if (on is ExpressionArrayItem) {
+            formateExpressionArrayItem(on as ExpressionArrayItem, sb, options);
+        } else if (on is Assignment) {
+            formateAssignment(on as Assignment, sb, options);
+        } else if (on is Block) {
+            formateBlock(on as Block, sb, options);
+        } else if (on is Break) {
+            formateBreak(on as Break, sb, options);
+        } else if (on is Continue) {
+            formateContinue(on as Continue, sb, options);
+        } else if (on is Declaration) {
+            formateDeclaration(on as Declaration, sb, options);
+        } else if (on is DoWhileLoop) {
+            formateDoWhileLoop(on as DoWhileLoop, sb, options);
+        } else if (on is ForLoop) {
+            formateForLoop(on as ForLoop, sb, options);
+        } else if (on is ForEachLoop) {
+            formateForEachLoop(on as ForEachLoop, sb, options);
+        } else if (on is IfStatement) {
+            formateIfStatement(on as IfStatement, sb, options);
+        } else if (on is MethodCall) {
+            formateMethodCall(on as MethodCall, sb, options);
+        } else if (on is PostfixExpression) {
+            formatePostfixExpression(on as PostfixExpression, sb, options);
+        } else if (on is PrefixExpression) {
+            formatePrefixExpression(on as PrefixExpression, sb, options);
+        } else if (on is Return) {
+            formateReturn(on as Return, sb, options);
+        } else if (on is SwitchStatement) {
+            formateSwitchStatement(on as SwitchStatement, sb, options);
+        } else if (on is ThrowStatement) {
+            formateThrowStatement(on as ThrowStatement, sb, options);
+        } else if (on is TryCatcheStatment) {
+            formateTryCatcheStatment(on as TryCatcheStatment, sb, options);
+        } else if (on is WhileLoop) {
+            formateWhileLoop(on as WhileLoop, sb, options);
+        }
+    }
+
+
+    static void formateArrayAccess(ArrayAccess a, StringBuffer sb, D3EFormattingOptions options) {
+        if (a.on != null) {
+            formate(a.on, sb, options);
+        }
+        sb.write('[');
+        if (a.index != null) {
+            formate(a.index, sb, options);
+        }
+        sb.write(']');
+    }
+
+    static void formateArrayExpression(ArrayExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.enforceType != null) {
+            sb.write('<');
+            formateDataType(on.enforceType, sb, options);
+            sb.write('>');
+        }
+        if (on.values.isEmpty) {
+            sb.write(on.list ? '[' : '{');
+            sb.write(on.list ? ']' : '}');
+            return;
+        }
+        sb.write(on.list ? '[' : '{');
+        sb.write('\n');
+        D3EFormattingOptions inc = options.inc();
+        inc.appendDepth(sb);
+        if (on.values.isNotEmpty) {
+            formate(on.values.first, sb, inc);
+            for (Integer i = 1; i < on.values.length; i++) {
+                sb.write(',\n');
+                inc.appendDepth(sb);
+                formate(on.values[i], sb, inc);
+            }
+        }
+        sb.write(',');
+        sb.write('\n');
+        options.appendDepth(sb);
+        sb.write(on.list ? ']' : '}');
+    }
+
+    static void formateBinaryExpression(BinaryExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.left != null) {
+            formate(on.left, sb, options);
+        }
+        sb.write(' ');
+        sb.write(on.op);
+        sb.write(' ');
+        if (on.right != null) {
+            formate(on.right, sb, options);
+        }
+    }
+
+    static void formateFieldOrEnumExpression(FieldOrEnumExpression fe, StringBuffer sb, D3EFormattingOptions options) {
+        if (fe.on != null) {
+            formate(fe.on, sb, options);
+            sb.write('.');
+        }
+        if (fe.name != null) {
+            sb.write(fe.name);
+        }
+    }
+
+
+    static void formateLambdaExpression(LambdaExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('(');
+        // sb.write(on.parameters.map((i) => i.name.value).join(', '));
+        sb.write(')');
+        if (on.expression != null) {
+            sb.write(' => ');
+            formate(on.expression, sb, options);
+        } else if (on.body != null) {
+            sb.write(' ');
+            formate(on.body, sb, options);
+        }
+    }
+
+    static void formateLiteralExpression(LiteralExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.value == null) {
+            return;
+        }
+        if (on.type == LiteralType.TypeString) {
+            if(on.isRawString) {
+                sb.write('r');
+            }
+            sb.write('\'');
+            if(on.isRawString) {
+                sb.write(on.value);
+            } else{
+                sb.write(on.value);
+            }
+            sb.write('\'');
+        } else {
+            sb.write(on.value);
+        }
+    }
+
+    static void formateNullExpression(NullExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('null');
+    }
+
+    static void formateParExpression(ParExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('(');
+        if (on.exp != null) {
+            formate(on.exp, sb, options);
+        }
+        sb.write(')');
+    }
+
+    static void formateSwitchExpression(SwitchExpression se, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('switch (');
+        if (se.on != null) {
+            formate(se.on, sb, options);
+        }
+        sb.write(')');
+        sb.write('{\n');
+        D3EFormattingOptions inc = options.inc();
+        se.cases.forEach((c) => formateCaseExpression(c, sb, inc));
+        if (se.onElse != null) {
+            inc.appendDepth(sb);
+            sb.write('default: ');
+            formate(se.onElse, sb, options);
+            sb.write('\n');
+        }
+        options.appendDepth(sb);
+        sb.write('}');
+    }
+
+    static void formateCaseExpression(CaseExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        on.tests.forEach((t) {
+            options.appendDepth(sb);
+            sb.write('case ');
+            formate(t, sb, options);
+            sb.write(':');
+        });
+        sb.write(' ');
+        if (on.result != null) {
+            formate(on.result, sb, options);
+        }
+        sb.write('\n');
+    }
+
+    static void formateTerinaryExpression(TerinaryExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.condition != null) {
+            formate(on.condition, sb, options);
+        }
+        sb.write(' ? ');
+        if (on.ifTrue != null) {
+            formate(on.ifTrue, sb, options);
+        }
+        sb.write(' : ');
+        if (on.ifFalse != null) {
+            formate(on.ifFalse, sb, options);
+        }
+    }
+
+    static void formateTypeCastOrCheckExpression(TypeCastOrCheckExpression on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.exp != null) {
+            formate(on.exp, sb, options);
+        }
+        sb.write(on.check ? ' is ' : ' as ');
+        if (on.dataType != null) {
+            formateDataType(on.dataType, sb, options);
+        }
+    }
+
+    static void formateCollectionIf(CollectionIf on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('if (');
+        if (on.test != null) {
+            formate(on.test, sb, options);
+        }
+        sb.write(') ');
+        sb.write('\n');
+        if (on.thenItem != null) {
+            D3EFormattingOptions inc = options.inc();
+            inc.appendDepth(sb);
+            formate(on.thenItem, sb, inc);
+        }
+        if (on.elseItem != null) {
+            sb.write('\n');
+            options.appendDepth(sb);
+            sb.write('else');
+            sb.write('\n');
+            D3EFormattingOptions inc = options.inc();
+            inc.appendDepth(sb);
+            formate(on.elseItem, sb, inc);
+        }
+    }
+
+    static void formateCollectionFor(CollectionFor on, StringBuffer sb, D3EFormattingOptions options) {
+        formateForEachLoop(on.stmt as ForEachLoop, sb, options);
+        formateForLoop(on.stmt as ForLoop, sb, options);
+        sb.write('\n');
+        if (on.value != null) {
+            D3EFormattingOptions inc = options.inc();
+            inc.appendDepth(sb);
+            formate(on.value, sb, inc);
+        }
+    }
+
+    static void formateCollectionSpread(CollectionSpread on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('...');
+        if(on.checkNull){
+            sb.write('?');
+        }
+        if (on.values != null) {
+            formate(on.values, sb, options);
+        }
+    }
+
+    static void formateExpressionArrayItem(ExpressionArrayItem on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.exp != null) {
+            formate(on.exp, sb, options);
+        }
+    }
+
+    static void formateAssignment(Assignment on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.left != null) {
+            formate(on.left, sb, options);
+        }
+        sb.write(' ');
+        sb.write(on.op);
+        sb.write(' ');
+        if (on.right != null) {
+            formate(on.right, sb, options);
+        }
+    }
+
+    static void formateBlock(Block on, StringBuffer sb, D3EFormattingOptions options, {Boolean needBraces = true}) {
+        if (needBraces) {
+            sb.write('{\n');
+        }
+        D3EFormattingOptions inc = options.inc();
+        on.statements.forEach((s) {
+            if (s == null) {
+                return;
+            }
+            inc.appendDepth(sb);
+            formate(s, sb, inc);
+            if (StatementUtil.needSemicolon(s)) {
+                sb.write(';');
+            }
+            sb.write('\n');
+        });
+        if (on.afterComments != null) {
+            inc.appendDepth(sb);
+        }
+        options.appendDepth(sb);
+        if (needBraces) {
+            sb.write('}');
+        }
+    }
+
+    static void formateBreak(Break on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('break');
+    }
+
+    static void formateContinue(Continue on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('continue');
+    }
+
+    static void formateDeclaration(Declaration on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.type != null) {
+            formateDataType(on.type, sb, options);
+        }
+        sb.write(' ');
+        for(NameAndValue nv in on.names) {
+            sb.write(nv.name);
+            if (nv.value != null) {
+                sb.write(' = ');
+                formate(nv.value, sb, options);
+            }
+
+        }
+    }
+
+    static void formateDoWhileLoop(DoWhileLoop on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('do ');
+        if (on.body != null) {
+            formate(on.body, sb, options);
+        }
+        sb.write(' while ');
+        sb.write('(');
+        if (on.test != null) {
+            formate(on.test, sb, options);
+        }
+        sb.write(')');
+    }
+
+    static void formateForLoop(ForLoop on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('for (');
+        if (on.decl != null) {
+            formate(on.decl, sb, options);
+            if (!on.inits.isEmpty) {
+                sb.write(', ');
+            }
+        }
+        options.appendCollection(sb, on.inits, (i) => formate(i, sb, options));
+        sb.write('; ');
+        if (on.test != null) {
+            formate(on.test, sb, options);
+        }
+        sb.write('; ');
+        options.appendCollection(sb, on.resets, (i) => formate(i, sb, options));
+        sb.write(')');
+        if (on.body != null) {
+            sb.write(' ');
+            formate(on.body, sb, options);
+        }
+    }
+
+
+    static void formateForEachLoop(ForEachLoop on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('for ');
+        sb.write('(');
+        if (on.dataType != null) {
+            formateDataType(on.dataType, sb, options);
+        }
+        sb.write(' ');
+        if (on.name != null) {
+            sb.write(on.name);
+        }
+        sb.write(' in ');
+        if (on.collection != null) {
+            formate(on.collection, sb, options);
+        }
+        sb.write(')');
+    }
+
+    static void formateIfStatement(IfStatement on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('if (');
+        if (on.test != null) {
+            formate(on.test, sb, options);
+        }
+        sb.write(')');
+        if (on.thenStatement != null) {
+            sb.write(' ');
+            formate(on.thenStatement, sb, options);
+        }
+        if (on.elseStatement != null) {
+            sb.write(' else ');
+            formate(on.elseStatement, sb, options);
+        }
+    }
+
+    static void formateMethodCall(MethodCall mc, StringBuffer sb, D3EFormattingOptions options) {
+        if (mc.on != null) {
+            formate(mc.on, sb, options);
+            sb.write('.');
+        }
+        if (mc.name != null) {
+            sb.write(mc.name);
+        }
+        // if (mc.typeArgs != null) {
+        //     formateTypeArguments(mc.typeArgs, sb, options);
+        // }
+        sb.write('(');
+        if (mc.positionArgs.isNotEmpty) {
+            formateArgument(mc.positionArgs.first, sb, options);
+            for (Integer i = 1; i < mc.positionArgs.length; i++) {
+                sb.write(', ');
+                formateArgument(mc.positionArgs[i], sb, options);
+            }
+        }
+        if (!mc.namedArgs.isEmpty) {
+            if (!mc.positionArgs.isEmpty) {
+                sb.write(',');
+            }
+            if (mc.namedArgs.isNotEmpty) {
+                formateNamedArgument(mc.namedArgs.first, sb, options);
+                for (Integer i = 1; i < mc.namedArgs.length; i++) {
+                    sb.write(',');
+                    formateNamedArgument(mc.namedArgs[i], sb, options);
+                }
+            }
+            sb.write(',');
+            sb.write('\n');
+            options.appendDepth(sb);
+        }
+        sb.write(')');
+    }
+
+    static void formatePostfixExpression(PostfixExpression pe, StringBuffer sb, D3EFormattingOptions options) {
+        if (pe.on != null) {
+            formate(pe.on, sb, options);
+        }
+        sb.write(pe.postfix);
+    }
+
+    static void formatePrefixExpression(PrefixExpression pe, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write(pe.prefix);
+        if (pe.on != null) {
+            formate(pe.on, sb, options);
+        }
+    }
+
+    static void formateReturn(Return on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('return');
+        if (on.expression != null) {
+            sb.write(' ');
+            formate(on.expression, sb, options);
+        }
+    }
+
+    static void formateSwitchStatement(SwitchStatement on, StringBuffer sb, D3EFormattingOptions main) {
+        sb.write('switch (');
+        if (on.test != null) {
+            formate(on.test, sb, main);
+        }
+        sb.write(')');
+        sb.write(' ');
+        sb.write('{');
+        D3EFormattingOptions options = main.inc();
+        on.cases.forEach((c) => formateSwitchCaseBlock(c, sb, options));
+        if (!on.defaults.isEmpty) {
+            sb.write('\n');
+            options.appendDepth(sb);
+            sb.write('default: ');
+            sb.write('\n');
+            D3EFormattingOptions sub = options.inc();
+            on.defaults.forEach((d) {
+                sub.appendDepth(sb);
+                formate(d, sb, sub);
+                if (StatementUtil.needSemicolon(d)) {
+                    sb.write(';');
+                }
+                sb.write('\n');
+            });
+        }
+        sb.write('\n');
+        main.appendDepth(sb);
+        sb.write('}');
+    }
+
+    static void formateSwitchCaseBlock(SwitchCaseBlock on, StringBuffer sb, D3EFormattingOptions options) {
+        on.tests.forEach((t) {
+            sb.write('\n');
+            options.appendDepth(sb);
+            sb.write('case ');
+            formate(t, sb, options);
+            sb.write(':');
+        });
+        sb.write('\n');
+        D3EFormattingOptions inc = options.inc();
+        on.statements.forEach((s) {
+            inc.appendDepth(sb);
+            formate(s, sb, inc);
+            if (StatementUtil.needSemicolon(s)) {
+                sb.write(';');
+            }
+            sb.write('\n');
+        });
+    }
+
+    static void formateThrowStatement(ThrowStatement on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('throw ');
+        if (on.exp != null) {
+            formate(on.exp, sb, options);
+        }
+    }
+
+    static void formateTryCatcheStatment(TryCatcheStatment on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('try ');
+        if (on.body != null) {
+            formate(on.body, sb, options);
+        }
+        on.catchParts.forEach((c) => formateCatchPart(c, sb, options));
+        if (on.finallyBody != null) {
+            sb.write(' finally ');
+            formate(on.finallyBody, sb, options);
+        }
+    }
+
+    static void formateCatchPart(CatchPart on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.onType != null) {
+            sb.write(' on ');
+            formateDataType(on.onType, sb, options);
+        }
+        if (on.exp != null) {
+            sb.write(' catch ');
+            sb.write('(');
+            sb.write(on.exp);
+            if (on.stackTrace != null) {
+                sb.write(', ');
+                sb.write(on.stackTrace);
+            }
+            sb.write(') ');
+        }
+        if (on.body != null) {
+            formate(on.body, sb, options);
+        }
+    }
+
+    static void formateWhileLoop(WhileLoop on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('while ');
+        sb.write('(');
+        if (on.test != null) {
+            formate(on.test, sb, options);
+        }
+        sb.write(')');
+        if (on.body != null) {
+            sb.write(' ');
+            formate(on.body, sb, options);
+        }
+    }
+
+    // static void formateTypeArguments(TypeArguments on, StringBuffer sb, D3EFormattingOptions options) {
+    //     sb.write('<');
+    //     if (on.args != null) {
+    //         options.appendCollection(sb, on.args, (i) => formateDataType(i, sb, options));
+    //     }
+    //     sb.write('>');
+    // }
+
+    static void formateArgument(Argument on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.arg != null) {
+            formate(on.arg, sb, options);
+        }
+    }
+
+    static void formateDataType(DataType on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write(on.name);
+        // if (on.args != null) {
+        //     formateTypeArguments(on.args, sb, options);
+        // }
+    }
+
+    static void formateNamedArgument(NamedArgument on, StringBuffer sb, D3EFormattingOptions options) {
+        D3EFormattingOptions inc = options.inc();
+        if (on.beforeComments != null) {
+            if (on.name != null) {
+                sb.write('\n');
+                inc.appendDepth(sb);
+            }
+        }
+        if (on.name != null) {
+            if (on.beforeComments == null) {
+                sb.write('\n');
+                inc.appendDepth(sb);
+            }
+            sb.write(on.name);
+        }
+        if (on.value != null) {
+            sb.write(': ');
+            formate(on.value, sb, inc);
+        }
+    }
+
+    static void formateMethodParam(MethodParam on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.deprecated) {
+            sb.write('@deprecated ');
+        }
+        if (on.dataType != null) {
+            formateDataType(on.dataType, sb, options);
+            sb.write(' ');
+        } else if (on.thisToken != null) {
+            sb.write(on.thisToken);
+            sb.write('.');
+        }
+        if (on.name != null) {
+            sb.write(on.name);
+        }
+        // if (on.params != null) {
+        //     formateMethodParams(on.params, sb, options);
+        // }
+        if (on.defaultValue != null) {
+            sb.write(' = ');
+            formate(on.defaultValue, sb, options);
+        }
+    }
+
+    static void formateMethodParams(MethodParams on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('(');
+        options.appendCollection(sb, on.positionalParams, (i) => formateMethodParam(i, sb, options));
+        if (!on.namedParams.isEmpty) {
+            if (!on.positionalParams.isEmpty) {
+                sb.write(', ');
+            }
+            sb.write('{');
+            options.appendCollection(sb, on.namedParams, (i) => formateMethodParam(i, sb, options));
+            sb.write('}');
+        }
+        if (!on.optionalParams.isEmpty) {
+            if (!on.positionalParams.isEmpty) {
+                sb.write(', ');
+            }
+            sb.write('[');
+            options.appendCollection(sb, on.optionalParams, (i) => formateMethodParam(i, sb, options));
+            sb.write(']');
+        }
+        sb.write(')');
+    }
+
+    static void formateTypeParams(TypeParams on, StringBuffer sb, D3EFormattingOptions options) {
+        sb.write('<');
+        if (on.params != null) {
+            options.appendCollection(sb, on.params, (i) => formateTypeParam(i, sb, options));
+        }
+        sb.write('>');
+    }
+
+    static void formateTypeParam(TypeParam on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.name != null) {
+            sb.write(on.name);
+        }
+        if (on.extendType != null) {
+            sb.write(' extends ');
+            formateDataType(on.extendType, sb, options);
+        }
+    }
+
+    static void formateFieldDecl(FieldDecl on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.static) {
+            sb.write('static ');
+        }
+        if (on.final) {
+            sb.write('final ');
+        }
+        if (on.const) {
+            sb.write('const ');
+        }
+        if (on.type != null) {
+            formateDataType(on.type, sb, options);
+        }
+        sb.write(' ');
+        sb.write(on.name);
+        if (on.value != null) {
+            sb.write(' = ');
+            formate(on.value, sb, options);
+        }
+        sb.write(';');
+    }
+
+    static void formateTypedef(MethodDecl on, StringBuffer sb, D3EFormattingOptions options, String name, TypeParams generics) {
+        sb.write('typedef');
+        sb.write(' ');
+        if (on.returnType != null) {
+            formateDataType(on.returnType, sb, options);
+        }
+        sb.write(' ');
+        if (on.name != null) {
+            sb.write(on.name);
+        }
+        if (on.generics != null) {
+            formateTypeParams(on.generics, sb, options);
+        }
+        // if (on.params != null) {
+        //     formateMethodParams(on.params, sb, options);
+        // }
+    }
+
+    static void formateMethodDecl(MethodDecl on, StringBuffer sb, D3EFormattingOptions options) {
+        if (on.static) {
+            sb.write('static ');
+        }
+        if (on.final) {
+            sb.write('final ');
+        }
+        if (on.const) {
+            sb.write('const ');
+        }
+        if (on.factory) {
+            sb.write('factory ');
+        }
+        if (on.factoryName != null) {
+            sb.write(on.factoryName);
+            sb.write('.');
+            sb.write(on.name);
+        } else {
+            if (on.returnType != null) {
+                formateDataType(on.returnType, sb, options);
+                sb.write(' ');
+            }
+            if (on.setter) {
+                sb.write('set ');
+            }
+            if (on.getter) {
+                sb.write('get ');
+            }
+            sb.write(on.name);
+        }
+        if (on.generics != null) {
+            formateTypeParams(on.generics, sb, options);
+        }
+        // if (on.params != null) {
+        //     formateMethodParams(on.params, sb, options);
+        // }
+        if (on.init != null) {
+            sb.write(': ');
+            formate(on.init, sb, options);
+        }
+        if (on.body != null) {
+            if (on.asyncType != ASyncType.NONE) {
+                sb.write(' ');
+                sb.write(on.asyncType.toString().toLowerCase());
+            }
+            sb.write(' ');
+            formateBlock(on.body, sb, options);
+        } else {
+            if (on.exp != null) {
+                sb.write(' => ');
+                formate(on.exp, sb, options);
+            }
+            sb.write(';');
+        }
+    }
+
+    static void formateParam(Param on, StringBuffer sb, D3EFormattingOptions options) {
+        // if (on.paramType != null) {
+        //     sb.write(on.paramType, sb, options);
+        // }
+        sb.write(' ');
+        if (on.name != null) {
+            sb.write(on.name);
+        }
+    }
+
+    static String toStringLambdaType(LambdaType on) {
+        StringBuffer sb = StringBuffer();
+        sb.write('(');
+        if (!on.method.params.isEmpty) {
+            sb.write(on.method.params.get(0));
+            for (Integer i = 1; i < on.method.params.length; i++) {
+                sb.write(', ');
+                sb.write(on.method.params.get(i).dataType);
+            }
+        }
+        sb.write(')');
+        sb.write(' => ');
+        sb.write(on.method.returnType);
+        sb.write(';');
+        return sb.toString();
+    }
+
+    static String toStringDataType(DataType on) {
+        StringBuffer sb = StringBuffer();
+        FormateUtil.formateDataType(on, sb, D3EFormattingOptions.withDefault());
+        return sb.toString();
+    }
+
+    static String toStringStatement(Statement on) {
+        StringBuffer sb = StringBuffer();
+        FormateUtil.formate(on, sb, D3EFormattingOptions.withDefault());
+        return sb.toString();
+    }
+
+    static String toStringTypeParams(TypeParams on) {
+        StringBuffer sb = StringBuffer();
+        FormateUtil.formateTypeParams(on, sb, D3EFormattingOptions.withDefault());
+        return sb.toString();
+    }
+
+    static String toStringPropType(PropType on) {
+        if (!on.typeVars.isEmpty) {
+            StringBuffer sb = StringBuffer(on.name);
+            sb.write('<');
+            if (on is ParameterizedType) {
+                ParameterizedType pt = on as ParameterizedType;
+                List<String> types = pt.arguments.map((x) => x.name.toString()).toList();
+                sb.write(types.join(', '));
+            } else {
+                sb.write(on.typeVars.join(', '));
+            }
+            sb.write('>');
+            return sb.toString();
+        }
+        return on.name;
+    }
+
+    static String toStringTypeVariable(TypeVariable on) {
+        return '~' + toStringPropType(on);
+    }
+
+    static String toStringTypeParam(TypeParam on) {
+        if (on.extendType == null) {
+            return on.name;
+        }
+        return on.name.toString() + ' extends ' + on.extendType.toString();
+    }
+}

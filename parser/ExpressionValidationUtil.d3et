@@ -1,0 +1,1678 @@
+server class ExpressionValidationUtil {
+
+    static void validate(Expression on, ValidationContext ctx) {
+        if (on is ArrayAccess) {
+            validateArrayAccess(on as ArrayAccess, ctx);
+        } else if (on is ArrayExpression) {
+            ArrayExpression exp = on as ArrayExpression;
+            validateArrayExpression(on as ArrayExpression, ctx);
+        } else if (on is BinaryExpression) {
+            validateBinaryExpression(on as BinaryExpression, ctx);
+        } else if (on is FieldOrEnumExpression) {
+            validateFieldOrEnumExpression(on as FieldOrEnumExpression, ctx);
+        } else if (on is LambdaExpression) {
+            LambdaExpression exp = on as LambdaExpression;
+            validateLambdaExpression(on as LambdaExpression, ctx);
+        } else if (on is LiteralExpression) {
+            validateLiteralExpression(on as LiteralExpression, ctx);
+        } else if (on is NullExpression) {
+            validateNullExpression(on as NullExpression, ctx);
+        } else if (on is ParExpression) {
+            validateParExpression(on as ParExpression, ctx);
+        } else if (on is SwitchExpression) {
+            validateSwitchExpression(on as SwitchExpression, ctx);
+        } else if (on is TerinaryExpression) {
+            validateTerinaryExpression(on as TerinaryExpression, ctx);
+        } else if (on is TypeCastOrCheckExpression) {
+            validateTypeCastOrCheckExpression(on as TypeCastOrCheckExpression, ctx);
+        } else if (on is CollectionIf) {
+            validateCollectionIf(on as CollectionIf, ctx);
+        } else if (on is CollectionFor) {
+            validateCollectionFor(on as CollectionFor, ctx);
+        } else if (on is CollectionSpread) {
+            validateCollectionSpread(on as CollectionSpread, ctx);
+        } else if (on is ExpressionArrayItem) {
+            validateExpressionArrayItem(on as ExpressionArrayItem, ctx);
+        } else if (on is Assignment) {
+            validateAssignment(on as Assignment, ctx);
+        } else if (on is Block) {
+            validateBlock(on as Block, ctx);
+        } else if (on is Break) {
+            validateBreak(on as Break, ctx);
+        } else if (on is Continue) {
+            validateContinue(on as Continue, ctx);
+        } else if (on is Declaration) {
+            validateDeclaration(on as Declaration, ctx);
+        } else if (on is DoWhileLoop) {
+            validateDoWhileLoop(on as DoWhileLoop, ctx);
+        } else if (on is ForLoop) {
+            validateForLoop(on as ForLoop, ctx);
+        } else if (on is ForEachLoop) {
+            validateForEachLoop(on as ForEachLoop, ctx);
+        } else if (on is IfStatement) {
+            validateIfStatement(on as IfStatement, ctx);
+        } else if (on is MethodCall) {
+            MethodCall exp = on as MethodCall;
+            validateMethodCall(exp, ctx);
+        } else if (on is PostfixExpression) {
+            validatePostfixExpression(on as PostfixExpression, ctx);
+        } else if (on is PrefixExpression) {
+            validatePrefixExpression(on as PrefixExpression, ctx);
+        } else if (on is Return) {
+            validateReturn(on as Return, ctx);
+        } else if (on is SwitchStatement) {
+            validateSwitchStatement(on as SwitchStatement, ctx);
+        } else if (on is ThrowStatement) {
+            validateThrowStatement(on as ThrowStatement, ctx);
+        } else if (on is TryCatcheStatment) {
+            validateTryCatcheStatment(on as TryCatcheStatment, ctx);
+        } else if (on is WhileLoop) {
+            validateWhileLoop(on as WhileLoop, ctx);
+        }
+    }
+
+
+    static void validateNullExpression(NullExpression on, ValidationContext ctx) {
+        on.expType = ctx.nullType();
+    }
+
+    static void validateAbstractForEachLoop(ForEachLoop on, ValidationContext ctx) {
+        PropType bool = ctx.bool();
+        ctx.addAttribute('#c', true);
+        ctx.addAttribute('#b', true);
+        if (on.dataType != null) {
+            validateDataType(on.dataType, ctx);
+        } else {
+            ctx.addError(null, 'Type is required');
+        }
+        PropType varType = ctx.typeOrObjectData(on.dataType);
+        if (on.name != null) {
+            if (ctx.hasLocalVar(on.name)) {
+                ctx.addError(null, 'Duplicate variable name \"' + on.name + '\" found.');
+            }
+            ctx.addLocalVar(varType, on.name, false);
+        } else {
+            ctx.addError(null, 'variable name is required');
+        }
+        if (on.collection == null) {
+            ctx.addError(null, 'collection expression is required');
+        } else {
+            validate(on.collection, ctx);
+            PropType collType = ctx.typeOrObject(on.collection);
+            PropType iterable = ctx.getType('Iterable');
+            if (PropTypeUtil.isAssignableFrom(iterable, collType)) {
+                PropType elementType = PropTypeUtil.getElemenetType(collType);
+                if (elementType != null && !PropTypeUtil.isAssignableFrom(varType, elementType)) {
+                    ctx.addError(on.collection.range, 'Can not convert \"' + elementType.toString() + '\" to \"' + varType.toString() + '\"');
+                }
+            } else {
+                ctx.addError(on.collection.range, 'Expression type(' + collType.toString() + ') should be collection');
+            }
+        }
+    }
+
+    static void validateArgument(Argument on, ValidationContext ctx) {
+        if (on.arg == null) {
+            ctx.addError(null, 'Invalid argument');
+        } else {
+            validate(on.arg, ctx);
+        }
+    }
+
+    static void validateArrayAccess(ArrayAccess a, ValidationContext ctx) {
+        validate(a.on, ctx);
+        validate(a.index, ctx);
+        a.method = validateWithOp(ctx, a.range, null, a.index.range, ctx.typeOrObject(a.on), ctx.typeOrObject(a.index), '[]');
+        a.expType = TypeUtils.elementType(ctx.typeOrObject(a.on));
+    }
+    
+    static void validateArrayExpression(ArrayExpression on, ValidationContext ctx) {
+        ValidationContext sub;
+        PropType pt;
+        if (on.enforceType != null) {
+            validateDataType(on.enforceType, ctx);
+            pt = on.enforceType.resolvedType;
+            sub = ctx.subWithType(pt);
+        } else {
+            pt = null;
+            sub = ctx;
+        }
+        on.values.forEach((e) => validate(e, sub));
+        if (pt != null) {
+            on.values.where((v) => !PropTypeUtil.isAssignableFrom(pt, sub.typeOrObject(v)))
+            .forEach((a) => sub.addError(a.range, 'Typemismatch: can not convert from ' + sub.typeOrObject(a).toString() + ' to ' + pt.toString()));
+        }
+        PropType elementType = computeElementType(on, ctx);
+        on.elementType = elementType;
+        if (on.list) {
+            on.expType = ctx.list(elementType);
+        } else {
+            on.expType = ctx.set(elementType);
+        }
+    }
+
+    static PropType computeElementType(ArrayExpression on, ValidationContext ctx) {
+        if (on.enforceType != null) {
+            return ctx.typeOrObjectData(on.enforceType);
+        } else {
+            if (on.values.isEmpty) {
+                PropType type = ctx.getExpectedType();
+                if (type == null) {
+                    type = ctx.object();
+                } else {
+                    PropType listType = ctx.getType('Iterable');
+                    if (PropTypeUtil.isAssignableFrom(listType, type)) {
+                        return TypeUtils.elementTypeWithIndex(type, 0);
+                    }
+                }
+                return type;
+            }
+            return ctx.findSuperType(on.values.map((e) => ctx.typeOrObject(e)).toList());
+        }
+    }
+
+    static Boolean shouldNotAssignToField(Expression exp) {
+        if (exp == null) {
+            return false;
+        }
+        if (!(exp is FieldOrEnumExpression)) {
+            return false;
+        }
+        FieldOrEnumExpression fe = exp as FieldOrEnumExpression;
+        ClassDecl type = fe.fieldClass;
+        if (type == null) {
+            return false;
+        }
+        FieldDecl curField = type.fields.firstWhere((f) => f.name == fe.name);
+        if (curField == null) {
+            return false;
+        }
+        return curField.final || curField.const;
+    }
+
+    static void validateAssignment(Assignment on, ValidationContext ctx) {
+        if (on.left is FieldOrEnumExpression) {
+            FieldOrEnumExpression fe = on.left as FieldOrEnumExpression;
+            fe.setter = true;
+            validate(on.left, ctx);
+            if(fe.evalType == LOCAL_VAR) {
+                LocalVar local = ctx.findLocalVar(fe.name);
+                local.markNotFinal();
+            }
+        } else {
+            // This case is wrong because on.left cannot be anything other than FieldOrEnumExpression
+            ctx.addError(null, 'Invalid assignment operator');
+        }
+        PropType lt = ctx.typeOrObject(on.left);
+        ctx = ctx.subWithType(lt);
+        if (on.right == null) {
+            ctx.addError(null, 'Assignment value is requried');
+        } else {
+            validate(on.right, ctx);
+        }
+        if (shouldNotAssignToField(on.left)) {
+            ctx.addError(on.left.range, 'Cannot assign to this field: ' + on.left.toString());
+            return;
+        }
+        PropType rt = ctx.typeOrObject(on.right);
+        switch (on.op) {
+            case '=':
+                if (!PropTypeUtil.isAssignableFrom(lt, rt)) {
+                    ctx.addError(null, 'Can not assign \"' + rt.toString() + '\" to \"' + lt.toString() + '\"');
+                }
+
+            default: 
+                validateWithOp(ctx, null, on.left.range, on.right.range, lt, rt, on.op);
+        }
+        on.expType = computeReturnType(on, ctx);
+    }
+
+    static FieldDecl getProp(Assignment on, ValidationContext ctx) {
+        if(on.left is FieldOrEnumExpression) {
+            FieldOrEnumExpression fe = on.left as FieldOrEnumExpression;
+            if (fe.on == null) {
+                return null;
+            }
+            PropType type = ctx.typeOrObject(fe.on);
+            return PropTypeUtil.getField(type, fe.name);
+
+        } else {
+            return null;
+        }
+    }
+
+    static void validateBinaryExpression(BinaryExpression on, ValidationContext ctx) {
+        on.expType = null;
+        if (on.left != null) {
+            validate(on.left, ctx);
+        }
+        PropType lt = ctx.typeOrObject(on.left);
+        ctx = ctx.subWithType(lt);
+        if (on.right != null) {
+            validate(on.right, ctx);
+        }
+        if (on.left == null || on.right == null) {
+            ctx.addError(null, 'Left and Right operand should be requried');
+            return;
+        }
+        PropType rt = ctx.typeOrObject(on.right);
+        on.method = validateWithOp(ctx, null, on.left.range, on.right.range, lt, rt, on.op);
+        on.expType = typeBinaryExpression(on, ctx);
+    }
+
+    static MethodDecl validateWithOp(ValidationContext ctx, Range _this, Range left, Range right, PropType lt, PropType rt, String op) {
+        if (op == null) {
+            ctx.addError(left, 'Invalid operator');
+            return null;
+        }
+        if ('==' == op || '!=' == op) {
+            if (!PropTypeUtil.canCompare(lt, rt)) {
+                ctx.addError(left, 'Can not compare two different Types \"' + lt.toString() + '\" and \"' + rt.toString() + '\"');
+            }
+            return null;
+        }
+        if (lt == null) {
+            ctx.addError(_this, 'left side is null');
+            return null;
+        }
+        MethodDecl method = PropTypeUtil.findOperatorMethod(lt, ctx, op, rt);
+        if (method == null) {
+            ctx.addError(_this, 'The operator ' + op.toString() + ' is undefined for the argument type(s) ' + lt.toString() + ', ' + rt.toString());
+        }
+        return method;
+    }
+
+    static PropType typeBinaryExpression(BinaryExpression on, ValidationContext ctx) {
+        if (on.expType != null) {
+            return on.expType;
+        }
+        if ('==' == on.op || '!=' == on.op) {
+            on.expType = ctx.bool();
+            return on.expType;
+        }
+        PropType lt = ctx.typeOrObject(on.left);
+        ctx = ctx.subWithType(lt);
+        PropType rt = ctx.typeOrObject(on.right);
+        if (lt == null) {
+            on.expType = ctx.object();
+            return on.expType;
+        }
+        MethodDecl method = PropTypeUtil.findOperatorMethod(lt, ctx, on.op, rt);
+        if (method != null) {
+            on.expType = PropTypeUtil.resolveType(lt, ctx, method.returnType.resolvedType, createTypeArguments(method, ctx, List()));
+            return on.expType;
+        }
+        on.expType = ctx.object();
+        return on.expType;
+    }
+    static Map<String, PropType> createTypeArguments(MethodDecl on, ValidationContext ctx, List<PropType> typeArgs) {
+        if (ctx == null || typeArgs == null || on.haveTypeParams) {
+            return Map();
+        }
+        Map<String, PropType> result = Map();
+        for (TypeParam t in on.generics.params) {
+            // FIXME
+            // List<TypeResolutionPosition> positions = t.positions;
+            List<PropType> all = List();
+            // for (TypeResolutionPosition p in positions) {
+            //     PropType res = getTypeAtPosition(on, ctx, p);
+            //     if (res != null) {
+            //         all.add(res);
+            //     }
+            // }
+            result.set(t.name, ctx.findSuperType(all));
+        }
+        //for (Integer x = 0; x < typeArgs.length && x < typeVars.length; x++) {
+        //	result.set(typeVars.get(x).name, typeArgs.get(x));
+        //}
+        return result;
+    }
+
+    static void validateBlock(Block on, ValidationContext context) {
+        ValidationContext ctx = context.createSharedSub();
+        Boolean hasReturnType = false;
+        for (Statement s in on.statements) {
+            if (s == null) {
+                break;
+            }
+            if (hasReturnType) {
+                ctx.addError(s.range, 'Unreachable code');
+                break;
+            }
+            ctx.statement = s;
+            s.finalVars.clear();
+            validate(s, ctx);
+            ctx.statement = null;
+            hasReturnType = computeReturnType(s, ctx) != null;
+        }
+        on.returnType = computeReturnType(on, ctx);
+        for (Statement s in on.statements) {
+            s.finalVars.removeWhere((v) => v.isFinal);
+        }
+    }
+
+    static Boolean hasBoolAttribute(Object attr) {
+        if (attr == null) {
+            return false;
+        }
+        try {
+            return (attr as Boolean);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    static void validateBreak(Break on, ValidationContext ctx) {
+        Object localVar = ctx.getAttribute('#b');
+        if (!hasBoolAttribute(localVar)) {
+            ctx.addError(null, 'break is not valid out side loops');
+        }
+    }
+
+    static void validateCatchPart(CatchPart on, ValidationContext ctx) {
+        if (on.onType != null) {
+            validateDataType(on.onType, ctx);
+        }
+        if (on.body != null) {
+            PropType expType = on.onType == null ? ctx.getType('Exception') : on.onType.resolvedType;
+            ValidationContext sub = ctx.createSharedSub();
+            if (on.exp != null) {
+                sub.addLocalVar(expType, on.exp, false);
+            }
+            if (on.stackTrace != null) {
+                sub.addLocalVar(ctx.getType('StackTrace'), on.stackTrace, false);
+            }
+            validate(on.body, sub);
+        } else {
+            ctx.addError(null, 'Catch block is required');
+        }
+    }
+
+    static void validateCollectionFor(CollectionFor on, ValidationContext context) {
+        ValidationContext ctx = context.createSharedSub();
+        if(on.stmt is ForEachLoop) {
+            validateForEachLoop(on.stmt as ForEachLoop, context);
+        } else if (on.stmt is ForLoop) {
+            validateForLoop(on.stmt as ForLoop, context);
+        }
+        if (on.value != null) {
+            validate(on.value, ctx);
+            if (on.value != null) {
+                on.expType = ctx.typeOrObject(on.value);
+            }
+        } else {
+            ctx.addError(null, 'For body is required');
+            on.expType = ctx.object();
+        }
+    }
+
+    static void validateCollectionIf(CollectionIf on, ValidationContext ctx) {
+        if (on.test != null) {
+            validate(on.test, ctx);
+            PropType type = ctx.typeOrObject(on.test);
+            if (!TypeUtils.isBool(type)) {
+                ctx.addError(on.test.range, 'Can not convert Boolean from \"' + type.toString() + '\"');
+            }
+        }
+        if (on.thenItem != null) {
+            validate(on.thenItem, ctx);
+        }
+        if (on.elseItem != null) {
+            validate(on.elseItem, ctx);
+        }
+
+        if (on.elseItem == null) {
+            on.expType = ctx.typeOrObject(on.thenItem);
+        } else {
+            on.expType = ctx.getCommonType(ctx.typeOrObject(on.thenItem), ctx.typeOrObject(on.elseItem));
+        }
+    }
+
+    static void validateCollectionSpread(CollectionSpread on, ValidationContext ctx) {
+        validate(on.values, ctx);
+        PropType type = ctx.typeOrObject(on.values);
+        if (!TypeUtils.isCollection(type)) {
+            ctx.addError(on.values.range, 'Expression type should be collection');
+        }
+        on.expType = TypeUtils.elementType(type);
+    }
+
+    static void validateContinue(Continue on, ValidationContext ctx) {
+        Object localVar = ctx.getAttribute('#c');
+        if (!hasBoolAttribute(localVar)) {
+            ctx.addError(null, '\'continue\' is not valid out side loops');
+        }
+    }
+    
+    static void validateDataType(DataType on, ValidationContext ctx) {
+        if(on is ValueType) {
+            ValueType von = on as ValueType;
+            PropType propType = ctx.getType(von.name);
+            if (propType == null) {
+                ctx.addError(null, 'Invalid type \"' + on.name + '\"');
+                propType = ctx.object();
+            } else {
+                ctx.addUsedType(propType);
+                ctx.addTypeUsage(propType);
+            }
+            validateTypeArguments(von.args, ctx, propType.typeVars);
+            on.resolvedType = DataTypeUtil.type(von, ctx);
+        } else if(on is FunctionType) {
+            //FIXME
+        }
+    }
+    
+    static void validateDeclaration(Declaration on, ValidationContext ctx) {
+        if (on.type != null) {
+            validateDataType(on.type, ctx);
+            on.expType = on.type.resolvedType;
+        } else {
+            ctx.addError(null, 'Type is required');
+        }
+        PropType propType = ctx.typeOrObjectData(on.type);
+        if (propType == null) {
+            propType = ctx.object();
+        }
+        for(NameAndValue nv in on.names) {
+                // ReservedWords.checkReserved(nv.name, ctx, null);
+            if (ctx.hasLocalVar(nv.name)) {
+                ctx.addError(null, 'Found duplicate field \"' + nv.name + '\"');
+            } else {
+                ctx.addLocalVar(propType, nv.name, false);
+            }
+            if (nv.value != null) {
+                ValidationContext sub = ctx.subWithType(propType);
+                validate(nv.value, sub);
+                PropType assignType = sub.typeOrObject(nv.value);
+                if (assignType!= null && !PropTypeUtil.isAssignableFrom(propType, assignType)) {
+                    sub.addError(nv.value.range, 'Can not assign \"' + assignType.toString() + '\" to type \"' + propType.toString() + '\"');
+                }
+            }
+        }
+    }
+    
+    static void validateDoWhileLoop(DoWhileLoop on, ValidationContext ctx) {
+        if (on.test == null) {
+            ctx.addError(null, 'Test expression is required');
+        } else {
+            validate(on.test, ctx);
+            PropType testType = ctx.typeOrObject(on.test);
+            if (!TypeUtils.isBool(testType)) {
+                ctx.addError(on.test.range, 'Can not convert Boolean from \"' + testType.toString() + '\"');
+            }
+        }
+        ValidationContext sub = ctx.createSharedSub();
+        PropType bool = sub.bool();
+        sub.addAttribute('#c', true);
+        sub.addAttribute('#b', true);
+        if (on.body == null) {
+            // sub.addWarn(null, 'Found empty body');
+        } else {
+            validate(on.body, sub);
+        }
+    }
+
+    static void validateExpressionArrayItem(ExpressionArrayItem on, ValidationContext ctx) {
+        if (on.exp != null) {
+            validate(on.exp, ctx);
+        }
+        on.expType = ctx.typeOrObject(on.exp);
+    }
+
+    static void validateFieldOrEnumExpression(FieldOrEnumExpression fe, ValidationContext ctx) {
+        validateInternal(fe, ctx);
+    }
+
+    static void validateInternal(FieldOrEnumExpression fe, ValidationContext ctx) {
+        fe.evalType = EvalType.ERROR;
+        fe.expType = null;
+        if (fe.on != null) {
+            if (fe.on is FieldOrEnumExpression) {
+                PropType eval = evalStaticType((fe.on as FieldOrEnumExpression), ctx);
+                if (eval != null) {
+                    ctx.addUsedType(eval);
+                    ctx.addTypeUsage(eval);
+                    if (!checkOnField(fe,ctx, eval, true)) {
+                        ctx.addError(fe.range, 'Invalid static field \'' + fe.name.toString() + '\' on type \'' + eval.toString() + '\'');
+                    }
+                    return;
+                }
+            }
+            validate(fe.on, ctx);
+            PropType type = ctx.typeOrObject(fe.on);
+            ctx.addUsedType(type);
+            if (!checkOnField(fe, ctx, type, false)) {
+                ctx.addError(fe.range, 'Invalid field \"' + fe.name.toString() + '\" on type \"' + type.toString() + '\"');
+                return;
+            }
+        } else {
+            if (fe.name == 'super') {
+                LocalVar _this = ctx.findLocalVar('this');
+                if (_this != null) {
+                    PropType _extends = _this.type.extends;
+                    fe.expType = _extends;
+                    fe.evalType = EvalType.LOCAL_VAR;
+                    return;
+                }
+            }
+            PropType et = ctx.getExpectedType();
+            if (et !=null && et.enm != null) {
+                FieldDecl findField = PropTypeUtil.findField(((et as ClassType)), fe.name, true);
+                if (findField != null) {
+                    if (!checkPrivateFieldAccess(findField.name, true, et, ctx)) {
+                        ctx.addError(fe.range, 'FieldDecl ' + findField.name + ' in ' + et.name + ' is not visible.');
+                        return;
+                    }
+                    fe.resolvedMember = findField;
+                    fe.evalType = EvalType.STATIC_FIELD;
+                    fe.fieldClass = et.cls;
+                    fe.expType = et;
+                    ctx.addTypeUsage(et);
+                    return;
+                }
+            }
+            LocalVar findLocalVar = ctx.findLocalVar(fe.name);
+            if (findLocalVar == null) {
+                LocalVar _this = ctx.findLocalVar('this');
+                if (_this != null) {
+                    if (checkOnField(fe, ctx, _this.type, false)) {
+                        return;
+                    }
+                }
+                if (checkOnField(fe, ctx, ctx.getDataType(), true)) {
+                    return;
+                }
+                ctx.addError(fe.range, 'Invalid field or type or enum value \"' + fe.name.toString() + '\"');
+            } else {
+                if(!findLocalVar.initialized) {
+                    LocalVar _this = ctx.findLocalVar('this');
+                    if (_this != null) {
+                        if (checkOnField(fe, ctx, _this.type, false)) {
+                            return;
+                        }
+                    }
+                    if (checkOnField(fe, ctx, ctx.getDataType(), true)) {
+                        return;
+                    }
+                    ctx.addError(fe.range, 'The local variable \"' + fe.name.toString() + '\" may not have been initialized');
+                }
+                fe.evalType = EvalType.LOCAL_VAR;
+                fe.expType = findLocalVar.type;
+                ctx.addLambdaUsed(findLocalVar, false);
+            }
+        }
+    }
+
+    static PropType evalStaticType(FieldOrEnumExpression fe, ValidationContext ctx) {
+        PropType type = null;
+        if (fe.on == null) {
+            PropType et = ctx.getExpectedType();
+            if (et is EnumType) {
+                if (PropTypeUtil.hasField(et as EnumType, ctx, fe.name, true)) {
+                    fe.expType = et;
+                    return null;
+                }
+            }
+            type = ctx.getType(fe.name);
+        } else {
+            if (fe.on is FieldOrEnumExpression) {
+                String pkg = pkgName((fe.on as FieldOrEnumExpression));
+                if (pkg != null) {
+                    type = ctx.getType(pkg + '.' + fe.name);
+                }
+            }
+        }
+        if (type != null) {
+            fe.fieldClass = type.cls;
+            fe.evalType = TYPE;
+        }
+        return type;
+    }
+
+    static String pkgName(FieldOrEnumExpression fe, ) {
+        if (fe.on == null) {
+            return fe.name;
+        }
+        if (fe.on is FieldOrEnumExpression) {
+            String pkg = pkgName((fe.on as FieldOrEnumExpression));
+            if (pkg != null) {
+                return pkg + '.' + fe.name;
+            } else {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    static Boolean checkPrivateFieldAccess(String fieldName, Boolean isStatic, PropType type, ValidationContext ctx) {
+        if (fieldName.startsWith('_')) {
+            PropType typeWithField = null;
+            if (!isStatic) {
+                LocalVar _this = ctx.findLocalVar('this');
+                if (_this != null && _this.type != null) {
+                    typeWithField = _this.type;
+                }
+            } else {
+                typeWithField = ctx.getDataType();
+            }
+            if (typeWithField != null && type != typeWithField) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static Boolean checkOnField(FieldOrEnumExpression fe, ValidationContext ctx, PropType type, Boolean isStatic) {
+        if (type == null) {
+            return false;
+        }
+        String fieldName = fe.name;
+        FieldDecl field = PropTypeUtil.getField(type, fieldName);
+        if (field != null && (field.type != null)) {
+            if (!checkPrivateFieldAccess(fieldName, isStatic, type, ctx)) {
+                ctx.addError(fe.range, 'FieldDecl ' + fieldName + ' in ' + type.name + ' is not visible.');
+                return false;
+            }
+            fe.expType = PropTypeUtil.resolveType(type, ctx, field.type.resolvedType, Map.fromIterable(field.typeArguments, key: (i)=> i.name, value:(k)=>k.type));
+            fe.resolvedMember = field;
+            fe.evalType = (isStatic ? EvalType.STATIC_FIELD : EvalType.FIELD);
+            fe.fieldClass = type.cls;
+            ctx.addFieldUsege(type, field);
+            return true;
+        }
+        MethodDecl method = PropTypeUtil.findMethodByName(ctx, type, fieldName, fe.setter, !fe.setter);
+        if (method == null) {
+            method = PropTypeUtil.findMethodByName(ctx, type, fieldName, false, false);
+            if (method == null) {
+                return false;
+            }
+            if (method.static != isStatic) {
+                String error;
+                if (method.static) {
+                    error = 'Static method \'' + fe.name + '\' in type \'' + type.name + '\ must be accessed in a static way.';
+                } else {
+                    error = 'Cannot make a static reference to non-static method \'' + fe.name + '\' in type \'' + type.name + '\'.';
+                }
+                ctx.addError(fe.range, error);
+                return false;
+            }
+            fe.resolvedMember = method;
+            fe.evalType = EvalType.METHOD_REFERENCE;
+            fe.fieldClass = type.cls;
+            fe.expType = PropTypeUtil.resolveType(type, ctx, LambdaTypeUtil.asLambdaType(method), Map());
+        } else {
+            fe.evalType = EvalType.GETTER;
+            fe.resolvedMember = method;
+            fe.fieldClass = type.cls;
+            fe.expType = PropTypeUtil.resolveType(type,ctx,  method.getter ? method.returnType.resolvedType : method.params.first.dataType.resolvedType, Map());
+        }
+        ctx.addMethodUsege(type, method);
+        return true;
+    }
+
+    static void validateForEachLoop(ForEachLoop on, ValidationContext context) {
+        ValidationContext ctx = context.createSharedSub();
+        validateAbstractForEachLoop(on, ctx);
+        if (on.body != null) {
+            validate(on.body, ctx);
+        } else {
+            ctx.addWarn(null, 'Empty for loop found');
+        }
+    }
+
+    static void validateForLoop(ForLoop on, ValidationContext context) {
+        ValidationContext ctx = context.createSharedSub();
+        PropType bool = ctx.bool();
+        ctx.addAttribute('#c', true);
+        ctx.addAttribute('#b', true);
+        if (on.decl != null) {
+            validate(on.decl, ctx);
+        }
+        on.inits.forEach((e) => validate(e, ctx));
+        if (on.test == null) {
+            ctx.addError(null, 'Test expression is required');
+        } else {
+            validate(on.test, ctx);
+            PropType testType = ctx.typeOrObject(on.test);
+            if (!TypeUtils.isBool(testType)) {
+                ctx.addError(on.test.range, 'Can not convert Boolean from \"' + testType.toString() + '\"');
+            }
+        }
+        on.resets.forEach((e) => validate(e, ctx));
+        if (on.body == null) {
+            ctx.addWarn(null, 'Found empty body');
+        } else {
+            validate(on.body, ctx);
+        }
+    }
+
+    static void validateIfStatement(IfStatement on, ValidationContext ctx) {
+        if (on.test == null) {
+            ctx.addError(null, 'Condition is required');
+        } else {
+            validate(on.test, ctx);
+            PropType type = ctx.typeOrObject(on.test);
+            if (!TypeUtils.isBool(type)) {
+                ctx.addError(on.test.range, 'Can not convert Boolean from \"' + type.toString() + '\"');
+            }
+        }
+        if (on.thenStatement != null) {
+            validate(on.thenStatement, ctx);
+        } else {
+            ctx.addError(null, 'If body is required');
+        }
+        if (on.elseStatement != null) {
+            validate(on.elseStatement, ctx);
+        }
+        on.returnType = computeReturnType(on, ctx);
+    }
+
+    static void validateLambdaExpression(LambdaExpression on, ValidationContext ctx) {
+        on.expType = null;
+        PropType ct = ctx.getExpectedType();
+        LambdaType expType = PropTypeUtil.findLambdaFunction(ct);
+        if (!(expType is LambdaType)) {
+            ctx.addError(null, 'Function not found.');
+            return;
+        }
+        MethodDecl method = expType.method;
+        on.originalMethod = method;
+        MethodDecl resultMethod = MethodDecl(declCls: ct, name:  '', typeAccess: TypeAccess.SHARED);
+        resultMethod.typeVars = method.typeVars;
+        resultMethod.returnType = method.returnType;
+        on.returnType = method.returnType;
+        List<MethodParam> lambdaParamTypes = List();
+        List<MethodParam> params = method.positionalParams;
+        if (params.length != on.params.length) {
+            ctx.addError(null, 'Arguments size is not matched with function parameters. ' + params.length.toString());
+        }
+        PropType rt = PropTypeUtil.resolveType(ct, ctx, method.returnType.resolvedType, Map<String, PropType>());
+        ValidationContext subCtx = ctx.subWithType(rt);
+        subCtx.insideLambda = true;
+        subCtx.addAttribute('#b', null);
+        subCtx.addAttribute('#c', null);
+        //subCtx.addLocalVar(ct, "#a", false);
+        CollectionsUtil.forEach(params, on.params, (p, a) {
+            PropType paramType = PropTypeUtil.resolveType(ct, subCtx, p.type.resolvedType, Map<String, PropType>());
+            lambdaParamTypes.add(MethodParam(name: a.name ,dataType:  paramType.toDataType()));
+            validateParam(a, subCtx, paramType);
+        });
+        if (on.expression != null) {
+            validate(on.expression, subCtx);
+            PropType returnType = subCtx.typeOrObject(on.expression);
+            if (rt != PropTypeUtil.VOID && !PropTypeUtil.isAssignableFrom(rt, returnType)) {
+                subCtx.addError(on.expression.range, 'Function return type \"' + returnType.toString() + '\" is not matched with \"' + rt.toString() + '\"');
+            } else {
+                resultMethod.returnType = returnType.toDataType();
+            }
+            resultMethod.expression = on.expression;
+        } else if (on.body != null) {
+            subCtx.addLocalVar(ctx.bool(), '#r');
+            validate(on.body, subCtx);
+            resultMethod.body = on.body;
+            PropType returnType = computeReturnType(on.body, subCtx);
+            if (returnType == null) {
+                if (rt.name != PropTypeUtil.VOID_TYPE) {
+                    subCtx.addError(null, 'Function must return a result of type \"' + rt.toString() + '\"');
+                }
+            } else {
+                resultMethod.returnType = returnType.toDataType();
+            }
+        }
+        resultMethod.positionalParams = lambdaParamTypes;
+        on.expectedType = ct;
+        PropType pt = createLambdaExpType(subCtx, resultMethod, ct);
+        on.expType = pt;
+    }
+    
+    static PropType createLambdaExpType(ValidationContext subCtx, MethodDecl resultMethod, PropType ct) {
+        LambdaType res = LambdaTypeUtil.withMethod(resultMethod);
+        ct.typeVars.forEach((i) => res.typeVars.add(i));
+        if (ct is ParameterizedType) {
+            subCtx.setExpectedType(resultMethod.returnType.resolvedType);
+            Map<String, PropType> arguments = ExecutableUtil.createTypeArguments(resultMethod, subCtx, List());
+            ParameterizedType dpt = (ct as ParameterizedType);
+            ParameterizedType pt = ParameterizedTypeUtil.from(res);
+            dpt.arguments.forEach((t){
+                ParameterizedTypeUtil.addArgumentWithName(pt, t.name, t.type);
+            });
+            resultMethod.typeVars.where((t) => TypeVariableUtil.isDependsOnReturn(t)).forEach((t) {
+                ParameterizedTypeUtil.addArgumentWithName(pt, t.name, PropTypeUtil.resolveType(res, subCtx, t, arguments));
+            });
+            return pt;
+        } else {
+            return res;
+        }
+    }
+
+    static void validateLiteralExpression(LiteralExpression on, ValidationContext ctx) {
+        if (on.type == LiteralType.TypeString) {
+            on.expType = ctx.getType('String');
+        } else if (on.type == LiteralType.TypeBoolean) {
+            on.expType = ctx.getType('Boolean');
+        } else if (on.type == LiteralType.TypeInteger) {
+            on.expType = ctx.getType('Integer');
+        } else if (on.type == LiteralType.TypeDouble) {
+            on.expType = ctx.getType('Double');
+        }
+    }
+
+
+    static void validateMethodCall(MethodCall mc,ValidationContext ctx) {
+        validateMethodCallInternal(mc, ctx);
+    }
+
+    static void validateMethodCallInternal(MethodCall mc,ValidationContext ctx) {
+        mc.expType = null;
+        mc.callType = MethodCallType.ERROR;
+        if (mc.name == null) {
+            ctx.addError(mc.range, 'MethodDecl name is required');
+            return;
+        }
+        if (mc.on == null) {
+            PropType type;
+            if (mc.name == 'super') {
+                LocalVar _super = ctx.findLocalVar('#super');
+                if (_super != null) {
+                    type = _super.type.extends;
+                } else {
+                    type = null;
+                }
+            } else {
+                type = ctx.getType(mc.name);
+            }
+            if (type != null) {
+                MethodDecl constructor = findMethod(ctx, mc, type);
+                if (constructor != null) {
+                    mc.expType = validateArgs(mc, ctx, type, constructor);
+                    mc.callType = MethodCallType.Constructor;
+                    ctx.addUsedType(mc.expType);
+                    mc.resolvedMethod = constructor;
+                    ctx.addMethodUsege(type, constructor);
+                    return;
+                } else {
+                    ctx.addError(mc.range, 'The constructor in the type \"' + type.toString() + '\" is not applicable for the arguments ' + getParamsError(mc, ctx));
+                }
+            } else {
+                LocalVar var = ctx.findLocalVar(mc.name);
+                if (var != null && var.initialized) {
+                    PropType fieldType = ctx.getLocalVarType(mc.name);
+                    FunctionType function = fieldType == null ? null : PropTypeUtil.findLambdaFunction(fieldType);
+                    if (function != null) {
+                        MethodDecl lambdaFunction = function.method;
+                        if (lambdaFunction != null) {
+                            mc.callType = MethodCallType.FunctionMethod;
+                            mc.expType = validateArgs(mc, ctx, fieldType, lambdaFunction);
+                            mc.resolvedMethod = lambdaFunction;
+                            ctx.addUsedType(mc.expType);
+                            mc.staticClass = function;
+                        } else {
+                            ctx.addError(mc.range, 'The method \"' + fieldType.name + '\" is not applicable for the arguments ' + getParamsError(mc, ctx));
+                        }
+                        return;
+                    }
+                } else {
+                    LocalVar _this = ctx.findLocalVar('this');
+                    if (_this != null) {
+                        if (validateOnMethod(mc, ctx, _this.type)) {
+                            return;
+                        }
+                    }
+                    if (findStaticMethod(mc, ctx, ctx.getDataType())) {
+                        return;
+                    }
+                }
+                ctx.addError(mc.range, 'Invalid method/type \"' + mc.name.toString() + '\"');
+            }
+        } else {
+            if (mc.on is FieldOrEnumExpression) {
+                FieldOrEnumExpression typeExp = mc.on as FieldOrEnumExpression;
+                PropType propType = evalStaticType(typeExp, ctx);
+                if (propType != null) {
+                    ctx.addTypeUsage(propType);
+                    if (!findStaticMethod(mc, ctx, propType)) {
+                        MethodDecl constructor = findConstructor(mc, ctx, propType);
+                        if (constructor != null) {
+                            mc.expType = validateArgs(mc, ctx, propType, constructor);
+                            mc.callType = MethodCallType.FactoryConstructor;
+                            mc.resolvedMethod = constructor;
+                            mc.staticClass = mc.expType is ParameterizedType ? (mc.expType as ParameterizedType).baseType : mc.expType;
+                            ctx.addMethodUsege(propType, constructor);
+                            ctx.addUsedType(mc.expType);
+                            return;
+                        }
+                        ctx.addError(mc.range, 'The static method \"' + mc.name + '\" in the type \"' + propType.toString() + '\" is not applicable for the arguments \" ' + getParamsError(mc, ctx));
+                    }
+                    return;
+                }
+            }
+            validate(mc.on, ctx);
+            PropType type = ctx.typeOrObject(mc.on);
+            if (!validateOnMethod(mc, ctx, type)) {
+                ctx.addError(mc.range, 'The method \"' + mc.name + '\" in the type \"' + type.toString() + '\" is not applicable for the arguments ' + getParamsError(mc, ctx));
+            }
+        }
+    }
+
+    static String getParamsError(MethodCall mc, ValidationContext ctx) {
+        List<PropType> positioanlTypes = mc.positionArgs.map((p) => ctx.typeOrObject(p.arg)).toList();
+        StringBuffer b = StringBuffer();
+        b.write('(');
+        if (!positioanlTypes.isEmpty) {
+            b.write(positioanlTypes.get(0));
+            for (Integer i = 1; i < positioanlTypes.length; i++) {
+                b.write(', ');
+                b.write(positioanlTypes.get(i));
+            }
+        }
+        if (!mc.namedArgs.isEmpty) {
+            if (!positioanlTypes.isEmpty) {
+                b.write(', ');
+            }
+            b.write(mc.namedArgs.get(0));
+            for (Integer i = 1; i < mc.namedArgs.length; i++) {
+                b.write(', ');
+                b.write(mc.namedArgs.get(i));
+            }
+        }
+        b.write(')');
+        return b.toString();
+    }
+
+    static MethodDecl findConstructor(MethodCall mc, ValidationContext ctx, PropType propType) {
+        String value = mc.name;
+        if (value == 'super') {
+            value = propType.name;
+        }
+        return PropTypeUtil.findConstructor(propType, ctx, value);
+    }
+
+    static MethodDecl findMethod(ValidationContext ctx, MethodCall mc, PropType propType) {
+        return PropTypeUtil.findMethod(ctx, propType, mc.name);
+    }
+
+    static Boolean findStaticMethod(MethodCall mc,ValidationContext ctx, PropType type) {
+        MethodDecl method = findMethod(ctx, mc, type);
+        if (method != null && method.static) {
+            mc.expType = validateArgs(mc, ctx, type, method);
+            mc.callType = MethodCallType.StaticMethod;
+            mc.resolvedMethod = method;
+            ctx.addMethodUsege(type, method);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+
+    static Boolean validateOnMethod(MethodCall mc, ValidationContext ctx, PropType type) {
+        MethodDecl method = findMethod(ctx, mc, type);
+        if (method != null && !method.static) {
+            if (method.getter) {
+                return false;
+            }
+            mc.expType = validateArgs(mc, ctx, type, method);
+            mc.callType = MethodCallType.InstanceMethod;
+            mc.resolvedMethod = method;
+            ctx.addMethodUsege(type, method);
+            return true;
+        } else {
+            FieldDecl field = PropTypeUtil.getField(type, mc.name);
+            if (field != null) {
+                PropType fieldType = field.type.resolvedType;
+                LambdaType function = fieldType == null ? null : PropTypeUtil.findLambdaFunction(fieldType);
+                if (function != null) {
+                    MethodDecl lambdaFunction = function.method;
+                    if (lambdaFunction != null) {
+                        mc.expType = validateArgs(mc, ctx, fieldType, lambdaFunction);
+                        mc.callType = MethodCallType.FunctionMethod;
+                        // mc.isInstanceFunction = true;
+                        mc.resolvedMethod = lambdaFunction;
+                        // mc.declaringClass = function;
+                        // mc.staticClass = function;
+                        return true;
+                    } else {
+                        ctx.addError(mc.range, '\' The MethodDecl \'' + fieldType.name + '\' is not applicable for the arguments \'' + getParamsError(mc, ctx));
+                    }
+                }
+            }
+            return false;
+        }
+    }
+
+    static PropType validateArgs(MethodCall mc, ValidationContext ctx, PropType propType, MethodDecl exe) {
+        if (mc.typeArgs != null) {
+            validateTypeArguments(mc.typeArgs, ctx, getTypeVars(mc, propType, exe));
+        }
+        if (mc.positionArgs.length > exe.positionalParams.length + exe.optionalParams.length) {
+            ctx.addError(mc.range, 'Too many positional paramters');
+            return null;
+        }
+        if (mc.positionArgs.length < exe.positionalParams.length) {
+            ctx.addError(mc.range, 'Too few positional paramters');
+            return null;
+        }
+        Boolean hasRequiredErrors = false;
+        for(MethodParam np in exe.namedParams) {
+            if(np.required) {
+                Boolean notFound = true;
+                for(NamedArgument na in mc.namedArgs) {
+                    if(na.name != null && np.name.equals(na.name)) {
+                        notFound = false;
+                        break;
+                    }
+                }
+                if(notFound) {
+                    hasRequiredErrors = true;
+                    ctx.addError(mc.range, 'Parameter ' + np.name + ' is required');
+                }
+            }
+        }
+        if(hasRequiredErrors) {
+            return null;
+        }
+        List<PropType> typesArray = ExecutableUtil.createTypesArray(exe, ctx, propType, mc.typeArgs);
+        MethodDecl dummy = MethodDecl(
+            name: '', 
+        );
+        dummy.typeVars = List.from(exe.typeVars);
+        dummy.returnType = exe.returnType;
+        List<MethodParam> positionalParams = exe.positionalParams;
+        Integer i = 0;
+        for (Integer j = 0; i < positionalParams.length; i++) {
+            MethodParam param = positionalParams.get(i);
+            Argument arg = mc.positionArgs.get(i);
+            PropType resolveType = PropTypeUtil.resolveType(propType, ctx, param.dataType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+            ValidationContext sub = ctx.subWithType(resolveType);
+            validateArgument(arg, sub);
+            PropType type = sub.typeOrObject(arg.arg);
+            dummy.positionalParams.add(MethodParam(name: param.name, dataType:  type.toDataType()));
+            if (!PropTypeUtil.isAssignableFrom(resolveType, type)) {
+                ctx.addError(null, 'Can not assign ' + type.toString() + ' to ' + resolveType.toString());
+            }
+        }
+
+        // Only one argument on Criteria method
+        Boolean onCriteria = (exe != null && exe.name == 'on') && (propType != null && propType.name == 'Criteria');
+        if (onCriteria) {
+            if (mc.positionArgs.isNotEmpty) {
+                Argument arg = mc.positionArgs.first;
+                Expression exp = arg.arg;
+                Boolean invalid = false;
+                if (!(exp is FieldOrEnumExpression)) {
+                    invalid = true;
+                } else {
+                    FieldOrEnumExpression fe = exp as FieldOrEnumExpression;
+                    if (fe.name != 'typeIdx') {
+                        invalid = true;
+                    }
+                }
+                
+                if (invalid) {
+                    ctx.addError(null, 'Wrong expression. Expected \'<Model>.typeIdx\'');
+                }
+            }
+        }
+
+        List<MethodParam> optionalParams = exe.optionalParams;
+        for (Integer j = 0; i < mc.positionArgs.length; j++, i++) {
+            MethodParam param = optionalParams.get(j);
+            Argument arg = mc.positionArgs.get(i);
+            PropType resolveType = PropTypeUtil.resolveType(propType, ctx, param.dataType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+            ValidationContext sub = ctx.subWithType(resolveType);
+            validateArgument(arg, sub);
+            PropType type = sub.typeOrObject(arg.arg);
+            dummy.optionalParams.add(MethodParam(name: param.name, dataType: type.toDataType()));
+            if (!PropTypeUtil.isAssignableFrom(resolveType, type)) {
+                ctx.addError(null, 'Can not assign ' + type.toString() + ' to ' + resolveType.toString());
+            }
+        }
+        List<MethodParam> namedParams = exe.namedParams;
+        for (NamedArgument arg in mc.namedArgs) {
+            MethodParam param = namedParams.firstWhere((f) => f.name == arg.name);
+            if (param != null) {
+                PropType resolveType = PropTypeUtil.resolveType(propType, ctx, param.dataType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+                ValidationContext sub = ctx.subWithType(resolveType);
+                validateNamedArgument(arg, sub);
+                PropType type = sub.typeOrObject(arg.value);
+                dummy.namedParams.add(MethodParam(name: param.name, dataType: type.toDataType()));
+                if (!PropTypeUtil.isAssignableFrom(resolveType, type)) {
+                    ctx.addError(null, 'Can not assign ' + type.toString() + ' to ' + resolveType.toString());
+                }
+            } else {
+                ctx.addError(null, 'Unknown named param ' + arg.name);
+            }
+        }
+        if (dummy.returnType != null) {
+            if (mc.callType == MethodCallType.FunctionMethod) {
+                dummy.typeVars.clear();
+            }
+            PropType resolveType = PropTypeUtil.resolveType(propType, ctx, exe.returnType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+            return resolveType;
+        }
+        return ctx.applyArgs(propType, typesArray);
+    }
+
+    static List<TypeVariable> getTypeVars(MethodCall mc,PropType propType, MethodDecl exe) {
+        List<TypeVariable> list = List.from(exe.typeVars);
+        return list;
+    }
+
+    static void validateMethodParams(MethodParams on, ValidationContext ctx, PropType declType) {
+        on.positionalParams.forEach((p) => validateMethodParam(p, ctx, declType));
+        on.namedParams.forEach((p) => validateMethodParam(p, ctx, declType));
+        on.optionalParams.forEach((p) => validateMethodParam(p, ctx, declType));
+        Set<String> names = Set();
+        [
+            ...on.positionalParams,
+            ...on.namedParams,
+            ...on.optionalParams,
+        ].map((a) => a).forEach((p) {
+            if (!names.add(p.name)) {
+                ctx.addError(null, 'Duplicate parameter name found \"' + p.name + '\"');
+            }
+        });
+    }
+
+    static void validateMethodParam(MethodParam on, ValidationContext ctx, PropType declType) {
+        if (on.dataType != null) {
+            validateDataType(on.dataType, ctx);
+        }
+        if (on.name == null) {
+            ctx.addError(null, 'Parameter name is required');
+        }
+        ReservedWords.checkReserved(on.name, ctx, null);
+        if (on.params != null) {
+            ctx.addError(null, 'FunctionParamer is not supporting');
+            validateMethodParams(on.params, ctx, declType);
+        }
+        if(on.def != null) {
+            validate(on.def.exp, ctx);
+        }
+        addField(on, ctx, declType);
+    }
+
+    static void addField(MethodParam on, ValidationContext ctx, PropType declType) {
+        if (on.name != null) {
+            PropType propType = MethodParamUtil.type(on, ctx, declType);
+            if (on.dataType == null && declType != null && (on.thisToken != null && on.thisToken == 'this')) {
+                // We assign Object in this case        
+                FieldDecl existing = PropTypeUtil.getAllFields(declType).firstWhere((f) => f.name == on.name);
+                if (existing == null) {
+                    ctx.addError(null, 'FieldDecl \"' + on.name + '\" not found in type \"' + declType.name + '\"');
+                    return;
+                }
+                if (existing != null && existing.type != null) {
+                    propType = existing.type;
+                }
+            }
+            ctx.addLocalVar(propType, on.name, false);
+        }
+    }
+
+    static void validateNamedArgument(NamedArgument on, ValidationContext ctx) {
+        if (on.value != null) {
+            validate(on.value, ctx);
+        }
+    }
+
+    static void validateWithType(NamedArgument on, ValidationContext ctx, PropType _this) {
+        if (getName(on) == null) {
+            ctx.addError(null, 'ModelProperty name is required');
+            return;
+        }
+        FieldDecl prop = PropTypeUtil.getField(_this, getName(on));
+        if (prop == null) {
+            ctx.addError(null, 'Invalid property \"' + on.name.toString() + '\"');
+            return;
+        }
+        ValidationContext sub = ctx.subWithField(prop);
+        validate(on.value, sub);
+        PropType type = sub.typeOrObject(on.value);
+        PropType fieldType = prop.type.resolvedType;
+        if (!PropTypeUtil.isAssignableFrom(fieldType, type)) {
+            ctx.addError(on.value.range, 'Type mismatch: cannot convert from ' + type.toString() + ' to ' + fieldType.toString());
+        }
+    }
+    
+    static String getName(NamedArgument on) {
+        return on.name == null ? null : on.name;
+    }
+
+    static void validateParam(Param on, ValidationContext ctx, PropType type) {
+        if (on.name != null && ctx.hasLocalVar(on.name)) {
+            ctx.addError(null, 'Duplicate argument name \"' + on.name.toString() + '\"');
+        }
+        PropType varType = type;
+        if (on.type != null) {
+            PropType argType = ctx.typeOrObjectData(on.type);
+            if (argType == null) {
+                ctx.addError(null, 'Invalid data type \"' + on.type.toString() + '\"');
+            } else {
+                if (!PropTypeUtil.isAssignableFrom(argType, varType)) {
+                    ctx.addError(null, 'Can not convert \"' + argType.toString() + '\" to \"' + varType.toString() + '\"');
+                }
+                varType = argType;
+            }
+        }
+        if (on.name != null) {
+            ctx.addLocalVar(varType, on.name, null);
+        }
+    }
+
+    static void validateParExpression(ParExpression on, ValidationContext ctx) {
+        if (on.exp != null) {
+            validate(on.exp, ctx);
+        }
+        on.expType = ctx.typeOrObject(on.exp);
+    }
+
+    static void validatePostfixExpression(PostfixExpression pe, ValidationContext ctx) {
+        pe.expType = null;
+        if (pe.on == null) {
+            ctx.addError(pe.range, 'Expression is required');
+            return;
+        }
+        if (pe.postfix == null) {
+            ctx.addError(pe.range, 'Postfix is required');
+            return;
+        }
+        if (!(pe.on is FieldOrEnumExpression)) {
+            ctx.addError(pe.range, 'Invalid operator');
+            return;
+        }
+        validate(pe.on, ctx);
+        PropType propType = ctx.typeOrObject(pe.on);
+        if (!TypeUtils.isNumber(propType)) {
+            ctx.addError(null, 'Expression type should be number type.');
+        }
+        pe.expType = ctx.typeOrObject(pe.on);
+        switch (pe.postfix) {
+            case '++':
+            case '--':
+                return;
+
+            default: 
+                ctx.addError(pe.range, 'Invalid operator \"' + pe.postfix + '\"');
+
+        }
+    }
+
+    static void validatePrefixExpression(PrefixExpression pe, ValidationContext ctx) {
+        pe.expType = null;
+        if (pe.on == null) {
+            ctx.addError(pe.range, 'Expression is required');
+            return;
+        }
+        if (pe.prefix == null) {
+            ctx.addError(pe.range, 'Prefix is required');
+            return;
+        }
+        if (pe.prefix == '++' || pe.prefix == '--') {
+            if (!(pe.on is FieldOrEnumExpression)) {
+                ctx.addError(pe.range, 'Invalid operator');
+                return;
+            }
+        }
+        validate(pe.on, ctx);
+        PropType propType = ctx.typeOrObject(pe.on);
+        if (pe.prefix == '!') {
+            if (!TypeUtils.isBool(propType)) {
+                ctx.addError(null, 'Expression type should be bool type.');
+            }
+        } else if (!TypeUtils.isNumber(propType)) {
+            ctx.addError(null, 'Expression type should be number type.');
+        }
+        pe.expType = ctx.typeOrObject(pe.on);
+        switch (pe.prefix) {
+            case '+':
+            case '-':
+            case '++':
+            case '--':
+            case '~':
+            case '!':
+                return;
+
+            default: 
+                ctx.addError(pe.range, 'Invalid operator \"' + pe.prefix + '\"');
+
+        }
+        
+    }
+
+    static void validateReturn(Return on, ValidationContext ctx) {
+        LocalVar localVar = ctx.findLocalVar('#r');
+        if (localVar == null) {
+            ctx.addError(null, 'Invalid return statment');
+            return;
+        }
+        if (on.expression != null) {
+            validate(on.expression, ctx);
+        }
+        PropType type = computeReturnType(on, ctx);
+        if (on.expression != null && type == PropTypeUtil.VOID) {
+            ctx.addError(null, 'Cannot return a void result');
+            return;
+        }
+        PropType expectedType = ctx.getExpectedType();
+        Boolean success = expectedType != null;
+        if (success) {
+            success = PropTypeUtil.isAssignableFrom(expectedType, type);
+            if (!success) {
+                LocalVar asyncVar = ctx.findLocalVar('#a');
+                if (asyncVar != null && (asyncVar.value as Boolean)) {
+                    if (PropTypeUtil.isAssignableFrom(ctx.getType('Future'), type)) {
+                        success = PropTypeUtil.isAssignableFrom(expectedType, ctx.elementTypeWithIndex(type, 0));
+                    } else {
+                        success = PropTypeUtil.isAssignableFrom(expectedType, type);
+                    }
+                }
+            }
+        }
+        if (type!=null && !success) {
+            ctx.addError(null, 'Can not convert from ' + type.toString() + ' to ' + ctx.getExpectedType().toString());
+        }
+        on.returnType = computeReturnType(on, ctx);
+    }
+
+    static void validateSwitchCaseBlock(SwitchCaseBlock on, ValidationContext ctx, PropType testType) {
+        Boolean isEnum = testType.enm != null;
+        ValidationContext testCtx = ctx.subWithType(testType);
+        on.tests.forEach((t) => validate(t, testCtx));
+        for (Expression t in on.tests) {
+            PropType tt = testCtx.typeOrObject(t);
+            if (PropTypeUtil.canCompare(testType, tt)) {
+                continue;
+            }
+            if (isEnum) {
+                ctx.addError(t.range, 'Enum value not found in ' + testType.toString());
+                continue;
+            }
+            ctx.addError(t.range, 'Can not compare ' + tt.toString() + ' with ' + testType.toString());
+        }
+        ValidationContext sub = ctx.createSharedSub();
+        on.statements.forEach((s) => validate(s, sub));
+    }
+
+    static void validateSwitchExpression(SwitchExpression se, ValidationContext ctx) {
+        if (se.on == null) {
+            ctx.addError(se.range, 'Switch test is required');
+        } else {
+            validate(se.on, ctx);
+        }
+        ValidationContext sub = ctx.subWithType(ctx.typeOrObject(se.on));
+        // se.cases.forEach((c) => validateCaseExpression(c, sub, se));
+        if (se.onElse != null) {
+            validate(se.onElse, sub);
+        } else {
+            if(se.cases.isEmpty) {
+                ctx.addError(se.range, 'Switch case should not be empty');
+            }
+        }
+        List<PropType> allTypes = se.cases.map((c) => sub.typeOrObject(c.result)).toList();
+        if (se.onElse != null) {
+            allTypes.add(sub.typeOrObject(se.onElse));
+        }
+        se.expType =  sub.findSuperType(allTypes);
+    }
+
+    static void validateSwitchStatement(SwitchStatement on, ValidationContext ctx) {
+        PropType type;
+        if (on.test != null) {
+            validate(on.test, ctx);
+            type = ctx.typeOrObject(on.test);
+        } else {
+            type = ctx.voidType();
+        }
+        ValidationContext sub = ctx.createSharedSub();
+        on.cases.forEach((c) => validateSwitchCaseBlock(c, sub, type));
+        on.defaults.forEach((d) => validate(d, sub));
+        on.returnType = computeReturnType(on, ctx);
+    }
+
+    static void validateTerinaryExpression(TerinaryExpression on, ValidationContext ctx) {
+        if (on.condition != null) {
+            validate(on.condition, ctx);
+            if (!TypeUtils.isBool(ctx.typeOrObject(on.condition))) {
+                ctx.addError(on.condition.range, 'Condition should be of Boolean type');
+            }
+        } else {
+            ctx.addError(null, 'Condition is required');
+        }
+        if (on.ifTrue != null) {
+            validate(on.ifTrue, ctx);
+        } else {
+            ctx.addError(null, 'Then is required');
+        }
+        if (on.ifFalse != null) {
+            validate(on.ifFalse, ctx);
+        } else {
+            ctx.addError(null, 'Else is required');
+        }
+        on.expType = ctx.getCommonType(ctx.typeOrObject(on.ifTrue), ctx.typeOrObject(on.ifFalse));
+    }
+
+
+    static void validateThrowStatement(ThrowStatement on, ValidationContext ctx) {
+        validate(on.exp, ctx);
+        on.returnType = computeReturnType(on, ctx);
+    }
+
+    static void validateTryCatcheStatment(TryCatcheStatment on, ValidationContext ctx) {
+        if (on.body != null) {
+            validate(on.body, ctx.createSharedSub());
+        } else {
+            ctx.addError(null, 'Try block is required');
+        }
+        on.catchParts.forEach((c) => validateCatchPart(c, ctx));
+        if (on.finallyBody != null) {
+            validate(on.finallyBody, ctx);
+        } else if (on.catchParts.isEmpty) {
+            ctx.addError(null, 'Catch/Finally block is required');
+        }
+        on.returnType = computeReturnType(on, ctx);
+    }
+
+    static void validateTypeArguments(List<DataType> args, ValidationContext ctx, List<TypeVariable> typeVars) {
+        args.forEach((a) => validateDataType(a, ctx));
+        if (typeVars == null || typeVars.length == 0) {
+            ctx.addError(null, 'The type arguments are not applicable here ' + args.toString());
+            return;
+        }
+        if (typeVars.length != args.length) {
+            ctx.addError(null, 'Incorrect number of arguments; it cannot be parameterized with arguments ' + args.toString());
+        } else {
+            CollectionsUtil.forEach(args, typeVars, (a, p) {
+                PropType val = a.resolvedType;
+                if (!PropTypeUtil.isAssignableFrom(p, val)) {
+                    ctx.addError(null, 'Bound mismatch: The type ' + val.toString() + ' is not a valid substitute for the bounded parameter \"' + p.toString() + '\"');
+                }
+            });
+        }
+    }
+
+    static void validateTypeCastOrCheckExpression(TypeCastOrCheckExpression on, ValidationContext ctx) {
+        if (on.exp != null) {
+            validate(on.exp, ctx);
+        }
+        if (on.dataType != null) {
+            validateDataType(on.dataType, ctx);
+            if(PropTypeUtil.isAssignableFrom(on.exp.expType, on.dataType.resolvedType)){
+
+            } else if(!PropTypeUtil.isAssignableFrom(on.dataType.resolvedType, on.exp.expType)){
+                ctx.addError(null, 'Can not convert from ' + on.dataType.resolvedType.toString() + ' to ' + on.exp.expType.toString());
+            }
+        } else {
+            ctx.addError(null, 'Type is required');
+        }
+        if (on.check) {
+            on.expType = ctx.bool();
+            return;
+        }
+        PropType tp = null;
+        if (on.dataType != null) {
+            tp = on.dataType.resolvedType;
+        }
+        if (tp == null) {
+            on.expType = ctx.object();
+            return;
+        }
+        if (!tp.typeVars.isEmpty) {
+            tp = ParameterizedTypeUtil.from(tp);
+        }
+        on.expType = tp;
+    }
+
+    static void validateTypeParams(TypeParams on, ValidationContext ctx) {
+        if (on.params != null) {
+            on.params.forEach((p) => validateTypeParam(p, ctx));
+        }
+    }
+
+    static void validateTypeParam(TypeParam on, ValidationContext ctx) {
+        if (on.name != null) {
+            PropType type = ctx.getType(on.name);
+            if (type != null) {
+                ctx.addWarn(null, 'The type parameter \'' + on.name.toString() + '\' is hiding the type \'' + type.toString() + '\'');
+            }
+        } else {
+            ctx.addError(null, 'Type argument is required');
+        }
+        if (on.extendType != null) {
+            validateDataType(on.extendType, ctx);
+        }
+    }
+
+    static void validateWhileLoop(WhileLoop on, ValidationContext ctx) {
+        if (on.test == null) {
+            ctx.addError(null, 'Test expression is required');
+        } else {
+            validate(on.test, ctx);
+            PropType testType = on.test.expType;
+            if (!TypeUtils.isBool(testType)) {
+                ctx.addError(on.test.range, 'Can not convert Boolean from \'' + testType.toString() + '\'');
+            }
+        }
+        ValidationContext sub = ctx.createSharedSub();
+        PropType bool = sub.bool();
+        sub.addAttribute('#c', true);
+        sub.addAttribute('#b', true);
+        if (on.body == null) {
+            sub.addWarn(null, 'Found empty body');
+        } else {
+            validate(on.body, sub);
+        }
+        on.returnType = computeReturnType(on, ctx);
+    }
+
+
+    static PropType computeReturnType(Statement on, ValidationContext ctx){
+        if (on is Block) {
+            return computeBlockReturnType(on as Block, ctx);
+        } else if (on is Declaration) {
+            return computeDeclarationReturnType(on as Declaration, ctx);
+        } else if (on is IfStatement) {
+            return computeIfStatementReturnType(on as IfStatement, ctx);
+        } else if (on is MethodCall) {
+            return computeMethodCallReturnType(on as MethodCall, ctx);
+        } else if (on is PostfixExpression) {
+            return computePostfixExpressionReturnType(on as PostfixExpression, ctx);
+        } else if (on is Return) {
+            return computeReturnReturnType(on as Return, ctx);
+        } else if (on is SwitchStatement) {
+            return computeSwitchStatementReturnType(on as SwitchStatement, ctx);
+        } else if (on is ThrowStatement) {
+            return computeThrowStatementReturnType(on as ThrowStatement, ctx);
+        } else if (on is TryCatcheStatment) {
+            return computeTryCatcheStatmentReturnType(on as TryCatcheStatment, ctx);
+        } else if (on is WhileLoop) {
+            return computeWhileLoopReturnType(on as WhileLoop, ctx);
+        }
+        return null;
+    }
+
+    static PropType computeWhileLoopReturnType(WhileLoop on, ValidationContext ctx) {
+        return null;
+    }
+
+    static PropType computeTryCatcheStatmentReturnType(TryCatcheStatment on, ValidationContext ctx) {
+        if (on.body != null) {
+            return computeReturnType(on.body, ctx);
+        }
+        return null;
+    }
+
+    static PropType computeBlockReturnType(Block on, ValidationContext ctx) {
+        for(Integer i = on.statements.length - 1; i>= 0 ;i--) {
+            Statement last = on.statements.get(i);
+            return computeReturnType(last, ctx);
+        }
+        return null;
+    }
+
+    static PropType computeDeclarationReturnType(Declaration on, ValidationContext ctx) {
+        return null;
+    }
+
+    static PropType computeIfStatementReturnType(IfStatement on, ValidationContext ctx) {
+        if (on.elseStatement == null || on.thenStatement == null) {
+            return null;
+        }
+        PropType trt = computeReturnType(on.thenStatement, ctx);
+        PropType ert = computeReturnType(on.elseStatement, ctx);
+        return trt == null || ert == null ? null : trt;
+    }
+
+    static PropType computeMethodCallReturnType(MethodCall mc,ValidationContext ctx) {
+        return null;
+    }
+
+    static PropType computePostfixExpressionReturnType(PostfixExpression pe, ValidationContext ctx) {
+        return null;
+    }
+
+    static PropType computeReturnReturnType(Return on, ValidationContext ctx) {
+        if (on.expression == null) {
+            return ctx.voidType();
+        }
+        return ctx.typeOrObject(on.expression);
+    }
+
+    static PropType computeSwitchCaseBlockReturnType(SwitchCaseBlock on, ValidationContext ctx) {
+        if (on.statements.isEmpty) {
+            return null;
+        }
+        Statement last = on.statements.last;
+        PropType ret = computeReturnType(last, ctx);
+        if (ret == null) {
+            return null;
+        }
+        return ret;
+    }
+
+    static PropType computeSwitchStatementReturnType(SwitchStatement on, ValidationContext ctx) {
+        List<PropType> returns = List();
+        for (SwitchCaseBlock c in on.cases) {
+            PropType ret = computeSwitchCaseBlockReturnType(c, ctx);
+            if (ret == null) {
+                return null;
+            }
+            returns.add(ret);
+        }
+        if (on.defaults.isEmpty) {
+            return null;
+        }
+        Statement last = on.defaults.last;
+        PropType ret = computeReturnType(last, ctx);
+        if (ret == null) {
+            return null;
+        }
+        returns.add(ret);
+        return ctx.findSuperType(returns);
+    }
+
+    static PropType computeThrowStatementReturnType(ThrowStatement on, ValidationContext ctx) {
+        return ctx.nullType();
+    }
+
+}

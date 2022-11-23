@@ -8,6 +8,8 @@ server class MethodCall extends Statement {
     Expression on;
     String onTypeName;
     MethodDecl resolvedMethod;
+
+    MethodCallType callType;
     MethodCall({
         this.name,
         this.typeArgs,
@@ -198,6 +200,16 @@ server class MethodCall extends Statement {
             );
         } else {
             return NullExpression();
+        }
+    }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(on);   
+        for(Argument arg in positionArgs) {
+            visitor.visit(arg.arg);
+        }
+        for(NamedArgument arg in namedArgs) {
+            visitor.visit(arg.value);
         }
     }
 }

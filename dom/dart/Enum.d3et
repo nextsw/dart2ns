@@ -36,4 +36,8 @@ server class Enum extends TopDecl {
 
     void simplify(Simplifier s){
     }
+
+    void visit(ExpressionVisitor visitor){
+        
+    }
 }

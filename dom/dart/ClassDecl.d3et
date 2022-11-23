@@ -9,6 +9,7 @@ server class ClassDecl extends TopDecl {
     Boolean isMixin;
     DataType mixinApplicationType;
     String _packagePath;
+    Map<String, String> resolvedGenerics;
     ClassDecl(this.isMixin, String name) : super(name, TopDeclType.Class, '');
 
     void collectUsedTypes(){
@@ -36,10 +37,38 @@ server class ClassDecl extends TopDecl {
         }
     }
 
+    void resolveGenerics() {
+        if(resolvedGenerics != null){
+            return;
+        }
+        resolvedGenerics = Map();
+        if(generics == null) {
+            for(TypeParam p in generics.params) {
+                if(p.extendType != null) {
+                    resolvedGenerics.set(p.name, p.extendType.name);
+                } else {
+                    resolvedGenerics.set(p.name, p.name);
+                }
+            }
+        }
+        // Check extends
+        if(extendType != null) {
+            ClassDecl ex = lib.get(extendType.name) as ClassDecl;
+            if(ex != null) {
+                ex.resolveGenerics();
+                ValueType extType = extendType as ValueType;
+                for(DataType arg in extType.args){
+                    
+                }
+            } 
+        }
+    }
+
     void resolveFields(ResolveContext context){
         for(ClassMember cm in members){
             cm.cls = this;
         }
+        resolveGenerics();
         D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);
@@ -80,5 +109,18 @@ server class ClassDecl extends TopDecl {
 
     String toString(){
         return name;
+    }
+
+    void visit(ExpressionVisitor visitor){
+        for(ClassMember cm in members){
+            cm.visit(visitor);
+        }
+    }
+
+    Iterable<FieldDecl> get fields {
+        return members.where(m => m is FieldDecl).map(m => m as FieldDecl);
+    }
+    Iterable<MethodDecl> get methods {
+        return members.where(m => m is MethodDecl).map(m => m as MethodDecl);
     }
 } 

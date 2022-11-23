@@ -35,4 +35,16 @@ server class SwitchStatement extends Statement {
             d.simplify(s);
         });
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(test);
+        cases.forEach((c) {
+            for(Statement ss in c.statements){
+                visitor.visit(ss);
+            }
+        });
+        defaults.forEach((d){
+            visitor.visit(d);
+        });
+    }
 }

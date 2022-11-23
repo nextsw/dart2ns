@@ -1,0 +1,381 @@
+server class PropTypeUtil {
+
+    static final String ANY_TYPE = 'Object';
+
+    static final String TEXT_TYPE = 'String';
+
+    static final String INTEGER_TYPE = 'Integer';
+
+    static final String DOUBLE_TYPE = 'Double';
+
+    static final String BOOLEAN_TYPE = 'Boolean';
+
+    static final String TYPE_TYPE = 'Type';
+
+    static final String PROPERTY_PATH_TYPE = 'PropertyPath';
+
+    static final String VOID_TYPE = 'void';
+
+    static final String FUNCTION_TYPE = 'Function';
+
+    static final String LIST_TYPE = 'List';
+
+    static final String DURATION_TYPE = 'Duration';
+
+    static final String DATE_TYPE = 'Date';
+
+    static final String DATETIME_TYPE = 'DateTime';
+
+    static final String TIME_TYPE = 'Time';
+
+    static final String SET_TYPE = 'Set';
+
+    static final String ITERABLE_TYPE = 'Iterable';
+
+    static final PropType VOID = createVoid();
+    
+    static PropType createVoid() {
+        PropType pt = PropType(
+            name: PropTypeUtil.VOID_TYPE,
+        );
+        return pt;
+    }
+
+
+    static final Set<String> PRIMITVES = Set.from([
+    ]);
+    
+
+    static void setExtends(PropType on, PropType extnds) {
+        on.extends = extnds;
+    }
+
+    static PropType getGen(PropType on, String name) {
+        for (TypeVariable varType in on.typeVars) {
+            if (varType.name == name) {
+                return varType.extends;
+            }
+        }
+        return null;
+    }
+
+    static Boolean canTypeSubstitute(PropType on, PropType type) {
+        return isAssignableFrom(on, type);
+    }
+
+    static Boolean isAssignableFrom(PropType on, PropType type) {
+        if(on is TypeVariable) {
+		    return TypeVariableUtil.isAssignableFrom(on as TypeVariable, type);
+	    }
+	    if(on is ParameterizedType) {
+		    return ParameterizedTypeUtil.isAssignableFrom(on as ParameterizedType, type);
+	    }
+	
+        return isAssignableFromInternal(on, type);
+    }
+
+    static Boolean isAssignableFromInternal(PropType on, PropType type) {
+        if (type == PropTypeUtil.VOID) {
+            return on == PropTypeUtil.VOID;
+        }
+        if (on == null || on == type || on.name == 'Object') {
+            return true;
+        }
+        if (type.name == 'null') {
+            return on != PropTypeUtil.VOID;
+        }
+        if (type == null) {
+            return false;
+        }
+        if (type is ParameterizedType) {
+            return isAssignableFrom(on, ((type as ParameterizedType)).baseType);
+        }
+        if (type is LambdaType) {
+            return LambdaTypeUtil.canAssignTo(type as LambdaType, on);
+        }
+        if (type.extends != null) {
+            if (isAssignableFrom(on, type.extends)) {
+                return true;
+            }
+        }
+        return type.impls.any((i) => isAssignableFrom(on, i));
+    }
+
+    static Boolean canCompare(PropType on, PropType type) {
+        if (type.name == 'null' && (on.name == 'Integer' || on.name == 'Boolean' || on.name == 'Double')) {
+            return false;
+        }
+        return isAssignableFrom(on, type) || isAssignableFrom(type, on);
+    }
+
+    static PropType fieldType(PropType on, ValidationContext ctx, String fieldName, Boolean isStatic) {
+        FieldDecl field = findField(on, fieldName, isStatic);
+        if (field == null) {
+            return ctx.object();
+        }
+        return resolveType(on, ctx, field.type.resolvedType, Map.fromIterable(field.typeArguments, key: (i)=> i.name, value: (i)=>i.type));
+    }
+
+    static Boolean hasField(PropType on, ValidationContext ctx, String fieldName, Boolean isStatic) {
+        return findField(on, fieldName, isStatic) != null;
+    }
+
+    static FieldDecl findField(PropType on, String fieldName, Boolean isStatic) {
+        for (FieldDecl f in getAllFields(on)) {
+            if (f.name == fieldName) {
+                return f.static == isStatic ? f : null;
+            }
+        }
+        return null;
+    }
+
+    static MethodDecl findMethod(ValidationContext ctx, PropType on, String methodName) {
+        return getAllMethods(ctx, on).firstWhere((m) => m.name == methodName, 
+            
+        );
+    }
+
+    static MethodDecl findMethodByName(ValidationContext ctx, PropType on, String methodName, Boolean isSetter, Boolean isGetter) {
+        return getAllMethods(ctx, on).where((m) => m.setter == isSetter).where((m) => m.getter == isGetter).firstWhere((m) => m.name.equals(methodName), 
+            orElse: () {
+                return null;
+            },
+        );
+    }
+
+    static PropType resolveType(PropType on, ValidationContext ctx, PropType type, Map<String, PropType> typeArgument) {
+        if (typeArgument == null) {
+            typeArgument = Map();
+        }
+        if (type is TypeVariable) {
+            PropType et = resolveTypeWithTypeVar(on, ctx, on, typeArgument, (type as TypeVariable));
+            return et == null ? type : et;
+        }
+        if (type.typeVars.isEmpty) {
+            return type;
+        }
+        Boolean isSame = true;
+        ParameterizedType pt;
+        if (type is ParameterizedType) {
+            pt = ParameterizedTypeUtil.from((type as ParameterizedType).baseType);
+        } else {
+            isSame = false;
+            pt = ParameterizedTypeUtil.from(type);
+        }
+        for (TypeVariable t in type.typeVars) {
+            PropType varType = elemenetType(type, t.name);
+            if (!(varType is TypeVariable)) {
+                PropType rt = resolveType(on, ctx, varType, typeArgument);
+                if (rt != varType) {
+                    isSame = false;
+                }
+                ParameterizedTypeUtil.addArgumentWithName(pt, t.name, rt);
+                continue;
+            }
+            PropType propType = resolveTypeWithTypeVar(on, ctx, type, typeArgument, (varType as TypeVariable));
+            if (propType != null) {
+                isSame = false;
+                ParameterizedTypeUtil.addArgumentWithName(pt, t.name, propType);
+            }
+        }
+        return isSame ? type : pt;
+    }
+
+    static PropType resolveTypeWithTypeVar(PropType on, ValidationContext ctx, PropType type, Map<String, PropType> typeArgument, TypeVariable t) {
+        if(on is ParameterizedType){
+            return ParameterizedTypeUtil.resolveTypeWithTypeVar(on as ParameterizedType, ctx, type, typeArgument, t);
+        }
+        PropType propType = typeArgument.get(t.name);
+        if (propType == null) {
+            List<PropType> all = [];
+            if(on.extends != null) {
+                all.add(on.extends);
+            }
+            all.addAll(on.impls);
+            for(PropType e in all) {
+                PropType r = resolveType(e, ctx, t, Map());
+                if(t != r) {
+                    return r;
+                }
+            }
+            return t;
+        }
+        return propType;
+    }
+
+    static PropType methodType(ValidationContext ctx, PropType type, String fieldName, PropType genType) {
+        FieldDecl field = findField(type, fieldName, false);
+        if (field == null) {
+            return PropTypeUtil.VOID;
+        }
+        PropType retType = field.type.resolvedType;
+        if (!type.typeVars.isEmpty && genType != null) {
+            ParameterizedType parameterizedType = ParameterizedTypeUtil.from(type);
+            ParameterizedTypeUtil.addArgument(parameterizedType, genType);
+            if(retType is LambdaType) {
+                MethodDecl method = (retType as LambdaType).method;
+                MethodDecl replaceMethod = MethodUtil.replaceGenerics(method, ctx, parameterizedType);
+                return LambdaTypeUtil.withMethod(replaceMethod);
+            } else {
+                return PropTypeUtil.resolveType(parameterizedType, ctx, retType, null);
+            }
+        }
+        return retType;
+    }
+
+    static List<MethodDecl> getAllMethods(ValidationContext ctx, PropType on) {
+        if(on == null) {
+            return [];
+        }
+	    if(on is ParameterizedType) {
+		  return getAllMethods(ctx, (on as ParameterizedType).baseType);
+	    }
+        if(on is TypeVariable) {
+		  return TypeVariableUtil.getAllMethods(ctx, on as TypeVariable);
+	    }
+        List<MethodDecl> all = List.from(on.cls.methods);
+        if (on.extends != null) {
+            all.addAll(getAllMethods(ctx, on.extends));
+        } else {
+            PropType objType = ctx.object();
+            if(on != objType) {
+                all.addAll(getAllMethods(ctx, objType));
+            }
+        }
+        on.impls.forEach((i) => all.addAll(getAllMethods(ctx, i)));
+        return all;
+    }
+
+    static List<FieldDecl> getAllFields(PropType on) {
+        if(on is ParameterizedType) {
+		  return getAllFields((on as ParameterizedType).baseType);
+	    }
+        if(on is TypeVariable) {
+		  return TypeVariableUtil.getAllFields(on as TypeVariable);
+	    }
+        List<FieldDecl> all = List.from(on.cls.fields);
+        if (on.extends != null) {
+            all.addAll(getAllFields(on.extends));
+        }
+        on.impls.forEach((i) => all.addAll(getAllFields(i)));
+        return all;
+    }
+
+    static PropType getElemenetType(PropType on) {
+        if(on is ParameterizedType){
+            return ParameterizedTypeUtil.getElemenetType(on as ParameterizedType);
+        }
+        if (on.typeVars.isEmpty) {
+            return null;
+        }
+        return on.typeVars.first;
+    }
+
+    static MethodDecl findOperatorMethod(PropType on, ValidationContext ctx, String method, PropType rt) {
+        return getAllMethods(ctx, on).where((m) => m.operator).where((m) => m.name == method).firstWhere((m) => isAssignableFrom(resolveType(on, ctx, m.positionalParams.first.dataType.resolvedType, null), rt), 
+            
+        );
+    }
+
+    static FieldDecl getField(PropType on, String name) {
+        return getAllFields(on).firstWhere((f) => f.name == name, 
+            
+        );
+    }
+
+    static LambdaType findLambdaFunction(PropType on) {
+        if(on is LambdaType) {
+            return on as LambdaType;
+        } else if (on is ParameterizedType) {
+            return findLambdaFunction((on as ParameterizedType).baseType);
+        }
+        if (!on.typeDef) {
+            return null;
+        }
+        if (on.cls.methods.length == 1) {
+            MethodDecl method = on.cls.methods.first;
+            return LambdaTypeUtil.withMethod(method);
+        }
+        return null;
+    }
+
+    static PropType elemenetType(PropType on, String type) {
+        if(on is ParameterizedType) {
+		    return ParameterizedTypeUtil.elemenetType(on as ParameterizedType, type);
+	    }
+        for (TypeVariable t in on.typeVars) {
+            if (t.name == type) {
+                return t;
+            }
+        }
+        if (on.extends != null) {
+            return elemenetType(on.extends, type);
+        }
+        return null;
+    }
+
+    // Commenting out to add method below.
+    // static PropType wrap(PropType on, Object type, PropType outer) {
+    //     ParameterizedType pt = ParameterizedTypeUtil.from(outer as PropType);
+    //     if (type is PropertyTypeData) {
+    //         pt.addArgument(typeOf(type));
+    //     } else if (type is PropType) {
+    //         pt.addArgument(type as PropType);
+    //     } else {
+    //         return null;
+    //     }
+    //     return pt;
+    // }
+    static PropType wrap(PropType outer, List<PropType> args) {
+        ParameterizedType pt = ParameterizedTypeUtil.from(outer as PropType);
+        for (PropType arg in args) {
+            ParameterizedTypeUtil.addArgument(pt, arg as PropType);
+        }
+        return pt;
+    }
+
+    static MethodDecl getOverride(ValidationContext ctx, PropType on, MethodDecl method) {
+        return findMethodByName(ctx, on, method.name, method.setter, method.getter);
+    }
+
+    // static PropType find(String name) {
+    //     PropType type =  ProjectSharedInstance.get(false).getRegistry().get(name);
+    //         if(type == null && name.length == 1){
+    //             return PropType(
+    //                 name : name
+    //             );
+    //         } else if(name.isEmpty){
+    //             return find('Object');
+    //         } else {
+    //             return type;
+    //         }
+    // }
+
+    static Boolean isPrimitive(PropType type) {
+        return PRIMITVES.contains(type.name);
+    }
+
+    static PropType fromType(Type k, ValidationContext ctx) {
+        if(k == null) {
+            return null;
+        }
+        if (k is WrappedType) {
+            WrappedType wrap = k as WrappedType;
+            PropType outer = PropTypeUtil.fromType(wrap.outer, ctx);
+            List<PropType> args = wrap.subs.map((t) => PropTypeUtil.fromType(t, ctx)).toList();
+            return PropTypeUtil.wrap(outer, args);
+        } else if (k is MethodType) {
+            MethodType wrap = k as MethodType;
+            PropType on = PropTypeUtil.fromType(wrap.on, ctx);
+            PropType gen = PropTypeUtil.fromType(wrap.gen, ctx);
+            return PropTypeUtil.methodType(ctx, on, wrap.name, gen);
+        } else {
+            if(k.name.isEmpty){
+                return ctx.getType('Object');
+            }
+            return ctx.getType(k.name);
+        }
+    }
+
+
+}

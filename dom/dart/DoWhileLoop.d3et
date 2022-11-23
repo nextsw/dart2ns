@@ -17,4 +17,9 @@ server class DoWhileLoop extends Statement {
         test = s.makeSimple(test);
         body.simplify(s);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(test);
+        visitor.visit(body);
+    }
 }

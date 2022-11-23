@@ -22,4 +22,10 @@ server class TerinaryExpression extends Statement {
         ifTrue = s.makeSimple(ifTrue);
         ifFalse = s.makeSimple(ifFalse);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(condition);
+        visitor.visit(ifTrue);
+        visitor.visit(ifFalse);
+    }
 }

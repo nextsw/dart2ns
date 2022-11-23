@@ -126,5 +126,12 @@ server class Library {
             obj.simplify(s);
         }
     }
+    void visit(ExpressionVisitor visitor){
+        for(TopDecl obj in objects){
+            obj.visit(visitor);
+        }
+    }
+
+
 
 }

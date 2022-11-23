@@ -1,0 +1,9 @@
+server class LambdaType extends PropType {
+    MethodDecl method;
+
+    LambdaType({String name, this.method}) : super(name: name);
+
+    String toString() {
+        return FormateUtil.toStringLambdaType(this);
+    }
+}

@@ -18,4 +18,9 @@ server class MapItem extends ArrayItem {
     void simplify(Simplifier s) {
         
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(key);
+        visitor.visit(value);
+    }
 }

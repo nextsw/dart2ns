@@ -1,0 +1,39 @@
+server class StatementUtil{
+
+    static Boolean needSemicolon(Statement on){
+        if (on is Assignment) { 
+            return true;
+        } else if (on is Block) {
+            return false;
+        } else if (on is Break) {
+            return true;
+        } else if (on is Continue) {
+            return true;
+        } else if (on is Declaration) {
+            return true;
+        } else if (on is DoWhileLoop) {
+            return true;
+        } else if (on is ForLoop) {
+            return false;
+        } else if (on is IfStatement) {
+            return false;
+        } else if (on is MethodCall) {
+            return true;
+        } else if (on is PostfixExpression) {
+            return true;
+        } else if (on is PrefixExpression) {
+            return true;
+        } else if (on is Return) {
+            return true;
+        } else if (on is SwitchStatement) {
+            return false;
+        } else if (on is ThrowStatement) {
+            return true;
+        } else if (on is TryCatcheStatment) {
+            return false;
+        } else if (on is WhileLoop) {
+            return false;
+        }
+        return false;
+    }
+}

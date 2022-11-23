@@ -1,0 +1,24 @@
+server class TypeRegistry {
+    PropType get(String name){
+        return null;
+    }
+
+    void add(PropType type){
+
+    }
+
+    PropType wrap(PropType baseType, PropType element) {
+        ParameterizedType type = ParameterizedTypeUtil.from(baseType);
+        ParameterizedTypeUtil.addArgument(type, element);
+        return type;
+    }
+
+    PropType list(PropType element) {
+        return wrap(get(PropTypeUtil.LIST_TYPE), element);
+    }
+
+    PropType set(PropType element) {
+        return wrap(get(PropTypeUtil.SET_TYPE), element);
+    }
+
+}

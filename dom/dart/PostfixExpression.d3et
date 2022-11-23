@@ -15,4 +15,8 @@ server class PostfixExpression extends Statement {
     void simplify(Simplifier s) {
         on.simplify(s);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        
+    }
 }

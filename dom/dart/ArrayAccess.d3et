@@ -3,6 +3,9 @@ server class ArrayAccess extends Expression {
     Expression index;
     Boolean checkNull = false;
     Boolean notNull = false;
+
+    //Resolved info
+    MethodDecl method;
     ArrayAccess({this.on, this.index, this.checkNull, this.notNull});
 
     void resolve(ResolveContext context) {
@@ -38,5 +41,9 @@ server class ArrayAccess extends Expression {
     void simplify(Simplifier s) {
         on = s.makeSimple(on);
         index = s.makeSimple(index);
+    }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(on);
+        visitor.visit(index);
     }
 }

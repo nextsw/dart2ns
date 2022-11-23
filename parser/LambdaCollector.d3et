@@ -1,0 +1,36 @@
+server class LambdaCollector  implements ExpressionVisitor{
+    List<Expression> list = [];
+    OneFunction<Expression, Boolean> predicate;
+    LambdaCollector(this.predicate);
+
+    static List<Expression> forLibrary(Library lib) {
+        LambdaCollector collector = LambdaCollector((exp) => exp is LambdaExpression);
+        lib.objects.forEach((obj) {
+            if(obj is ClassDecl) {
+             } else {
+                obj.visit(collector);
+             }
+        });
+        return collector.list;
+    }
+    static List<Expression> forClass(ClassDecl cls) {
+        LambdaCollector collector = LambdaCollector((exp) => exp is LambdaExpression);
+        cls.visit(collector);
+        return collector.list;
+    }
+
+    void visit(Expression exp) {
+        if(exp == null){
+            return;
+        }
+        Boolean res = predicate(exp);
+        if(res){
+            list.add(exp);
+        }
+        exp.visit(this);
+    }
+
+    static List<FieldOrEnumExpression> getFieldsIn(Expression expression) {
+        return [];
+    }
+}

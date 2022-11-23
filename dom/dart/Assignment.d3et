@@ -37,4 +37,8 @@ server class Assignment extends Statement {
             right.simplify(s);
         }
     }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(left);
+        visitor.visit(right);
+    }
 }

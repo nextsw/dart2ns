@@ -1,0 +1,5 @@
+server class ParameterizedType extends PropType {
+    PropType baseType;
+    List<TypeArgument> arguments = [];
+    ParameterizedType() : super();
+}

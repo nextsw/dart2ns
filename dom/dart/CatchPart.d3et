@@ -3,4 +3,5 @@ server class CatchPart {
     Block body;
     String stackTrace;
     DataType onType;
+    Range range;
 }

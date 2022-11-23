@@ -12,4 +12,7 @@ server class Break extends Statement {
     void simplify(Simplifier s){
         
     }
+
+    void visit(ExpressionVisitor visitor) {
+    }
 }

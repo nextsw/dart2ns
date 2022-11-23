@@ -19,4 +19,10 @@ server class StringInterExp extends Expression {
     void simplify(Simplifier s) {
         values = values.map(v => s.makeSimple(v)).toList();
     }
+
+    void visit(ExpressionVisitor visitor) {
+        for(Expression exp in values) {
+            visitor.visit(exp);
+        }
+    }
 }

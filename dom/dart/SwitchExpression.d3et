@@ -40,4 +40,12 @@ server class SwitchExpression extends Expression {
             onElse = s.makeSimple(onElse);
         }
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(on);
+        cases.forEach((c) {
+            visitor.visit(c.result);
+        });
+        visitor.visit(onElse);
+    }
 }

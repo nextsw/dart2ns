@@ -1,0 +1,10 @@
+server class TypeResolutionPosition {
+    TypeResolutionPositionType type;
+    Integer index;
+    String name;
+    String genVar;
+
+    TypeResolutionPosition({this.type = TypeResolutionPositionType.RETURN});
+
+    List<TypeResolutionPosition> gens = [];
+}

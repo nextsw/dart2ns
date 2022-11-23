@@ -1,0 +1,16 @@
+class CollectionsUtil {
+
+    static void forEach<T, U>(Iterable<T> first, Iterable<U> next, BiConsumer<T, U> consumer) {
+        Iterator<T> fi = first.iterator;
+        Iterator<U> ni = next.iterator;
+        while (fi.moveNext() && ni.moveNext()) {
+            consumer(fi.current, ni.current);
+        }
+    }
+
+    static List<T> sort<T>(List<T> from, BiFunction<T, T, Integer> comparator) {
+        List<T> list = List.from(from);
+        list.sort(comparator);
+        return list;
+    }
+}

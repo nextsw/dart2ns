@@ -10,4 +10,8 @@ server class NullExpression extends Expression {
     void simplify(Simplifier s) {
         
     }
+
+    void visit(ExpressionVisitor visitor) {
+        
+    }
 }

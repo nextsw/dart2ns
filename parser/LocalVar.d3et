@@ -1,0 +1,17 @@
+server class LocalVar {
+    String name;
+    PropType type;
+    Boolean initialized;
+    Boolean isFinal;
+    Object value;
+    void markNotFinal(){
+        
+    }
+
+    void markInitialized(){
+
+    }
+    void markNotInitialized(){
+        
+    }
+}

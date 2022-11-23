@@ -22,4 +22,9 @@ server class WhileLoop extends Statement {
         }
         body.simplify(s);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(test);
+        visitor.visit(body);
+    }
 }

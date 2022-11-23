@@ -14,4 +14,8 @@ server class ExpressionArrayItem extends ArrayItem{
     void simplify(Simplifier s) {
         exp = s.makeSimple(exp);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(exp);
+    }
 }

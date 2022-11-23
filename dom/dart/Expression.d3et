@@ -2,11 +2,18 @@ abstract server class Expression {
     List<Comment> comments = [];   
     DataType resolvedType;
 
+    Range range;
+
     Boolean hasAwait;
+
+    PropType expType;
+    
 
     void resolve(ResolveContext conext);
     void collectUsedTypes(List<DataType> types);
 
     void simplify(Simplifier s);
+
+    void visit(ExpressionVisitor visitor);
     
 }

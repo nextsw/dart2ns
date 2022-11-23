@@ -18,4 +18,8 @@ server class Typedef extends TopDecl {
     void simplify(Simplifier s){
     }
 
+    void visit(ExpressionVisitor visitor){
+        
+    }
+
 }

@@ -1,0 +1,5 @@
+server class TypeVariable extends PropType {
+    // List<TypeResolutionPosition> positions = [];
+
+    TypeVariable({String name}) : super(name: name);
+}

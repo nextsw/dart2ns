@@ -44,4 +44,7 @@ server class FieldDecl extends ClassMember {
     void simplify(Simplifier s){
     }
 
+    void visit(ExpressionVisitor visitor){
+        visitor.visit(value);
+    }
 }

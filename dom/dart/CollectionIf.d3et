@@ -25,4 +25,9 @@ server class CollectionIf extends ArrayItem {
         // thenItem = s.makeSimple(thenItem);
         // elseItem = s.makeSimple(elseItem);
     }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(test);
+        visitor.visit(thenItem);
+        visitor.visit(elseItem);
+    }
 }

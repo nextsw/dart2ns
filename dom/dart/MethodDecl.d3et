@@ -1,6 +1,9 @@
 server class MethodDecl extends ClassMember{
     String name;
     List<Annotation> annotations = [];
+    List<MethodParam> positionalParams = [];
+    List<MethodParam> optionalParams = [];
+    List<MethodParam> namedParams = [];
     List<MethodParam> params = [];
     DataType returnType;
     Boolean final;
@@ -9,13 +12,16 @@ server class MethodDecl extends ClassMember{
     Boolean setter;
     Boolean getter;
     Boolean factory;
+    Boolean operator;
     Expression init;
     String factoryName;
-    TypeParams generics;
+    List<TypeParam> typeVars = [];
     Block body;
     ASyncType asyncType;
     Expression exp;
     String nativeString;
+
+    LambdaType lambdaType;
     MethodDecl({
         this.name, 
         MethodParams params, 
@@ -34,7 +40,11 @@ server class MethodDecl extends ClassMember{
         this.asyncType,
         this.exp,
         this.external,
+        this.operator,
     }) : super(name, TopDeclType.Method, ''){
+        this.positionalParams = params?.positionalParams ?? [];
+        this.optionalParams = params?.optionalParams ?? [];
+        this.namedParams = params?.namedParams ?? [];
         this.params = params?.toFixedParams() ?? [];
     }
     String content;
@@ -127,4 +137,12 @@ server class MethodDecl extends ClassMember{
         return context.ofUnknownType();
     }
 
+    void visit(ExpressionVisitor visitor){
+        visitor.visit(exp);
+        visitor.visit(body);
+    }
+
+    Boolean get haveTypeParams {
+        return generics != null && generics.params.isNotEmpty;
+    }
 }

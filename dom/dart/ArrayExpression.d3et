@@ -4,6 +4,12 @@ server class ArrayExpression extends Expression{
     List<ArrayItem> values = [];
     ArrayType type;
 
+    PropType elementType;
+
+    Boolean get list {
+        return type == ArrayType.List;
+    }
+
 
     void resolve(ResolveContext context) {
         for(ArrayItem item in values){
@@ -32,6 +38,11 @@ server class ArrayExpression extends Expression{
     void simplify(Simplifier s) {
         for(ArrayItem item in values){
             item.simplify(s);
+        }
+    }
+    void visit(ExpressionVisitor visitor) {
+        for(ArrayItem item in values){
+            visitor.visit(item);
         }
     }
 }

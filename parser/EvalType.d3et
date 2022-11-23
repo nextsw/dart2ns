@@ -1,0 +1,9 @@
+enum EvalType {
+    ERROR,
+    LOCAL_VAR,
+    GETTER,
+    STATIC_FIELD,
+    TYPE,
+    FIELD,
+    METHOD_REFERENCE,
+}

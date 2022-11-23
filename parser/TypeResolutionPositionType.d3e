@@ -1,0 +1,19 @@
+(OptionSet TypeResolutionPositionType {
+    options [
+        (RETURN {
+        
+        })
+        (POSITIONAL {
+        
+        })
+        (OPTIONAL {
+        
+        })
+        (NAMED {
+        
+        })
+        (GEN {
+        
+        })
+    ]
+})

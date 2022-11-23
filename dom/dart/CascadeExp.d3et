@@ -15,4 +15,7 @@ server class CascadeExp extends Statement {
     void simplify(Simplifier s) {
         on = s.makeSimple(on);
     }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(on);
+    }
 }

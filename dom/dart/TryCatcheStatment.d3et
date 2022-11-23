@@ -34,4 +34,11 @@ server class TryCatcheStatment extends Statement {
             c.body.simplify(s);
         }
     }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(body);
+        visitor.visit(finallyBody);
+        for(CatchPart c in catchParts) {
+            visitor.visit(c.body);
+        }
+    }
 }

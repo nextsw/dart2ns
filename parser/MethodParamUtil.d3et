@@ -1,0 +1,61 @@
+server class MethodParamUtil {
+
+    static PropType type(MethodParam on, ValidationContext ctx, PropType declType) {
+        if (on.dataType is FunctionType) {
+            return ctx.createLambdaFunctionType(declType, ctx.typeOrObjectData(on.dataType), on.name, on.params, null, false);
+        } else {
+            return findParamType(ctx, on, declType);
+        }
+    }
+
+    static PropType findParamType(ValidationContext ctx, MethodParam param, PropType declType) {
+        if(param.thisToken != null) {
+            FieldDecl field = PropTypeUtil.findField(declType, param.name, false);
+            if(field != null) {
+                return field.type.resolvedType;
+            } else {
+                return ctx.object();
+            }
+        }
+        return ctx.typeOrObjectData(param.dataType);
+    }
+
+    static PropType rawType(MethodParam on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars) {
+        if (on.dataType is FunctionType) {
+            return ctx.createLambdaFunctionType(declType, DataTypeUtil.rawType(on.dataType, ctx), on.name.value, on.params, typeVars, true);
+        } else if (on.dataType != null) {
+            return DataTypeUtil.rawType(on.dataType, ctx);
+        } else {
+            return ctx.object();
+        }
+    }
+
+    static FuncParam createParam(MethodParam on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
+        if (on.name.value == null) {
+            return null;
+        }
+        PropType propType;
+        if (on.thisToken != null && on.thisToken.value != null) {
+            propType = PropTypeUtil.fieldType(declType, ctx, on.name.value, false);
+        } else {
+            propType = raw ? rawType(on, ctx, declType, typeVars) : type(on, ctx, declType);
+        }
+        FuncParam param = FuncParam(name: on.name.value, type: propType);
+        param.required = on.required;
+        param.instance = on.thisToken != null && on.thisToken.value != null;
+        if(on.def != null) {
+            Expression exp = Parser.parseExpression(on.def, ctx);
+            on.def.exp = exp;
+            param.def = on.def.exp;
+        }
+        Map<String, String> annotations = Map();
+        for (D3EAnnotation a in on.annotations) {
+            if (a.value != null && a.name != null) {
+                annotations.set(a.name.value, a.value);
+            }
+        }
+        return param;
+    }
+
+
+}

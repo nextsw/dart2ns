@@ -31,4 +31,10 @@ server class Block extends Statement {
             }
         }
     }
+
+    void visit(ExpressionVisitor visitor) {
+        for(Statement stmt in statements) {
+            visitor.visit(stmt);
+        }
+    }
 }

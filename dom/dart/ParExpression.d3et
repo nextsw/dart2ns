@@ -13,4 +13,8 @@ server class ParExpression extends Expression {
     void simplify(Simplifier s) {
         exp.simplify(s);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(exp);
+    }
 }

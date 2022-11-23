@@ -642,9 +642,11 @@ server class TypeParser {
                 name = checkName();
             }
         }
+        Boolean operator = false;
         if(name.equals('operator')) {
             name = tok.lit;
             next();
+            operator = true;
             while(this.tok.kind != TypeKind.Lpar) {
                 name += tok.lit;
                 next();
@@ -719,6 +721,7 @@ server class TypeParser {
             annotations: annotations,
             asyncType: asyncType,
             exp: exp,
+            operator: operator,
         );
         decl.nativeString = nativeString;
         return decl;
@@ -1722,7 +1725,7 @@ server class TypeParser {
         ValueType type = ValueType(name);
         type.in = package;
         if (tok.kind == TypeKind.Lt) {
-            List<DataType> typeArgs = readTypeArgs();
+            List<ValueType> typeArgs = readTypeArgs();
             if(typeArgs == null) {
                 return null;
             }
@@ -1795,12 +1798,12 @@ server class TypeParser {
         return type;
     }
 
-    List<DataType> readTypeArgs() {
+    List<ValueType> readTypeArgs() {
         TypeToken start = tok;
         check(TypeKind.Lt);
-        List<DataType> args = [];
+        List<ValueType> args = [];
         while (true) {
-            DataType sub = readType(false);
+            ValueType sub = readValueType(false) as ValueType;
             if(sub == null) {
                 return null;
             }

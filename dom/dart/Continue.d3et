@@ -13,4 +13,6 @@ server class Continue extends Statement {
     void simplify(Simplifier s){
         
     }
+    void visit(ExpressionVisitor visitor) {
+    }
 }

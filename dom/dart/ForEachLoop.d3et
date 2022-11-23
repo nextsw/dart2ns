@@ -37,4 +37,9 @@ server class ForEachLoop extends Statement {
         }
         body.simplify(s);
     }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(collection);
+        visitor.visit(body);
+    }
 }

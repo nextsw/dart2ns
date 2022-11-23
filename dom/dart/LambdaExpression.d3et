@@ -3,6 +3,9 @@ server class LambdaExpression extends Expression {
     Expression expression;
     Block body;
     ASyncType asyncType = ASyncType.NONE;
+    MethodDecl originalMethod;
+    DataType returnType;
+    PropType expectedType;
     LambdaExpression({this.params});
 
 
@@ -50,5 +53,10 @@ server class LambdaExpression extends Expression {
         if(body != null) {
             body.simplify(s);
         }
+    }
+
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(expression);
+        visitor.visit(body);
     }
 }

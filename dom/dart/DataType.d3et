@@ -1,6 +1,8 @@
-abstract class DataType {
+abstract server class DataType {
     String name;
     Boolean optional = false;
+
+    PropType resolvedType;
 
     void collectUsedTypes(Set<String> types);
 

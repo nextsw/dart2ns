@@ -54,4 +54,15 @@ server class ForLoop extends Statement {
         }
         body.simplify(s);
     }
+    void visit(ExpressionVisitor visitor) {
+        visitor.visit(body);
+        visitor.visit(decl);
+        visitor.visit(test);
+        for(Statement s in inits){
+            visitor.visit(s);
+        }
+        for(Statement s in resets){
+            visitor.visit(s);
+        }
+    }
 }

@@ -1,6 +1,9 @@
 server class CaseExpression {
     List<Expression> tests = [];
     Expression result;
+    Range range;
+
+    DataType expType;
 
     void resolve(ResolveContext context) {
         tests.forEach((c) {
