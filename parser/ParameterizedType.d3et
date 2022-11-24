@@ -2,4 +2,117 @@ server class ParameterizedType extends PropType {
     PropType baseType;
     List<TypeArgument> arguments = [];
     ParameterizedType() : super();
+
+
+
+    // Map<String, PropType> arguments = Map();
+
+    static ParameterizedType from(PropType baseType){
+        ParameterizedType type = ParameterizedType();
+        type.baseType = baseType;
+        type.name = baseType.name;
+        type.typeVars = baseType.typeVars;
+        type.extends = baseType.extends;
+        type.impls = baseType.impls;
+        type.types = baseType.types;
+        type.abstract = baseType.abstract;
+        return type;
+    }
+
+    void addArgument(PropType type) {
+        if (baseType.typeVars.length <= arguments.length) {
+            return;
+        }
+        TypeVariable typeVar = baseType.typeVars[arguments.length];
+        addArgumentWithName(typeVar.name, type);
+    }
+    void addArgumentWithName(String name, PropType type) {
+	    TypeArgument arg = arguments.firstWhere((i) => i.name == name);
+	    if(arg == null) {   
+                TypeArgument typeArgument = TypeArgument(
+                name: name,
+                type: type,
+            );
+		    arguments.add(typeArgument);
+	    } else {
+	        arg.type = type;
+	    }	    
+    }
+
+
+    PropType getElemenetType() {
+        if (baseType.typeVars.isEmpty) {
+            return null;
+        }
+        TypeArgument arg = arguments.firstWhere((i) => i.name == baseType.typeVars.first.name);
+        if (arg != null) {
+            return arg.type;
+        }
+        return baseType.getElemenetType();
+    }
+
+    Boolean isAssignableFrom(PropType type) {
+        if (isAssignableFromInternal(type)) {
+            return true;
+        }
+        if (type is ParameterizedType) {
+            ParameterizedType pt = (type as ParameterizedType);
+            if (baseType.isAssignableFrom(pt.baseType)) {
+                if (arguments.isEmpty || pt.arguments.isEmpty) {
+                    return true;
+                }
+                if (arguments.length == pt.arguments.length) {
+                    Integer index = 0;
+                    for (TypeArgument e in arguments) {
+                        PropType leftType = e.type;
+                        PropType rightType = pt.arguments.get(index).type;
+                        index++;
+                        if ((leftType == null || rightType == null) || !leftType.isAssignableFrom(rightType)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    PropType elemenetType(String type) {
+        TypeArgument arg = arguments.firstWhere((i) => i.name == type);
+        if (arg != null) {
+            return arg.type;
+        }
+        return baseType.elemenetType(type);
+    }
+
+    PropType resolveTypeWithTypeVar(ValidationContext ctx, PropType type, Map<String, PropType> typeArgument, TypeVariable t) {
+        PropType propType =typeArgument.get(t.name);
+        if (propType == null) {
+            TypeArgument arg = arguments.firstWhere((i) => i.name == t.name);
+            if (arg == null) {
+                return t;
+            } else {
+                return arg.type;
+            }
+        } else if (propType is TypeVariable) {
+            TypeArgument arg = arguments.firstWhere((i) => i.name == propType.name);
+            if (arg != null) {
+                return arg.type;
+            }
+        }
+        return propType;
+    }
+
+    List<PropType> getTypeArgumentsList() {
+        return typeVars.map((t) => elemenetType(t.name)).toList();
+    }
+
+    DataType toDataType() {
+        DataType base = baseType.toDataType();
+        ValueType t = base as ValueType;
+        t.args = arguments.map(x => x.type.toDataType()).toList();
+        return t;
+    }
+
 }

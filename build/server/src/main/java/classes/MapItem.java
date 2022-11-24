@@ -23,4 +23,9 @@ public class MapItem extends ArrayItem {
   }
 
   public void simplify(Simplifier s) {}
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.key);
+    visitor.visit(this.value);
+  }
 }

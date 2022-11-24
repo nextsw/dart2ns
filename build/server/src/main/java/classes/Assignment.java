@@ -40,4 +40,9 @@ public class Assignment extends Statement {
       this.right.simplify(s);
     }
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.left);
+    visitor.visit(this.right);
+  }
 }

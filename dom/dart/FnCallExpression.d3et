@@ -12,7 +12,7 @@ server class FnCallExpression extends Statement {
             FunctionType ft = onType as FunctionType;
             resolvedType = ft.returnType;
         } else {
-            D3ELogger.error('We should not be calling non function types');
+            context.error('We should not be calling non function types');
             resolvedType = context.ofUnknownType();
         }
     }

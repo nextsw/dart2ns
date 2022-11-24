@@ -1,14 +1,14 @@
 server class MethodParamsUtil {
 
-    static List<MethodParam> createPositionalParams(MethodParams on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
-        return on.positionalParams.map((p) => MethodParamUtil.createParam(p, ctx, declType, typeVars, raw)).where((i) => i != null).toList();
-    }
+    // static List<MethodParam> createPositionalParams(MethodParams on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
+    //     return on.positionalParams.map((p) => MethodParamUtil.createParam(p, ctx, declType, typeVars, raw)).where((i) => i != null).toList();
+    // }
 
-    static List<MethodParam> createNamedParams(MethodParams on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
-        return on.namedParams.map((p) => MethodParamUtil.createParam(p, ctx, declType, typeVars, raw)).where((i) => i != null).toList();
-    }
+    // static List<MethodParam> createNamedParams(MethodParams on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
+    //     return on.namedParams.map((p) => MethodParamUtil.createParam(p, ctx, declType, typeVars, raw)).where((i) => i != null).toList();
+    // }
 
-    static List<MethodParam> createOptionalParams(MethodParams on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
-        return on.optionalParams.map((p) => MethodParamUtil.createParam(p, ctx, declType, typeVars, raw)).where((i) => i != null).toList();
-    }
+    // static List<MethodParam> createOptionalParams(MethodParams on, ValidationContext ctx, PropType declType, List<TypeVariable> typeVars, Boolean raw) {
+    //     return on.optionalParams.map((p) => MethodParamUtil.createParam(p, ctx, declType, typeVars, raw)).where((i) => i != null).toList();
+    // }
 }

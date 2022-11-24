@@ -1,4 +1,4 @@
-server class Library {
+server class Library implements TypeRegistry {
     String fullPath;
     String packagePath;
     String id;
@@ -9,14 +9,32 @@ server class Library {
     List<Part> parts = [];
     String partOf;
 
+    Map<String, PropType> types = Map();
+
+    Map<String, TopDecl> cache = Map();
+    Set<String> notFound = Set();
+
     Library({this.parent, this.fullPath, this.packagePath});
     
 
     TopDecl get(String name) {
-        if(name.startsWith('__')){
+        if(name == null){
             return null;
         }
-        return _getInternal(name, Set(), true);
+        if(name.startsWith('__') || notFound.contains(name)){
+            return null;
+        }
+        TopDecl obj = cache.get(name);
+        if(obj != null) {
+            return obj;
+        }
+        obj = _getInternal(name, Set(), true);
+        if(obj != null) {
+            cache.set(name, obj);
+        } else {
+            notFound.add(name);
+        }
+        return obj;
     }
     TopDecl _getInternal(String name, Set<Library> checked, Boolean checkImports) {
         if(checked.contains(this)) {
@@ -132,6 +150,33 @@ server class Library {
         }
     }
 
+    PropType getType(String name){
+        return types.get(name);
+    }
 
+    void addType(PropType type){
+        types.set(type.name, type);
+    }
+
+    void validate(){
+        ValidationContext ctx = ValidationContext(this);
+        for(TopDecl top in objects) {
+            top.register(ctx);
+        }
+        D3ELogger.info('Validating : ' + packagePath);
+        for(TopDecl top in objects) {
+            top.validate(ctx, 0);
+        }
+        for(TopDecl top in objects) {
+            top.validate(ctx, 1);
+        }
+    }
+
+    void addAll(List<TopDecl> list) {
+        for(TopDecl i in list){
+            i.lib = this;
+        }
+        objects.addAll(list);
+    }
 
 }

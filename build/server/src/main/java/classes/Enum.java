@@ -45,4 +45,10 @@ public class Enum extends TopDecl {
   }
 
   public void simplify(Simplifier s) {}
+
+  public void visit(ExpressionVisitor visitor) {}
+
+  public void validate(ValidationContext ctx, long phase) {}
+
+  public void register(ValidationContext ctx) {}
 }

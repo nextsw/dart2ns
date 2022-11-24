@@ -21,7 +21,7 @@ server class ArrayAccess extends Expression {
                 MethodDecl indexMethod = context.getMember(cls, '[]') as MethodDecl;
                 if(indexMethod == null) {
                     resolvedType = context.ofUnknownType();
-                    D3ELogger.error('Can not find [] operator in : ' + cls.name);
+                    context.error('Can not find [] operator in : ' + cls.name);
                 } else  if(indexMethod.returnType.name.length == 1){
                     resolvedType = context.getListValueType(cls) ?? context.ofUnknownType();
                 } else {
@@ -29,7 +29,7 @@ server class ArrayAccess extends Expression {
                 }
             } else {
                 resolvedType = context.ofUnknownType();
-                D3ELogger.error('It must be Class');
+                context.error('It must be Class');
             }
         }
     }

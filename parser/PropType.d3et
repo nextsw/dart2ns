@@ -19,7 +19,437 @@ server class PropType {
     }
 
     DataType toDataType(){
-        // TODO null;
+        ValueType t = ValueType(name);
+        t.resolvedType = this;
+        return t;
+    }
+
+    static final String ANY_TYPE = 'Object';
+
+    static final String TEXT_TYPE = 'String';
+
+    static final String INTEGER_TYPE = 'Integer';
+
+    static final String DOUBLE_TYPE = 'Double';
+
+    static final String BOOLEAN_TYPE = 'Boolean';
+
+    static final String TYPE_TYPE = 'Type';
+
+    static final String PROPERTY_PATH_TYPE = 'PropertyPath';
+
+    static final String VOID_TYPE = 'void';
+
+    static final String FUNCTION_TYPE = 'Function';
+
+    static final String LIST_TYPE = 'List';
+
+    static final String DURATION_TYPE = 'Duration';
+
+    static final String DATE_TYPE = 'Date';
+
+    static final String DATETIME_TYPE = 'DateTime';
+
+    static final String TIME_TYPE = 'Time';
+
+    static final String SET_TYPE = 'Set';
+
+    static final String ITERABLE_TYPE = 'Iterable';
+
+    static final PropType VOID = createVoid();
+    
+    static PropType createVoid() {
+        PropType pt = PropType(
+            name: PropType.VOID_TYPE,
+        );
+        return pt;
+    }
+
+
+    static final Set<String> PRIMITVES = Set.from([
+    ]);
+    
+
+    void setExtends(PropType extnds) {
+        this.extends = extnds;
+    }
+
+    PropType getGen(String name) {
+        for (TypeVariable varType in typeVars) {
+            if (varType.name == name) {
+                return varType.extends;
+            }
+        }
         return null;
     }
+
+    Boolean canTypeSubstitute(PropType type) {
+        return isAssignableFrom(type);
+    }
+
+    Boolean isAssignableFrom(PropType type) {
+        return isAssignableFromInternal(type);
+    }
+
+    Boolean isAssignableFromInternal(PropType type) {
+        if (type == PropType.VOID) {
+            return this == PropType.VOID;
+        }
+        if (this == type || name == 'Object') {
+            return true;
+        }
+        if (type.name == 'null') {
+            return this != PropType.VOID;
+        }
+        if (type == null) {
+            return false;
+        }
+        if (type is ParameterizedType) {
+            return isAssignableFrom(((type as ParameterizedType)).baseType);
+        }
+        if (type is LambdaType) {
+            return (type as LambdaType).canAssignTo(this);
+        }
+        if (type.extends != null) {
+            if (isAssignableFrom(type.extends)) {
+                return true;
+            }
+        }
+        return type.impls.any((i) => isAssignableFrom(i));
+    }
+
+    Boolean canCompare(PropType type) {
+        if (type.name == 'null' && (name == 'Integer' || name == 'Boolean' || name == 'Double')) {
+            return false;
+        }
+        return isAssignableFrom(type) || type.isAssignableFrom(this);
+    }
+
+    PropType fieldType(ValidationContext ctx, String fieldName, Boolean isStatic) {
+        FieldDecl field = findField(fieldName, isStatic);
+        if (field == null) {
+            return ctx.object();
+        }
+        return resolveType(ctx, field.type.resolvedType, Map.fromIterable(field.type.resolvedType.typeVars, key: (i)=> i.name, value: (i)=>i));
+    }
+
+    Boolean hasField(ValidationContext ctx, String fieldName, Boolean isStatic) {
+        return findField(fieldName, isStatic) != null;
+    }
+
+    FieldDecl findField(String fieldName, Boolean isStatic) {
+        for (FieldDecl f in getAllFields()) {
+            if (f.name == fieldName) {
+                return f.static == isStatic ? f : null;
+            }
+        }
+        return null;
+    }
+
+    MethodDecl findMethod(ValidationContext ctx, String methodName) {
+        return getAllMethods(ctx).firstWhere((m) => m.name == methodName, 
+            
+        );
+    }
+
+    MethodDecl findMethodByName(ValidationContext ctx, String methodName, Boolean isSetter, Boolean isGetter) {
+        return getAllMethods(ctx).where((m) => m.setter == isSetter).where((m) => m.getter == isGetter).firstWhere((m) => m.name.equals(methodName), 
+            orElse: () {
+                return null;
+            },
+        );
+    }
+
+    PropType resolveType(ValidationContext ctx, PropType type, Map<String, PropType> typeArgument) {
+        if (typeArgument == null) {
+            typeArgument = Map();
+        }
+        if (type is TypeVariable) {
+            PropType et = resolveTypeWithTypeVar(ctx, this, typeArgument, (type as TypeVariable));
+            return et == null ? type : et;
+        }
+        if (type.typeVars.isEmpty) {
+            return type;
+        }
+        Boolean isSame = true;
+        ParameterizedType pt;
+        if (type is ParameterizedType) {
+            pt = ParameterizedType.from((type as ParameterizedType).baseType);
+        } else {
+            isSame = false;
+            pt = ParameterizedType.from(type);
+        }
+        for (TypeVariable t in type.typeVars) {
+            PropType varType = type.elemenetType(t.name);
+            if (!(varType is TypeVariable)) {
+                PropType rt = resolveType(ctx, varType, typeArgument);
+                if (rt != varType) {
+                    isSame = false;
+                }
+                pt.addArgumentWithName(t.name, rt);
+                continue;
+            }
+            PropType propType = resolveTypeWithTypeVar(ctx, type, typeArgument, (varType as TypeVariable));
+            if (propType != null) {
+                isSame = false;
+                pt.addArgumentWithName(t.name, propType);
+            }
+        }
+        return isSame ? type : pt;
+    }
+
+    PropType resolveTypeWithTypeVar(ValidationContext ctx, PropType type, Map<String, PropType> typeArgument, TypeVariable t) {
+        PropType propType = typeArgument.get(t.name);
+        if (propType == null) {
+            List<PropType> all = [];
+            if(extends != null) {
+                all.add(extends);
+            }
+            all.addAll(impls);
+            for(PropType e in all) {
+                PropType r = e.resolveType(ctx, t, Map());
+                if(t != r) {
+                    return r;
+                }
+            }
+            return t;
+        }
+        return propType;
+    }
+
+    PropType methodType(ValidationContext ctx, String fieldName, PropType genType) {
+        FieldDecl field = findField(fieldName, false);
+        if (field == null) {
+            return PropType.VOID;
+        }
+        PropType retType = field.type.resolvedType;
+        if (!typeVars.isEmpty && genType != null) {
+            ParameterizedType parameterizedType = ParameterizedType.from(this);
+            parameterizedType.addArgument(genType);
+            // if(retType is LambdaType) {
+            //     return retType;
+            // } else {
+                return parameterizedType.resolveType(ctx, retType, null);
+            // }
+        }
+        return retType;
+    }
+
+    List<MethodDecl> getAllMethods(ValidationContext ctx) {
+        List<MethodDecl> all = List.from(cls.methods);
+        if (extends != null) {
+            all.addAll(extends.getAllMethods(ctx));
+        } else {
+            PropType objType = ctx.object();
+            if(this != objType) {
+                all.addAll(objType.getAllMethods(ctx));
+            }
+        }
+        impls.forEach((i) => all.addAll(i.getAllMethods(ctx)));
+        return all;
+    }
+
+    List<FieldDecl> getAllFields() {
+        List<FieldDecl> all = List.from(cls.fields);
+        if (extends != null) {
+            all.addAll(extends.getAllFields());
+        }
+        impls.forEach((i) => all.addAll(i.getAllFields()));
+        return all;
+    }
+
+    PropType getElemenetType() {
+        if (typeVars.isEmpty) {
+            return null;
+        }
+        return typeVars.first;
+    }
+
+    MethodDecl findOperatorMethod(ValidationContext ctx, String method, PropType rt) {
+        return getAllMethods(ctx).where((m) => m.operator && m.name == method && m.params.positionalParams.isNotEmpty).firstWhere((m) => resolveType(ctx, m.params.positionalParams.first.dataType.resolvedType, null).isAssignableFrom(rt), 
+            
+        );
+    }
+
+    FieldDecl getField(String name) {
+        return getAllFields().firstWhere((f) => f.name == name, 
+            
+        );
+    }
+
+    LambdaType findLambdaFunction() {
+        if (!typeDef) {
+            return null;
+        }
+        if (cls.methods.length == 1) {
+            MethodDecl method = cls.methods.first;
+            return LambdaType.withMethod(method);
+        }
+        return null;
+    }
+
+    PropType elemenetType(String type) {
+        for (TypeVariable t in typeVars) {
+            if (t.name == type) {
+                return t;
+            }
+        }
+        if (extends != null) {
+            return extends.elemenetType(type);
+        }
+        return null;
+    }
+
+    // Commenting out to add method below.
+    // static PropType wrap(PropType on, Object type, PropType outer) {
+    //     ParameterizedType pt = ParameterizedTypeUtil.from(outer as PropType);
+    //     if (type is PropertyTypeData) {
+    //         pt.addArgument(typeOf(type));
+    //     } else if (type is PropType) {
+    //         pt.addArgument(type as PropType);
+    //     } else {
+    //         return null;
+    //     }
+    //     return pt;
+    // }
+    PropType wrap(List<PropType> args) {
+        ParameterizedType pt = ParameterizedType.from(this);
+        for (PropType arg in args) {
+            pt.addArgument(arg as PropType);
+        }
+        return pt;
+    }
+
+    MethodDecl getOverride(ValidationContext ctx, MethodDecl method) {
+        return findMethodByName(ctx, method.name, method.setter, method.getter);
+    }
+
+    // static PropType find(String name) {
+    //     PropType type =  ProjectSharedInstance.get(false).getRegistry().get(name);
+    //         if(type == null && name.length == 1){
+    //             return PropType(
+    //                 name : name
+    //             );
+    //         } else if(name.isEmpty){
+    //             return find('Object');
+    //         } else {
+    //             return type;
+    //         }
+    // }
+
+    static Boolean isPrimitive(PropType type) {
+        return PRIMITVES.contains(type.name);
+    }
+
+    static PropType fromType(Type k, ValidationContext ctx) {
+        if(k == null) {
+            return null;
+        }
+        if (k is WrappedType) {
+            WrappedType wrap = k as WrappedType;
+            PropType outer = PropType.fromType(wrap.outer, ctx);
+            List<PropType> args = wrap.subs.map((t) => PropType.fromType(t, ctx)).toList();
+            return outer.wrap(args);
+        } else if (k is MethodType) {
+            MethodType wrap = k as MethodType;
+            PropType on = PropType.fromType(wrap.on, ctx);
+            PropType gen = PropType.fromType(wrap.gen, ctx);
+            return on.methodType(ctx, wrap.name, gen);
+        } else {
+            if(k.name.isEmpty){
+                return ctx.getType('Object');
+            }
+            return ctx.getType(k.name);
+        }
+    }
+
+    Boolean isCollection() {
+        if (this is ParameterizedType) {
+            return (this as ParameterizedType).baseType.isCollection();
+        }
+        if (name == PropType.LIST_TYPE || name == PropType.SET_TYPE || name == PropType.ITERABLE_TYPE) {
+            return true;
+        }
+        if(extends != null){
+            return extends.isCollection();
+        }
+        return false;
+    }
+
+    
+
+
+    PropType elementType() {
+        if (isCollection()) {
+            return getElemenetType();
+        }
+        return this;
+    }
+
+    PropType applyArg(PropType arg) {
+        return applyArgs([
+            arg,
+        ]);
+    }
+
+    PropType applyArgs(List<PropType> args) {
+        if (args.isEmpty || typeVars.isEmpty) {
+            return this;
+        }
+        ParameterizedType pt = ParameterizedType.from(this);
+        if (args != null) {
+            args.forEach((a) => pt.addArgument(a));
+        }
+        return pt;
+    }
+
+    PropType elementTypeWithGeneric(PropType type, String genericName) {
+        for (TypeVariable typeVar in type.typeVars) {
+            if (typeVar.name == genericName) {
+                return typeVar;
+            }
+        }
+        return type;
+    }
+
+    PropType elementTypeWithIndex(Integer index) {
+        if (this is ParameterizedType) {
+            List<PropType> arguments = (this as ParameterizedType).getTypeArgumentsList();
+            if (arguments.length > index) {
+                return arguments.get(index);
+            }
+            return this;
+        }
+        if (typeVars.length > index) {
+            return typeVars.get(index);
+        }
+        return this;
+    }
+
+    Boolean isTypeType() {
+        if (extends != null && extends.name != 'Object') {
+            return extends.isTypeType();
+        }
+        if (this is ParameterizedType) {
+            return (this as ParameterizedType).baseType.isTypeType();
+        }
+        return name == PropType.TYPE_TYPE;
+    }
+
+    Boolean isIntOrLong() {
+        return name == PropType.INTEGER_TYPE;
+    }
+
+    Boolean isFloatOrDouble() {
+        return name == PropType.DOUBLE_TYPE;
+    }
+
+    Boolean isNumber() {
+        return isIntOrLong() || isFloatOrDouble();
+    }
+
+    Boolean isBool() {
+        return name == BOOLEAN_TYPE;
+    }
+    
 }

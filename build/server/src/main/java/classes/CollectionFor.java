@@ -12,8 +12,10 @@ public class CollectionFor extends ArrayItem {
   }
 
   public void resolve(ResolveContext context) {
+    context.scope = new Scope(context.scope, null);
     this.stmt.resolve(context);
     this.value.resolve(context);
+    context.scope = context.scope.parent;
   }
 
   public void collectUsedTypes(List<DataType> types) {
@@ -23,5 +25,10 @@ public class CollectionFor extends ArrayItem {
 
   public void simplify(Simplifier s) {
     this.stmt.simplify(s);
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.stmt);
+    visitor.visit(this.value);
   }
 }

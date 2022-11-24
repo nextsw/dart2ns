@@ -1,6 +1,5 @@
 package classes;
 
-import d3e.core.D3ELogger;
 import java.util.List;
 
 public class FnCallExpression extends Statement {
@@ -20,7 +19,7 @@ public class FnCallExpression extends Statement {
       FunctionType ft = ((FunctionType) onType);
       this.resolvedType = ft.returnType;
     } else {
-      D3ELogger.error("We should not be calling non function types");
+      context.error("We should not be calling non function types");
       this.resolvedType = context.ofUnknownType();
     }
   }
@@ -32,5 +31,10 @@ public class FnCallExpression extends Statement {
 
   public void simplify(Simplifier s) {
     this.on = s.makeSimple(this.on);
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
+    visitor.visit(this.call);
   }
 }

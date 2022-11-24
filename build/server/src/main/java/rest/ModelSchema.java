@@ -8,12 +8,14 @@ import classes.CommentType;
 import classes.ConnectionStatus;
 import classes.DBResult;
 import classes.DBResultStatus;
+import classes.EvalType;
 import classes.GradientType;
 import classes.IconType;
 import classes.ImageFrom;
 import classes.LiteralType;
 import classes.LoginResult;
 import classes.MemberFilter;
+import classes.MethodCallType;
 import classes.MutateResultStatus;
 import classes.ReportOutAttribute;
 import classes.ReportOutCell;
@@ -24,6 +26,7 @@ import classes.ReportOutput;
 import classes.TopDeclType;
 import classes.TrackSizeType;
 import classes.TypeKind;
+import classes.TypeResolutionPositionType;
 import classes.VerificationDataByToken;
 import d3e.core.DFile;
 import d3e.core.RPCConstants;
@@ -65,7 +68,10 @@ public class ModelSchema extends AbstractModelSchema {
     addEnum(LiteralType.class, SchemaConstants.LiteralType);
     addEnum(MemberFilter.class, SchemaConstants.MemberFilter);
     addEnum(TopDeclType.class, SchemaConstants.TopDeclType);
+    addEnum(EvalType.class, SchemaConstants.EvalType);
+    addEnum(MethodCallType.class, SchemaConstants.MethodCallType);
     addEnum(TypeKind.class, SchemaConstants.TypeKind);
+    addEnum(TypeResolutionPositionType.class, SchemaConstants.TypeResolutionPositionType);
   }
 
   protected void createAllTables() {

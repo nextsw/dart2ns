@@ -46,4 +46,12 @@ public class TryCatcheStatment extends Statement {
       c.body.simplify(s);
     }
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.body);
+    visitor.visit(this.finallyBody);
+    for (CatchPart c : this.catchParts) {
+      visitor.visit(c.body);
+    }
+  }
 }

@@ -22,4 +22,12 @@ server class Typedef extends TopDecl {
         
     }
 
+    void validate(ValidationContext ctx, Integer phase) {
+        
+    }
+
+    void register(ValidationContext ctx) {
+
+    }
+
 }

@@ -1,10 +1,8 @@
 server class MethodDecl extends ClassMember{
     String name;
     List<Annotation> annotations = [];
-    List<MethodParam> positionalParams = [];
-    List<MethodParam> optionalParams = [];
-    List<MethodParam> namedParams = [];
-    List<MethodParam> params = [];
+    MethodParams params;
+    List<MethodParam> allParams = [];
     DataType returnType;
     Boolean final;
     Boolean const;
@@ -15,13 +13,14 @@ server class MethodDecl extends ClassMember{
     Boolean operator;
     Expression init;
     String factoryName;
-    List<TypeParam> typeVars = [];
+    TypeParams generics;
     Block body;
     ASyncType asyncType;
     Expression exp;
     String nativeString;
 
     LambdaType lambdaType;
+
     MethodDecl({
         this.name, 
         MethodParams params, 
@@ -42,19 +41,17 @@ server class MethodDecl extends ClassMember{
         this.external,
         this.operator,
     }) : super(name, TopDeclType.Method, ''){
-        this.positionalParams = params?.positionalParams ?? [];
-        this.optionalParams = params?.optionalParams ?? [];
-        this.namedParams = params?.namedParams ?? [];
-        this.params = params?.toFixedParams() ?? [];
+        this.params = params ?? MethodParams();
+        this.allParams = this.params.toFixedParams();
     }
     String content;
 
     void resolve(ResolveContext context){
-        D3ELogger.info('Resolving Method: ' + name);
+        // D3ELogger.info('Resolving Method: ' + name);
         MethodDecl prev = context.method;
         context.method = this;
         context.scope = Scope(parent: context.scope);
-        for(MethodParam p in params){
+        for(MethodParam p in allParams){
             if(p.dataType != null) {
                 if(p.dataType.name != null && p.dataType.name.length == 1) {
                     // Need to resolve the type...
@@ -97,7 +94,7 @@ server class MethodDecl extends ClassMember{
         if(returnType != null){
             usedTypes.add(returnType);
         }
-        for(MethodParam p in params){
+        for(MethodParam p in allParams){
             if(p.dataType != null) {
                 usedTypes.add(p.dataType);
             }
@@ -143,6 +140,194 @@ server class MethodDecl extends ClassMember{
     }
 
     Boolean get haveTypeParams {
-        return generics != null && generics.params.isNotEmpty;
+        return generics != null;
     }
+
+
+
+
+    Boolean isSignatureMatched(ValidationContext ctx, PropType _this, String methodName, Boolean isStatic, Boolean isGetter, Boolean isSetter, List<PropType> positionParamTypes, Map<String, PropType> namedParamTypes, List<PropType> typeArguments) {
+        if (static != isStatic) {
+            return false;
+        }
+        if (setter != isSetter) {
+            return false;
+        }
+        if (getter != isGetter) {
+            return false;
+        }
+        if (methodName != name) {
+            return false;
+        }
+        if (positionParamTypes == null) {
+            return true;
+        }
+        if (params.positionalParams.length > positionParamTypes.length) {
+            return false;
+        }
+        if (params.namedParams.length < namedParamTypes.length) {
+            return false;
+        }
+        if (params.optionalParams.length < (positionParamTypes.length - params.positionalParams.length)) {
+            return false;
+        }
+        Map<String, PropType> typeVars = createTypeArguments(ctx, typeArguments);
+        Integer i = 0;
+        for (Integer j = 0; i < params.positionalParams.length; i++) {
+            MethodParam parameter = params.positionalParams.get(i);
+            PropType propType = positionParamTypes.get(i);
+            if (!_this.resolveType(null, parameter.dataType.resolvedType, typeVars).isAssignableFrom(propType)) {
+                return false;
+            }
+            i++;
+        }
+        for (MethodParam p in params.namedParams) {
+            PropType propType = namedParamTypes.get(p.name);
+            if (propType == null) {
+                if (p.required) {
+                    return false;
+                }
+                continue;
+            }
+            if (!_this.resolveType(null, p.dataType.resolvedType, typeVars).isAssignableFrom(propType)) {
+                return false;
+            }
+        }
+        for (Integer j = 0; i < positionParamTypes.length; j++, i++) {
+            MethodParam parameter = params.optionalParams.get(j);
+            PropType propType = positionParamTypes.get(i);
+            if (!_this.resolveType(null, parameter.dataType.resolvedType, typeVars).isAssignableFrom(propType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    Map<String, PropType> createTypeArguments(ValidationContext ctx, List<PropType> typeArgs) {
+        if (ctx == null || generics == null || generics.params.isEmpty) {
+            return Map();
+        }
+        Map<String, PropType> result = Map();
+        for (TypeParam t in generics.params) {
+            List<TypeResolutionPosition> positions = t.typeVar.positions;
+            List<PropType> all = List();
+            for (TypeResolutionPosition p in positions) {
+                PropType res = getTypeAtPosition(ctx, p);
+                if (res != null) {
+                    all.add(res);
+                }
+            }
+            result.set(t.name, ctx.findSuperType(all));
+        }
+        //for (Integer x = 0; x < typeArgs.length && x < typeVars.length; x++) {
+        //	result.set(typeVars.get(x).name, typeArgs.get(x));
+        //}
+        return result;
+    }
+
+    PropType getTypeAtPosition(ValidationContext ctx, TypeResolutionPosition pos) {
+        if(pos.type == TypeResolutionPositionType.RETURN) {
+            return getTypeAtPostion(ctx, ctx.getExpectedType(), pos.gens);
+	    }
+        TypeResolutionPositionType type = pos.type;
+        switch (type) {
+            case NAMED:
+                for (MethodParam p in params.namedParams) {
+                    if (p.name == pos.name) {
+                        return getTypeAtPostion(ctx, p.dataType.resolvedType, pos.gens);
+                    }
+                }
+
+            case OPTIONAL:
+                if (pos.index < params.optionalParams.length) {
+                    return getTypeAtPostion(ctx, params.optionalParams.get(pos.index).dataType.resolvedType, pos.gens);
+                }
+
+            case POSITIONAL:
+                if (pos.index < params.positionalParams.length) {
+                    return getTypeAtPostion(ctx, params.positionalParams.get(pos.index).dataType.resolvedType, pos.gens);
+                }
+
+            case RETURN:
+                return null;
+
+        }
+        return null;
+    }
+
+    PropType getTypeAtPostion(ValidationContext ctx, PropType type, List<TypeResolutionPosition> gens) {
+        if (type == null || gens == null || gens.isEmpty) {
+            return type;
+        }
+        List<PropType> all = List();
+        for (TypeResolutionPosition p in gens) {
+            if (p.genVar == null) {
+                // MethodDecl method = type.findLambdaFunction().method;
+                D3ELogger.error('Not sure what this getTypeAtPostion is');
+                // PropType pt;
+                // if (p.type == TypeResolutionPositionType.RETURN) {
+                //     pt = method.getTypeAtPostion(ctx, method.returnType.resolvedType, p.gens);
+                // } else {
+                //     pt = method.getTypeAtPosition(ctx, p);
+                // }
+                // addType(all, pt);
+            } else {
+                PropType ele = type.elemenetType(p.genVar);
+                if (ele != null) {
+                    addType(all, getTypeAtPostion(ctx, ele, p.gens));
+                }
+            }
+        }
+        if (all.isEmpty) {
+            return null;
+        }
+        return ctx.findSuperType(all);
+    }
+
+    static void addType(List<PropType> all, PropType type) {
+        if (type == null || (type is TypeVariable) || all.contains(type)) {
+            return;
+        }
+        all.add(type);
+    }
+
+    List<PropType> createTypesArray(ValidationContext ctx, PropType type) {
+        if(generics == null){
+            return [];
+        }
+        return generics.params.map((a) => a.typeVar).toList();
+    }
+
+    LambdaType asLambdaType() {
+        if (lambdaType == null) {
+            lambdaType = LambdaType.withMethod(this);
+        }
+        return lambdaType;
+    }
+
+    void validate(ValidationContext ctx, Integer phase) {
+        ValidationContext sub = ctx.sub();
+        D3ELogger.info('Validating ' + (cls?.name ?? '') +'.' + name);
+        if(phase == 0) {
+            validateTypes(sub);
+
+        } else {
+            sub.validateExpression(body);
+        }
+    }
+
+    void register(ValidationContext ctx) {
+
+    }
+
+    void validateTypes(ValidationContext ctx){
+        ctx.validateType(returnType);
+        ExpressionValidationUtil.validateMethodParams(params, ctx, cls?.type);
+        for(MethodParam p in allParams){
+            if(p.dataType != null) {
+                ctx.validateType(p.dataType);
+            }
+        }
+    }
+
 }

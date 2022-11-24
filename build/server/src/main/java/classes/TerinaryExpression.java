@@ -31,4 +31,10 @@ public class TerinaryExpression extends Statement {
     this.ifTrue = s.makeSimple(this.ifTrue);
     this.ifFalse = s.makeSimple(this.ifFalse);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.condition);
+    visitor.visit(this.ifTrue);
+    visitor.visit(this.ifFalse);
+  }
 }

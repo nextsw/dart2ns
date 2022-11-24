@@ -1,0 +1,12 @@
+// class A extends B<A> {
+//     static void test(){
+//         A a;
+//         String s = a.removeAt(0);
+//     }
+// }
+// abstract class B<T> extends C {
+
+// } 
+// abstract class C extends List<String> {
+
+// }

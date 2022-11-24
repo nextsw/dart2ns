@@ -5,8 +5,10 @@ server class CollectionFor extends ArrayItem {
 
 
     void resolve(ResolveContext context) {
+        context.scope = Scope(parent: context.scope);
         stmt.resolve(context);
         value.resolve(context);
+        context.scope = context.scope.parent;
     }
     void collectUsedTypes(List<DataType> types) {
         stmt.collectUsedTypes(types);

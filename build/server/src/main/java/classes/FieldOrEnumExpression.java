@@ -1,6 +1,5 @@
 package classes;
 
-import d3e.core.D3ELogger;
 import d3e.core.ListExt;
 import java.util.List;
 import java.util.Objects;
@@ -11,7 +10,10 @@ public class FieldOrEnumExpression extends Statement {
   public boolean checkNull = false;
   public boolean notNull = false;
   public boolean isGetter = false;
+  public boolean setter = false;
+  public EvalType evalType = EvalType.ERROR;
   public ClassMember resolvedMember;
+  public ClassDecl fieldClass;
   public List<String> primitives = ListExt.asList("int", "bool", "double", "num");
 
   public FieldOrEnumExpression(boolean checkNull, String name, boolean notNull, Expression on) {
@@ -40,7 +42,7 @@ public class FieldOrEnumExpression extends Statement {
         }
       } else if (Objects.equals(this.on.resolvedType, context.typeType)) {
         if (!(this.on instanceof FieldOrEnumExpression)) {
-          D3ELogger.error("Mist be FE Exp");
+          context.error("Mist be FE Exp");
           this.resolvedType = context.ofUnknownType();
           return;
         }
@@ -56,7 +58,7 @@ public class FieldOrEnumExpression extends Statement {
         */
       } else if (Objects.equals(this.on.resolvedType, context.libraryType)) {
         if (!(this.on instanceof FieldOrEnumExpression)) {
-          D3ELogger.error("Mist be FE Exp");
+          context.error("Mist be FE Exp");
           this.resolvedType = context.ofUnknownType();
           return;
         }
@@ -131,7 +133,7 @@ public class FieldOrEnumExpression extends Statement {
         String cls = value$;
         var value$1 = context.method == null ? null : context.method.name;
         String method = value$1;
-        D3ELogger.error("No field found: " + this.name + " in Cls: " + cls + " Method: " + method);
+        context.error("No field found: " + this.name + " in Cls: " + cls + " Method: " + method);
         this.resolvedType = context.ofUnknownType();
       }
     }
@@ -150,13 +152,13 @@ public class FieldOrEnumExpression extends Statement {
       if (md.getter) {
         this.isGetter = true;
         if (onType != null) {
-          this.resolvedType = context.resolveType(onType, md.returnType);
+          this.resolvedType = context.resolveType(onType, md.cls, md.returnType);
         } else {
           this.resolvedType = md.returnType;
         }
         this.resolvedMember = cm;
       } else {
-        this.resolvedType = new FunctionType(false, md.params, md.returnType, ListExt.List());
+        this.resolvedType = new FunctionType(false, md.allParams, md.returnType, ListExt.List());
         this.resolvedMember = cm;
       }
     } else {
@@ -166,7 +168,7 @@ public class FieldOrEnumExpression extends Statement {
           field.resolve(context);
         }
         if (onType != null) {
-          this.resolvedType = context.resolveType(onType, field.type);
+          this.resolvedType = context.resolveType(onType, field.cls, field.type);
         } else {
           this.resolvedType = field.type;
         }
@@ -178,7 +180,7 @@ public class FieldOrEnumExpression extends Statement {
         String method = value$1;
         var value$2 = onType == null ? null : onType.name;
         String inType = value$2;
-        D3ELogger.error(
+        context.error(
             "No field found: "
                 + this.name
                 + " in "
@@ -193,7 +195,12 @@ public class FieldOrEnumExpression extends Statement {
   }
 
   public String toString() {
-    return this.on == null ? this.on.toString() : "" + this.name;
+    var value$1 = this.on == null ? null : this.on.toString();
+    String value$ = value$1;
+    if (value$ == null) {
+      value$ = "";
+    }
+    return (value$) + this.name;
   }
 
   public void simplify(Simplifier s) {
@@ -208,5 +215,9 @@ public class FieldOrEnumExpression extends Statement {
     } else {
       this.on = s.makeSimple(this.on);
     }
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
   }
 }

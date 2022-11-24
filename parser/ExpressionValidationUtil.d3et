@@ -100,9 +100,9 @@ server class ExpressionValidationUtil {
             validate(on.collection, ctx);
             PropType collType = ctx.typeOrObject(on.collection);
             PropType iterable = ctx.getType('Iterable');
-            if (PropTypeUtil.isAssignableFrom(iterable, collType)) {
-                PropType elementType = PropTypeUtil.getElemenetType(collType);
-                if (elementType != null && !PropTypeUtil.isAssignableFrom(varType, elementType)) {
+            if (iterable.isAssignableFrom(collType)) {
+                PropType elementType = collType.getElemenetType();
+                if (elementType != null && !varType.isAssignableFrom(elementType)) {
                     ctx.addError(on.collection.range, 'Can not convert \"' + elementType.toString() + '\" to \"' + varType.toString() + '\"');
                 }
             } else {
@@ -123,7 +123,7 @@ server class ExpressionValidationUtil {
         validate(a.on, ctx);
         validate(a.index, ctx);
         a.method = validateWithOp(ctx, a.range, null, a.index.range, ctx.typeOrObject(a.on), ctx.typeOrObject(a.index), '[]');
-        a.expType = TypeUtils.elementType(ctx.typeOrObject(a.on));
+        a.expType = ctx.typeOrObject(a.on).elementType();
     }
     
     static void validateArrayExpression(ArrayExpression on, ValidationContext ctx) {
@@ -139,7 +139,7 @@ server class ExpressionValidationUtil {
         }
         on.values.forEach((e) => validate(e, sub));
         if (pt != null) {
-            on.values.where((v) => !PropTypeUtil.isAssignableFrom(pt, sub.typeOrObject(v)))
+            on.values.where((v) => !pt.isAssignableFrom(sub.typeOrObject(v)))
             .forEach((a) => sub.addError(a.range, 'Typemismatch: can not convert from ' + sub.typeOrObject(a).toString() + ' to ' + pt.toString()));
         }
         PropType elementType = computeElementType(on, ctx);
@@ -161,8 +161,8 @@ server class ExpressionValidationUtil {
                     type = ctx.object();
                 } else {
                     PropType listType = ctx.getType('Iterable');
-                    if (PropTypeUtil.isAssignableFrom(listType, type)) {
-                        return TypeUtils.elementTypeWithIndex(type, 0);
+                    if (listType.isAssignableFrom(type)) {
+                        return type.elementTypeWithIndex(0);
                     }
                 }
                 return type;
@@ -217,7 +217,7 @@ server class ExpressionValidationUtil {
         PropType rt = ctx.typeOrObject(on.right);
         switch (on.op) {
             case '=':
-                if (!PropTypeUtil.isAssignableFrom(lt, rt)) {
+                if (!lt.isAssignableFrom(rt)) {
                     ctx.addError(null, 'Can not assign \"' + rt.toString() + '\" to \"' + lt.toString() + '\"');
                 }
 
@@ -234,7 +234,7 @@ server class ExpressionValidationUtil {
                 return null;
             }
             PropType type = ctx.typeOrObject(fe.on);
-            return PropTypeUtil.getField(type, fe.name);
+            return type.getField(fe.name);
 
         } else {
             return null;
@@ -266,7 +266,7 @@ server class ExpressionValidationUtil {
             return null;
         }
         if ('==' == op || '!=' == op) {
-            if (!PropTypeUtil.canCompare(lt, rt)) {
+            if (!lt.canCompare(rt)) {
                 ctx.addError(left, 'Can not compare two different Types \"' + lt.toString() + '\" and \"' + rt.toString() + '\"');
             }
             return null;
@@ -275,7 +275,7 @@ server class ExpressionValidationUtil {
             ctx.addError(_this, 'left side is null');
             return null;
         }
-        MethodDecl method = PropTypeUtil.findOperatorMethod(lt, ctx, op, rt);
+        MethodDecl method = lt.findOperatorMethod(ctx, op, rt);
         if (method == null) {
             ctx.addError(_this, 'The operator ' + op.toString() + ' is undefined for the argument type(s) ' + lt.toString() + ', ' + rt.toString());
         }
@@ -297,16 +297,16 @@ server class ExpressionValidationUtil {
             on.expType = ctx.object();
             return on.expType;
         }
-        MethodDecl method = PropTypeUtil.findOperatorMethod(lt, ctx, on.op, rt);
+        MethodDecl method = lt.findOperatorMethod(ctx, on.op, rt);
         if (method != null) {
-            on.expType = PropTypeUtil.resolveType(lt, ctx, method.returnType.resolvedType, createTypeArguments(method, ctx, List()));
+            on.expType = lt.resolveType(ctx, method.returnType.resolvedType, createTypeArguments(method, ctx, List()));
             return on.expType;
         }
         on.expType = ctx.object();
         return on.expType;
     }
     static Map<String, PropType> createTypeArguments(MethodDecl on, ValidationContext ctx, List<PropType> typeArgs) {
-        if (ctx == null || typeArgs == null || on.haveTypeParams) {
+        if (ctx == null || typeArgs == null || !on.haveTypeParams) {
             return Map();
         }
         Map<String, PropType> result = Map();
@@ -410,7 +410,7 @@ server class ExpressionValidationUtil {
         if (on.test != null) {
             validate(on.test, ctx);
             PropType type = ctx.typeOrObject(on.test);
-            if (!TypeUtils.isBool(type)) {
+            if (!type.isBool()) {
                 ctx.addError(on.test.range, 'Can not convert Boolean from \"' + type.toString() + '\"');
             }
         }
@@ -431,10 +431,10 @@ server class ExpressionValidationUtil {
     static void validateCollectionSpread(CollectionSpread on, ValidationContext ctx) {
         validate(on.values, ctx);
         PropType type = ctx.typeOrObject(on.values);
-        if (!TypeUtils.isCollection(type)) {
+        if (!type.isCollection()) {
             ctx.addError(on.values.range, 'Expression type should be collection');
         }
-        on.expType = TypeUtils.elementType(type);
+        on.expType = type.elementType();
     }
 
     static void validateContinue(Continue on, ValidationContext ctx) {
@@ -455,10 +455,21 @@ server class ExpressionValidationUtil {
                 ctx.addUsedType(propType);
                 ctx.addTypeUsage(propType);
             }
-            validateTypeArguments(von.args, ctx, propType.typeVars);
-            on.resolvedType = DataTypeUtil.type(von, ctx);
+            if(von.args.isNotEmpty){
+                validateTypeArguments(von.args, ctx, propType.typeVars);
+            }
+            on.resolvedType = von.type(ctx);
         } else if(on is FunctionType) {
-            //FIXME
+            FunctionType fnType = on as FunctionType;
+            validateDataType(fnType.returnType, ctx);
+            for(MethodParam p in fnType.params) {
+                validateMethodParam(p, ctx, ctx.getDataType());
+            }
+            if(fnType.typeArgs.isNotEmpty){
+                D3ELogger.error('Type Args for Function type are not supported');
+                // validateTypeArguments(fnType.typeArgs, ctx, propType.typeVars);
+            }
+            on.resolvedType = fnType.type(ctx);
         }
     }
     
@@ -484,7 +495,7 @@ server class ExpressionValidationUtil {
                 ValidationContext sub = ctx.subWithType(propType);
                 validate(nv.value, sub);
                 PropType assignType = sub.typeOrObject(nv.value);
-                if (assignType!= null && !PropTypeUtil.isAssignableFrom(propType, assignType)) {
+                if (assignType!= null && !propType.isAssignableFrom(assignType)) {
                     sub.addError(nv.value.range, 'Can not assign \"' + assignType.toString() + '\" to type \"' + propType.toString() + '\"');
                 }
             }
@@ -497,7 +508,7 @@ server class ExpressionValidationUtil {
         } else {
             validate(on.test, ctx);
             PropType testType = ctx.typeOrObject(on.test);
-            if (!TypeUtils.isBool(testType)) {
+            if (!testType.isBool()) {
                 ctx.addError(on.test.range, 'Can not convert Boolean from \"' + testType.toString() + '\"');
             }
         }
@@ -557,7 +568,7 @@ server class ExpressionValidationUtil {
             }
             PropType et = ctx.getExpectedType();
             if (et !=null && et.enm != null) {
-                FieldDecl findField = PropTypeUtil.findField(((et as ClassType)), fe.name, true);
+                FieldDecl findField = et.findField(fe.name, true);
                 if (findField != null) {
                     if (!checkPrivateFieldAccess(findField.name, true, et, ctx)) {
                         ctx.addError(fe.range, 'FieldDecl ' + findField.name + ' in ' + et.name + ' is not visible.');
@@ -580,6 +591,9 @@ server class ExpressionValidationUtil {
                     }
                 }
                 if (checkOnField(fe, ctx, ctx.getDataType(), true)) {
+                    return;
+                }
+                if(checkOnLibraryFunction(fe, ctx)) {
                     return;
                 }
                 ctx.addError(fe.range, 'Invalid field or type or enum value \"' + fe.name.toString() + '\"');
@@ -608,7 +622,7 @@ server class ExpressionValidationUtil {
         if (fe.on == null) {
             PropType et = ctx.getExpectedType();
             if (et is EnumType) {
-                if (PropTypeUtil.hasField(et as EnumType, ctx, fe.name, true)) {
+                if (et.hasField(ctx, fe.name, true)) {
                     fe.expType = et;
                     return null;
                 }
@@ -667,22 +681,22 @@ server class ExpressionValidationUtil {
             return false;
         }
         String fieldName = fe.name;
-        FieldDecl field = PropTypeUtil.getField(type, fieldName);
+        FieldDecl field = type.getField(fieldName);
         if (field != null && (field.type != null)) {
             if (!checkPrivateFieldAccess(fieldName, isStatic, type, ctx)) {
                 ctx.addError(fe.range, 'FieldDecl ' + fieldName + ' in ' + type.name + ' is not visible.');
                 return false;
             }
-            fe.expType = PropTypeUtil.resolveType(type, ctx, field.type.resolvedType, Map.fromIterable(field.typeArguments, key: (i)=> i.name, value:(k)=>k.type));
+            fe.expType = type.resolveType(ctx, field.type.resolvedType, Map.fromIterable(field.type.resolvedType.typeVars, key: (i)=> i.name, value:(k)=>k));
             fe.resolvedMember = field;
             fe.evalType = (isStatic ? EvalType.STATIC_FIELD : EvalType.FIELD);
             fe.fieldClass = type.cls;
             ctx.addFieldUsege(type, field);
             return true;
         }
-        MethodDecl method = PropTypeUtil.findMethodByName(ctx, type, fieldName, fe.setter, !fe.setter);
+        MethodDecl method = type.findMethodByName(ctx, fieldName, fe.setter, !fe.setter);
         if (method == null) {
-            method = PropTypeUtil.findMethodByName(ctx, type, fieldName, false, false);
+            method = type.findMethodByName(ctx, fieldName, false, false);
             if (method == null) {
                 return false;
             }
@@ -699,14 +713,38 @@ server class ExpressionValidationUtil {
             fe.resolvedMember = method;
             fe.evalType = EvalType.METHOD_REFERENCE;
             fe.fieldClass = type.cls;
-            fe.expType = PropTypeUtil.resolveType(type, ctx, LambdaTypeUtil.asLambdaType(method), Map());
+            fe.expType = type.resolveType(ctx, method.asLambdaType(), Map());
         } else {
             fe.evalType = EvalType.GETTER;
             fe.resolvedMember = method;
             fe.fieldClass = type.cls;
-            fe.expType = PropTypeUtil.resolveType(type,ctx,  method.getter ? method.returnType.resolvedType : method.params.first.dataType.resolvedType, Map());
+            fe.expType = type.resolveType(ctx, method.getter ? method.returnType.resolvedType : method.allParams.first.dataType.resolvedType, Map());
         }
         ctx.addMethodUsege(type, method);
+        return true;
+    }
+    static Boolean checkOnLibraryFunction(FieldOrEnumExpression fe, ValidationContext ctx) {
+        String fieldName = fe.name;
+        FieldDecl field = ctx.getLibraryField(fieldName);
+        if (field != null && (field.type != null)) {
+            fe.expType = field.type.resolvedType;
+            fe.resolvedMember = field;
+            fe.evalType = EvalType.GLOBAL_FIELD;
+            return true;
+        }
+        MethodDecl method = ctx.getLibraryMethod(fieldName);
+        if(method == null){
+            return false;
+        }
+        if (method != null && !method.getter) {
+            fe.resolvedMember = method;
+            fe.evalType = EvalType.GLOBAL_METHOD_REFERENCE;
+            fe.expType = method.asLambdaType();
+        } else {
+            fe.evalType = EvalType.GETTER;
+            fe.resolvedMember = method;
+            fe.expType = method.returnType.resolvedType;
+        }
         return true;
     }
 
@@ -734,7 +772,7 @@ server class ExpressionValidationUtil {
         } else {
             validate(on.test, ctx);
             PropType testType = ctx.typeOrObject(on.test);
-            if (!TypeUtils.isBool(testType)) {
+            if (!testType.isBool()) {
                 ctx.addError(on.test.range, 'Can not convert Boolean from \"' + testType.toString() + '\"');
             }
         }
@@ -752,7 +790,7 @@ server class ExpressionValidationUtil {
         } else {
             validate(on.test, ctx);
             PropType type = ctx.typeOrObject(on.test);
-            if (!TypeUtils.isBool(type)) {
+            if (!type.isBool()) {
                 ctx.addError(on.test.range, 'Can not convert Boolean from \"' + type.toString() + '\"');
             }
         }
@@ -770,74 +808,57 @@ server class ExpressionValidationUtil {
     static void validateLambdaExpression(LambdaExpression on, ValidationContext ctx) {
         on.expType = null;
         PropType ct = ctx.getExpectedType();
-        LambdaType expType = PropTypeUtil.findLambdaFunction(ct);
+        LambdaType expType = ct.findLambdaFunction();
         if (!(expType is LambdaType)) {
             ctx.addError(null, 'Function not found.');
             return;
         }
-        MethodDecl method = expType.method;
-        on.originalMethod = method;
-        MethodDecl resultMethod = MethodDecl(declCls: ct, name:  '', typeAccess: TypeAccess.SHARED);
-        resultMethod.typeVars = method.typeVars;
-        resultMethod.returnType = method.returnType;
-        on.returnType = method.returnType;
-        List<MethodParam> lambdaParamTypes = List();
-        List<MethodParam> params = method.positionalParams;
-        if (params.length != on.params.length) {
-            ctx.addError(null, 'Arguments size is not matched with function parameters. ' + params.length.toString());
+        if (expType.params.length != on.params.length) {
+            ctx.addError(null, 'Arguments size is not matched with function parameters. ' + expType.params.length.toString());
         }
-        PropType rt = PropTypeUtil.resolveType(ct, ctx, method.returnType.resolvedType, Map<String, PropType>());
+        PropType rt = ct.resolveType(ctx, expType.returnType, Map<String, PropType>());
         ValidationContext subCtx = ctx.subWithType(rt);
         subCtx.insideLambda = true;
         subCtx.addAttribute('#b', null);
         subCtx.addAttribute('#c', null);
         //subCtx.addLocalVar(ct, "#a", false);
-        CollectionsUtil.forEach(params, on.params, (p, a) {
-            PropType paramType = PropTypeUtil.resolveType(ct, subCtx, p.type.resolvedType, Map<String, PropType>());
-            lambdaParamTypes.add(MethodParam(name: a.name ,dataType:  paramType.toDataType()));
+        CollectionsUtil.forEach(expType.params, on.params, (p, a) {
+            PropType paramType = ct.resolveType(subCtx, p, Map<String, PropType>());
             validateParam(a, subCtx, paramType);
         });
         if (on.expression != null) {
             validate(on.expression, subCtx);
             PropType returnType = subCtx.typeOrObject(on.expression);
-            if (rt != PropTypeUtil.VOID && !PropTypeUtil.isAssignableFrom(rt, returnType)) {
+            if (rt != PropType.VOID && !rt.isAssignableFrom(returnType)) {
                 subCtx.addError(on.expression.range, 'Function return type \"' + returnType.toString() + '\" is not matched with \"' + rt.toString() + '\"');
-            } else {
-                resultMethod.returnType = returnType.toDataType();
             }
-            resultMethod.expression = on.expression;
         } else if (on.body != null) {
-            subCtx.addLocalVar(ctx.bool(), '#r');
+            subCtx.addLocalVar(ctx.bool(), '#r', false);
             validate(on.body, subCtx);
-            resultMethod.body = on.body;
             PropType returnType = computeReturnType(on.body, subCtx);
             if (returnType == null) {
-                if (rt.name != PropTypeUtil.VOID_TYPE) {
+                if (rt.name != PropType.VOID_TYPE) {
                     subCtx.addError(null, 'Function must return a result of type \"' + rt.toString() + '\"');
                 }
-            } else {
-                resultMethod.returnType = returnType.toDataType();
             }
         }
-        resultMethod.positionalParams = lambdaParamTypes;
-        on.expectedType = ct;
-        PropType pt = createLambdaExpType(subCtx, resultMethod, ct);
-        on.expType = pt;
+        on.expectedType = expType;
+        on.expType = expType;
     }
     
     static PropType createLambdaExpType(ValidationContext subCtx, MethodDecl resultMethod, PropType ct) {
-        LambdaType res = LambdaTypeUtil.withMethod(resultMethod);
+        LambdaType res = LambdaType.withMethod(resultMethod);
         ct.typeVars.forEach((i) => res.typeVars.add(i));
         if (ct is ParameterizedType) {
             subCtx.setExpectedType(resultMethod.returnType.resolvedType);
-            Map<String, PropType> arguments = ExecutableUtil.createTypeArguments(resultMethod, subCtx, List());
+            Map<String, PropType> arguments = resultMethod.createTypeArguments(subCtx, List());
             ParameterizedType dpt = (ct as ParameterizedType);
-            ParameterizedType pt = ParameterizedTypeUtil.from(res);
+            ParameterizedType pt = ParameterizedType.from(res);
             dpt.arguments.forEach((t){
-                ParameterizedTypeUtil.addArgumentWithName(pt, t.name, t.type);
+                pt.addArgumentWithName(t.name, t.type);
             });
-            resultMethod.typeVars.where((t) => TypeVariableUtil.isDependsOnReturn(t)).forEach((t) {
-                ParameterizedTypeUtil.addArgumentWithName(pt, t.name, PropTypeUtil.resolveType(res, subCtx, t, arguments));
+            resultMethod.generics.params.where((t) => t.typeVar.isDependsOnReturn()).forEach((t) {
+                pt.addArgumentWithName(t.name, res.resolveType(subCtx, t.typeVar, arguments));
             });
             return pt;
         } else {
@@ -897,13 +918,12 @@ server class ExpressionValidationUtil {
                 LocalVar var = ctx.findLocalVar(mc.name);
                 if (var != null && var.initialized) {
                     PropType fieldType = ctx.getLocalVarType(mc.name);
-                    FunctionType function = fieldType == null ? null : PropTypeUtil.findLambdaFunction(fieldType);
+                    LambdaType function = fieldType == null ? null : fieldType.findLambdaFunction();
                     if (function != null) {
-                        MethodDecl lambdaFunction = function.method;
-                        if (lambdaFunction != null) {
+                        if (false) {
+                            // FIXME
                             mc.callType = MethodCallType.FunctionMethod;
-                            mc.expType = validateArgs(mc, ctx, fieldType, lambdaFunction);
-                            mc.resolvedMethod = lambdaFunction;
+                            mc.expType = validateArgs(mc, ctx, fieldType, null);
                             ctx.addUsedType(mc.expType);
                             mc.staticClass = function;
                         } else {
@@ -984,11 +1004,11 @@ server class ExpressionValidationUtil {
         if (value == 'super') {
             value = propType.name;
         }
-        return PropTypeUtil.findConstructor(propType, ctx, value);
+        return propType.findMethod(ctx, value);
     }
 
     static MethodDecl findMethod(ValidationContext ctx, MethodCall mc, PropType propType) {
-        return PropTypeUtil.findMethod(ctx, propType, mc.name);
+        return propType.findMethod(ctx, mc.name);
     }
 
     static Boolean findStaticMethod(MethodCall mc,ValidationContext ctx, PropType type) {
@@ -1017,17 +1037,17 @@ server class ExpressionValidationUtil {
             ctx.addMethodUsege(type, method);
             return true;
         } else {
-            FieldDecl field = PropTypeUtil.getField(type, mc.name);
+            FieldDecl field = type.getField(mc.name);
             if (field != null) {
                 PropType fieldType = field.type.resolvedType;
-                LambdaType function = fieldType == null ? null : PropTypeUtil.findLambdaFunction(fieldType);
+                LambdaType function = fieldType == null ? null : fieldType.findLambdaFunction();
                 if (function != null) {
-                    MethodDecl lambdaFunction = function.method;
-                    if (lambdaFunction != null) {
-                        mc.expType = validateArgs(mc, ctx, fieldType, lambdaFunction);
+                    if (false) {
+                        //FIXME
+                        mc.expType = validateArgs(mc, ctx, fieldType, null);
                         mc.callType = MethodCallType.FunctionMethod;
                         // mc.isInstanceFunction = true;
-                        mc.resolvedMethod = lambdaFunction;
+                        // mc.resolvedMethod = lambdaFunction;
                         // mc.declaringClass = function;
                         // mc.staticClass = function;
                         return true;
@@ -1041,19 +1061,19 @@ server class ExpressionValidationUtil {
     }
 
     static PropType validateArgs(MethodCall mc, ValidationContext ctx, PropType propType, MethodDecl exe) {
-        if (mc.typeArgs != null) {
+        if (mc.typeArgs.isNotEmpty) {
             validateTypeArguments(mc.typeArgs, ctx, getTypeVars(mc, propType, exe));
         }
-        if (mc.positionArgs.length > exe.positionalParams.length + exe.optionalParams.length) {
+        if (mc.positionArgs.length > exe.params.positionalParams.length + exe.params.optionalParams.length) {
             ctx.addError(mc.range, 'Too many positional paramters');
             return null;
         }
-        if (mc.positionArgs.length < exe.positionalParams.length) {
+        if (mc.positionArgs.length < exe.params.positionalParams.length) {
             ctx.addError(mc.range, 'Too few positional paramters');
             return null;
         }
         Boolean hasRequiredErrors = false;
-        for(MethodParam np in exe.namedParams) {
+        for(MethodParam np in exe.params.namedParams) {
             if(np.required) {
                 Boolean notFound = true;
                 for(NamedArgument na in mc.namedArgs) {
@@ -1071,23 +1091,23 @@ server class ExpressionValidationUtil {
         if(hasRequiredErrors) {
             return null;
         }
-        List<PropType> typesArray = ExecutableUtil.createTypesArray(exe, ctx, propType, mc.typeArgs);
+        List<PropType> typesArray = exe.createTypesArray(ctx, propType);
         MethodDecl dummy = MethodDecl(
             name: '', 
         );
-        dummy.typeVars = List.from(exe.typeVars);
+        // dummy.generics.params = List.from(exe.generics.typeVars);
         dummy.returnType = exe.returnType;
-        List<MethodParam> positionalParams = exe.positionalParams;
+        List<MethodParam> positionalParams = exe.params.positionalParams;
         Integer i = 0;
         for (Integer j = 0; i < positionalParams.length; i++) {
             MethodParam param = positionalParams.get(i);
             Argument arg = mc.positionArgs.get(i);
-            PropType resolveType = PropTypeUtil.resolveType(propType, ctx, param.dataType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+            PropType resolveType = propType.resolveType(ctx, param.dataType.resolvedType, dummy.createTypeArguments(ctx, typesArray));
             ValidationContext sub = ctx.subWithType(resolveType);
             validateArgument(arg, sub);
             PropType type = sub.typeOrObject(arg.arg);
-            dummy.positionalParams.add(MethodParam(name: param.name, dataType:  type.toDataType()));
-            if (!PropTypeUtil.isAssignableFrom(resolveType, type)) {
+            dummy.params.positionalParams.add(MethodParam(name: param.name, dataType:  type.toDataType()));
+            if (!resolveType.isAssignableFrom(type)) {
                 ctx.addError(null, 'Can not assign ' + type.toString() + ' to ' + resolveType.toString());
             }
         }
@@ -1114,29 +1134,29 @@ server class ExpressionValidationUtil {
             }
         }
 
-        List<MethodParam> optionalParams = exe.optionalParams;
+        List<MethodParam> optionalParams = exe.params.optionalParams;
         for (Integer j = 0; i < mc.positionArgs.length; j++, i++) {
             MethodParam param = optionalParams.get(j);
             Argument arg = mc.positionArgs.get(i);
-            PropType resolveType = PropTypeUtil.resolveType(propType, ctx, param.dataType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+            PropType resolveType = propType.resolveType(ctx, param.dataType.resolvedType, dummy.createTypeArguments(ctx, typesArray));
             ValidationContext sub = ctx.subWithType(resolveType);
             validateArgument(arg, sub);
             PropType type = sub.typeOrObject(arg.arg);
-            dummy.optionalParams.add(MethodParam(name: param.name, dataType: type.toDataType()));
-            if (!PropTypeUtil.isAssignableFrom(resolveType, type)) {
+            dummy.params.optionalParams.add(MethodParam(name: param.name, dataType: type.toDataType()));
+            if (!resolveType.isAssignableFrom(type)) {
                 ctx.addError(null, 'Can not assign ' + type.toString() + ' to ' + resolveType.toString());
             }
         }
-        List<MethodParam> namedParams = exe.namedParams;
+        List<MethodParam> namedParams = exe.params.namedParams;
         for (NamedArgument arg in mc.namedArgs) {
             MethodParam param = namedParams.firstWhere((f) => f.name == arg.name);
             if (param != null) {
-                PropType resolveType = PropTypeUtil.resolveType(propType, ctx, param.dataType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+                PropType resolveType = propType.resolveType(ctx, param.dataType.resolvedType, dummy.createTypeArguments(ctx, typesArray));
                 ValidationContext sub = ctx.subWithType(resolveType);
                 validateNamedArgument(arg, sub);
                 PropType type = sub.typeOrObject(arg.value);
-                dummy.namedParams.add(MethodParam(name: param.name, dataType: type.toDataType()));
-                if (!PropTypeUtil.isAssignableFrom(resolveType, type)) {
+                dummy.params.namedParams.add(MethodParam(name: param.name, dataType: type.toDataType()));
+                if (!resolveType.isAssignableFrom(type)) {
                     ctx.addError(null, 'Can not assign ' + type.toString() + ' to ' + resolveType.toString());
                 }
             } else {
@@ -1145,16 +1165,16 @@ server class ExpressionValidationUtil {
         }
         if (dummy.returnType != null) {
             if (mc.callType == MethodCallType.FunctionMethod) {
-                dummy.typeVars.clear();
+                dummy.generics.params.clear();
             }
-            PropType resolveType = PropTypeUtil.resolveType(propType, ctx, exe.returnType.resolvedType, ExecutableUtil.createTypeArguments(dummy, ctx, typesArray));
+            PropType resolveType = propType.resolveType(ctx, exe.returnType.resolvedType, dummy.createTypeArguments(ctx, typesArray));
             return resolveType;
         }
-        return ctx.applyArgs(propType, typesArray);
+        return propType.applyArgs(typesArray);
     }
 
     static List<TypeVariable> getTypeVars(MethodCall mc,PropType propType, MethodDecl exe) {
-        List<TypeVariable> list = List.from(exe.typeVars);
+        List<TypeVariable> list = List.from(exe.generics.params.map(t => t.typeVar));
         return list;
     }
 
@@ -1177,37 +1197,39 @@ server class ExpressionValidationUtil {
     static void validateMethodParam(MethodParam on, ValidationContext ctx, PropType declType) {
         if (on.dataType != null) {
             validateDataType(on.dataType, ctx);
-        }
+        } 
         if (on.name == null) {
             ctx.addError(null, 'Parameter name is required');
         }
-        ReservedWords.checkReserved(on.name, ctx, null);
-        if (on.params != null) {
-            ctx.addError(null, 'FunctionParamer is not supporting');
-            validateMethodParams(on.params, ctx, declType);
+        // ReservedWords.checkReserved(on.name, ctx, null);
+        // if (on.params != null) {
+        //     ctx.addError(null, 'FunctionParamer is not supporting');
+        //     validateMethodParams(on.params, ctx, declType);
+        // }
+        if(on.defaultValue != null) {
+            validate(on.defaultValue, ctx);
         }
-        if(on.def != null) {
-            validate(on.def.exp, ctx);
+        PropType type = addField(on, ctx, declType);
+        if(on.dataType == null) {
+            on.dataType = type.toDataType();
         }
-        addField(on, ctx, declType);
     }
 
-    static void addField(MethodParam on, ValidationContext ctx, PropType declType) {
-        if (on.name != null) {
-            PropType propType = MethodParamUtil.type(on, ctx, declType);
-            if (on.dataType == null && declType != null && (on.thisToken != null && on.thisToken == 'this')) {
-                // We assign Object in this case        
-                FieldDecl existing = PropTypeUtil.getAllFields(declType).firstWhere((f) => f.name == on.name);
-                if (existing == null) {
-                    ctx.addError(null, 'FieldDecl \"' + on.name + '\" not found in type \"' + declType.name + '\"');
-                    return;
-                }
-                if (existing != null && existing.type != null) {
-                    propType = existing.type;
-                }
+    static PropType addField(MethodParam on, ValidationContext ctx, PropType declType) {
+        PropType propType = MethodParamUtil.type(on, ctx, declType);
+        if (on.dataType == null && declType != null && (on.thisToken != null && on.thisToken == 'this')) {
+            // We assign Object in this case        
+            FieldDecl existing = declType.getAllFields().firstWhere((f) => f.name == on.name);
+            if (existing == null) {
+                ctx.addError(null, 'FieldDecl \"' + on.name + '\" not found in type \"' + declType.name + '\"');
+                return null;
             }
-            ctx.addLocalVar(propType, on.name, false);
+            if (existing != null && existing.type != null) {
+                propType = existing.type.resolvedType;
+            }
         }
+        ctx.addLocalVar(propType, on.name, false);
+        return propType;
     }
 
     static void validateNamedArgument(NamedArgument on, ValidationContext ctx) {
@@ -1221,7 +1243,7 @@ server class ExpressionValidationUtil {
             ctx.addError(null, 'ModelProperty name is required');
             return;
         }
-        FieldDecl prop = PropTypeUtil.getField(_this, getName(on));
+        FieldDecl prop = _this.getField(getName(on));
         if (prop == null) {
             ctx.addError(null, 'Invalid property \"' + on.name.toString() + '\"');
             return;
@@ -1230,7 +1252,7 @@ server class ExpressionValidationUtil {
         validate(on.value, sub);
         PropType type = sub.typeOrObject(on.value);
         PropType fieldType = prop.type.resolvedType;
-        if (!PropTypeUtil.isAssignableFrom(fieldType, type)) {
+        if (!fieldType.isAssignableFrom(type)) {
             ctx.addError(on.value.range, 'Type mismatch: cannot convert from ' + type.toString() + ' to ' + fieldType.toString());
         }
     }
@@ -1249,7 +1271,7 @@ server class ExpressionValidationUtil {
             if (argType == null) {
                 ctx.addError(null, 'Invalid data type \"' + on.type.toString() + '\"');
             } else {
-                if (!PropTypeUtil.isAssignableFrom(argType, varType)) {
+                if (!argType.isAssignableFrom(varType)) {
                     ctx.addError(null, 'Can not convert \"' + argType.toString() + '\" to \"' + varType.toString() + '\"');
                 }
                 varType = argType;
@@ -1283,7 +1305,7 @@ server class ExpressionValidationUtil {
         }
         validate(pe.on, ctx);
         PropType propType = ctx.typeOrObject(pe.on);
-        if (!TypeUtils.isNumber(propType)) {
+        if (!propType.isNumber()) {
             ctx.addError(null, 'Expression type should be number type.');
         }
         pe.expType = ctx.typeOrObject(pe.on);
@@ -1317,10 +1339,10 @@ server class ExpressionValidationUtil {
         validate(pe.on, ctx);
         PropType propType = ctx.typeOrObject(pe.on);
         if (pe.prefix == '!') {
-            if (!TypeUtils.isBool(propType)) {
+            if (!propType.isBool()) {
                 ctx.addError(null, 'Expression type should be bool type.');
             }
-        } else if (!TypeUtils.isNumber(propType)) {
+        } else if (!propType.isNumber()) {
             ctx.addError(null, 'Expression type should be number type.');
         }
         pe.expType = ctx.typeOrObject(pe.on);
@@ -1350,21 +1372,21 @@ server class ExpressionValidationUtil {
             validate(on.expression, ctx);
         }
         PropType type = computeReturnType(on, ctx);
-        if (on.expression != null && type == PropTypeUtil.VOID) {
+        if (on.expression != null && type == PropType.VOID) {
             ctx.addError(null, 'Cannot return a void result');
             return;
         }
         PropType expectedType = ctx.getExpectedType();
         Boolean success = expectedType != null;
         if (success) {
-            success = PropTypeUtil.isAssignableFrom(expectedType, type);
+            success = expectedType.isAssignableFrom(type);
             if (!success) {
                 LocalVar asyncVar = ctx.findLocalVar('#a');
                 if (asyncVar != null && (asyncVar.value as Boolean)) {
-                    if (PropTypeUtil.isAssignableFrom(ctx.getType('Future'), type)) {
-                        success = PropTypeUtil.isAssignableFrom(expectedType, ctx.elementTypeWithIndex(type, 0));
+                    if (ctx.getType('Future').isAssignableFrom(type)) {
+                        success = expectedType.isAssignableFrom(type.elementTypeWithIndex(0));
                     } else {
-                        success = PropTypeUtil.isAssignableFrom(expectedType, type);
+                        success = expectedType.isAssignableFrom(type);
                     }
                 }
             }
@@ -1381,7 +1403,7 @@ server class ExpressionValidationUtil {
         on.tests.forEach((t) => validate(t, testCtx));
         for (Expression t in on.tests) {
             PropType tt = testCtx.typeOrObject(t);
-            if (PropTypeUtil.canCompare(testType, tt)) {
+            if (testType.canCompare(tt)) {
                 continue;
             }
             if (isEnum) {
@@ -1433,7 +1455,7 @@ server class ExpressionValidationUtil {
     static void validateTerinaryExpression(TerinaryExpression on, ValidationContext ctx) {
         if (on.condition != null) {
             validate(on.condition, ctx);
-            if (!TypeUtils.isBool(ctx.typeOrObject(on.condition))) {
+            if (!ctx.typeOrObject(on.condition).isBool()) {
                 ctx.addError(on.condition.range, 'Condition should be of Boolean type');
             }
         } else {
@@ -1484,7 +1506,7 @@ server class ExpressionValidationUtil {
         } else {
             CollectionsUtil.forEach(args, typeVars, (a, p) {
                 PropType val = a.resolvedType;
-                if (!PropTypeUtil.isAssignableFrom(p, val)) {
+                if (!p.isAssignableFrom(val)) {
                     ctx.addError(null, 'Bound mismatch: The type ' + val.toString() + ' is not a valid substitute for the bounded parameter \"' + p.toString() + '\"');
                 }
             });
@@ -1497,9 +1519,9 @@ server class ExpressionValidationUtil {
         }
         if (on.dataType != null) {
             validateDataType(on.dataType, ctx);
-            if(PropTypeUtil.isAssignableFrom(on.exp.expType, on.dataType.resolvedType)){
+            if(on.exp.expType.isAssignableFrom(on.dataType.resolvedType)){
 
-            } else if(!PropTypeUtil.isAssignableFrom(on.dataType.resolvedType, on.exp.expType)){
+            } else if(!on.dataType.resolvedType.isAssignableFrom(on.exp.expType)){
                 ctx.addError(null, 'Can not convert from ' + on.dataType.resolvedType.toString() + ' to ' + on.exp.expType.toString());
             }
         } else {
@@ -1518,7 +1540,7 @@ server class ExpressionValidationUtil {
             return;
         }
         if (!tp.typeVars.isEmpty) {
-            tp = ParameterizedTypeUtil.from(tp);
+            tp = ParameterizedType.from(tp);
         }
         on.expType = tp;
     }
@@ -1549,7 +1571,7 @@ server class ExpressionValidationUtil {
         } else {
             validate(on.test, ctx);
             PropType testType = on.test.expType;
-            if (!TypeUtils.isBool(testType)) {
+            if (!testType.isBool()) {
                 ctx.addError(on.test.range, 'Can not convert Boolean from \'' + testType.toString() + '\'');
             }
         }
@@ -1675,4 +1697,53 @@ server class ExpressionValidationUtil {
         return ctx.nullType();
     }
 
+
+    ///////////////// FROM TypeUtils ////////////////////////
+    static void forEachInvolvedType(PropType type, Consumer<PropType> consumer) {
+        if(type is ParameterizedType) {
+            ParameterizedType pt = type as ParameterizedType;
+            PropType baseType = pt.baseType;
+            consumer(baseType);
+            pt.arguments.forEach((t) => forEachInvolvedType(t.type, consumer));
+        } else {
+            consumer(type);
+        }
+    }
+
+
+
+    static String listToString(List<PropType> paramTypes) {
+        StringBuffer sb = StringBuffer();
+        sb.write('(');
+        if (paramTypes != null && !paramTypes.isEmpty) {
+            sb.write(paramTypes[0]);
+            for (Integer i = 1; i < paramTypes.length; i++) {
+                sb.write(' ');
+                sb.write(paramTypes[i]);
+            }
+        }
+        sb.write(')');
+        return sb.toString();
+    }
+
+
+    //////// From TypeArgumentUtil /////////
+
+
+    // From DataTypeUtil ///////
+    
+
+
+
+    ////// From TypeParam Utils  ///////
+
+
+
+    ////// From TypeParams Utils//////////
+
+
+    ///// From Validation Context 
+
+
+    
 }

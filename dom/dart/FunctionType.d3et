@@ -2,6 +2,7 @@ server class FunctionType extends DataType{
     DataType returnType;
     List<MethodParam> params = [];
     List<DataType> typeArgs = [];
+    MethodDecl method;
     FunctionType({this.returnType, this.params, this.optional, this.typeArgs});
     String signature;
     String toString(){
@@ -51,5 +52,19 @@ server class FunctionType extends DataType{
             sb.write('void');
         }
         return sb.toString();
+    }
+
+    PropType type(ValidationContext ctx){
+        // FIXME
+        return null;
+    }
+
+    PropType rawType(ValidationContext ctx){
+        // FIXME
+        return null;
+    }
+
+    List<DataType> get typeArguments {
+        return [];
     }
 }

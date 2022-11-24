@@ -26,4 +26,8 @@ public class YieldExpression extends Statement {
   public void simplify(Simplifier s) {
     this.exp.simplify(s);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.exp);
+  }
 }

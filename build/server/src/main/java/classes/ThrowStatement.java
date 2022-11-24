@@ -19,4 +19,8 @@ public class ThrowStatement extends Statement {
   public void simplify(Simplifier s) {
     this.exp = s.makeSimple(this.exp);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.exp);
+  }
 }

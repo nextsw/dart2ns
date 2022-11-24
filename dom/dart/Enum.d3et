@@ -40,4 +40,11 @@ server class Enum extends TopDecl {
     void visit(ExpressionVisitor visitor){
         
     }
+
+    void validate(ValidationContext ctx, Integer phase) {
+        
+    }
+    void register(ValidationContext ctx) {
+
+    }
 }

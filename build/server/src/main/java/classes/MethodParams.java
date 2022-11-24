@@ -24,13 +24,14 @@ public class MethodParams {
   }
 
   public List<MethodParam> toFixedParams() {
-    ListExt.addAll(this.positionalParams, this.optionalParams);
+    List<MethodParam> list = ListExt.from(this.positionalParams, false);
+    ListExt.addAll(list, this.optionalParams);
     ListExt.sort(
         this.namedParams,
         (a, b) -> {
           return StringExt.compareTo(a.name, b.name);
         });
-    ListExt.addAll(this.positionalParams, this.namedParams);
-    return this.positionalParams;
+    ListExt.addAll(list, this.namedParams);
+    return list;
   }
 }

@@ -5,6 +5,7 @@ public class CatchPart {
   public Block body;
   public String stackTrace;
   public DataType onType;
+  public Range range;
 
   public CatchPart() {}
 }

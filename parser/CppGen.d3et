@@ -149,12 +149,12 @@ server class CppGen implements Gen{
         hpLines.clear();
     }
 
-    String generics(List<TypeParam> params){
-        if(params.isEmpty) {
+    String generics(TypeParams params){
+        if(params == null) {
             return '';
         }
 
-        return 'template<' + params.map(p => 'typename ' + typeParamToString(p)).join(', ') +'>\n';
+        return 'template<' + params.params.map(p => 'typename ' + typeParamToString(p)).join(', ') +'>\n';
     }
     String typeArgsToString(List<DataType> args){
         if(args.isEmpty) {
@@ -238,7 +238,7 @@ server class CppGen implements Gen{
 
     void genClassDecl(ClassDecl c) {
         hpp('');
-        if(c.generics != null) {
+        if(c.generics!= null) {
             hp(generics(c.generics));
         }
         hp('class ');
@@ -270,7 +270,7 @@ server class CppGen implements Gen{
         hp(' = std::shared_ptr<');
         hp(c.name);
         hp('Cls');
-        if(c.generics != null && c.generics.params.isNotEmpty) {
+        if(c.generics != null) {
             hp('<');
             hp(c.generics.params.map(p => typeParamToString(p)).join(', '));
             hp('>');
@@ -336,8 +336,8 @@ server class CppGen implements Gen{
             hp('    ');
             depth--;
         }
-        if(m.typeVars.isNotEmpty){
-            hp(generics(m.typeVars));
+        if(m.generics != null){
+            hp(generics(m.generics));
             hp(' ');
         }
         // if(m.external) {
@@ -378,7 +378,7 @@ server class CppGen implements Gen{
         if(c != null) {
             updateSuperAndParams(m, c);
         }
-        genMethodParams(m.params, c, x => hp(x));
+        genMethodParams(m.allParams, c, x => hp(x));
         hp(')');
         if(m.body == null && m.init == null && m.exp == null){
             if(isConstructor || c == null) {
@@ -437,7 +437,7 @@ server class CppGen implements Gen{
         cp('(');
         
         scope = Scope(thisType: c);
-        genMethodParams(m.params, c, x => cp(x));
+        genMethodParams(m.allParams, c, x => cp(x));
         cp(')');
         if(isConstructor) {
             if(m.init != null) {
@@ -499,15 +499,7 @@ server class CppGen implements Gen{
         if(md.params == null) {
             return null;
         }
-        MethodParam param = md.params.firstWhere(m => m.name == name);
-        if(param != null) {
-            return param.dataType;
-        }
-        param = md.params.firstWhere(m => m.name == name);
-        if(param != null) {
-            return param.dataType;
-        }
-        param = md.params.firstWhere(m => m.name == name);
+        MethodParam param = md.allParams.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
@@ -528,12 +520,12 @@ server class CppGen implements Gen{
             }
         }
         Integer x = 0;
-        for(MethodParam p in md.params){
+        for(MethodParam p in md.allParams){
             if(p.thisToken == 'this') {
                 p.dataType = getFieldType(c, p.name);
             } else if (p.thisToken == 'super' && superCon != null) {
                 superPosParams.add(p);
-                MethodParam superParam = superCon.params.get(x);
+                MethodParam superParam = superCon.allParams.get(x);
                 p.dataType = superParam.dataType;
             }
             x++;

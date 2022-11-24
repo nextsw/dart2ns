@@ -167,7 +167,7 @@ public class CppGen implements Gen {
   }
 
   public String generics(TypeParams params) {
-    if (params == null || params.params.isEmpty()) {
+    if (params == null) {
       return "";
     }
     return "template<"
@@ -318,7 +318,7 @@ public class CppGen implements Gen {
     hp(" = std::shared_ptr<");
     hp(c.name);
     hp("Cls");
-    if (c.generics != null && ListExt.isNotEmpty(c.generics.params)) {
+    if (c.generics != null) {
       hp("<");
       hp(
           IterableExt.join(
@@ -466,7 +466,7 @@ public class CppGen implements Gen {
       updateSuperAndParams(m, c);
     }
     genMethodParams(
-        m.params,
+        m.allParams,
         c,
         (x) -> {
           hp(x);
@@ -533,7 +533,7 @@ public class CppGen implements Gen {
     cp("(");
     this.scope = new Scope(null, c);
     genMethodParams(
-        m.params,
+        m.allParams,
         c,
         (x) -> {
           cp(x);
@@ -637,27 +637,7 @@ public class CppGen implements Gen {
     }
     MethodParam param =
         ListExt.firstWhere(
-            md.params,
-            (m) -> {
-              return Objects.equals(m.name, name);
-            },
-            null);
-    if (param != null) {
-      return param.dataType;
-    }
-    param =
-        ListExt.firstWhere(
-            md.params,
-            (m) -> {
-              return Objects.equals(m.name, name);
-            },
-            null);
-    if (param != null) {
-      return param.dataType;
-    }
-    param =
-        ListExt.firstWhere(
-            md.params,
+            md.allParams,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -682,12 +662,12 @@ public class CppGen implements Gen {
       }
     }
     long x = 0l;
-    for (MethodParam p : md.params) {
+    for (MethodParam p : md.allParams) {
       if (Objects.equals(p.thisToken, "this")) {
         p.dataType = getFieldType(c, p.name);
       } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
         superPosParams.add(p);
-        MethodParam superParam = ListExt.get(superCon.params, x);
+        MethodParam superParam = ListExt.get(superCon.allParams, x);
         p.dataType = superParam.dataType;
       }
       x++;
@@ -851,8 +831,6 @@ public class CppGen implements Gen {
       genDeclaration(((Declaration) exp), depth, xp);
     } else if (exp instanceof DoWhileLoop) {
       genDoWhileLoop(((DoWhileLoop) exp), depth, xp);
-    } else if (exp instanceof DynamicTypeExpression) {
-      genDynamicTypeExpression(((DynamicTypeExpression) exp), depth, xp);
     } else if (exp instanceof FnCallExpression) {
       genFnCallExpression(((FnCallExpression) exp), depth, xp);
     } else if (exp instanceof ForEachLoop) {
@@ -1626,10 +1604,6 @@ public class CppGen implements Gen {
     xp.apply(" while (");
     genExp(exp.test, depth, xp);
     xp.apply(")");
-  }
-
-  public void genDynamicTypeExpression(DynamicTypeExpression exp, long depth, Xp xp) {
-    xp.apply("DynamicTypeExpression");
   }
 
   public String getRecentCast(String name) {

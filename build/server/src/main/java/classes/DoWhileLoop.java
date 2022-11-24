@@ -25,4 +25,9 @@ public class DoWhileLoop extends Statement {
     this.test = s.makeSimple(this.test);
     this.body.simplify(s);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.test);
+    visitor.visit(this.body);
+  }
 }

@@ -8,8 +8,13 @@ public class ArrayExpression extends Expression {
   public DataType valueType;
   public List<ArrayItem> values = ListExt.asList();
   public ArrayType type;
+  public PropType elementType;
 
   public ArrayExpression() {}
+
+  public boolean getList() {
+    return this.type == ArrayType.List;
+  }
 
   public void resolve(ResolveContext context) {
     for (ArrayItem item : this.values) {
@@ -39,6 +44,12 @@ public class ArrayExpression extends Expression {
   public void simplify(Simplifier s) {
     for (ArrayItem item : this.values) {
       item.simplify(s);
+    }
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    for (ArrayItem item : this.values) {
+      visitor.visit(item);
     }
   }
 }

@@ -1,5 +1,62 @@
 server class TypeVariable extends PropType {
-    // List<TypeResolutionPosition> positions = [];
+    List<TypeResolutionPosition> positions = [];
 
     TypeVariable({String name}) : super(name: name);
+
+
+
+    Boolean canTypeSubstitute(PropType type) {
+        if (type is TypeVariable) {
+            TypeVariable tv = (type as TypeVariable);
+            if (tv.extends == null) {
+                return extends == null;
+            }
+            return canTypeSubstitute(tv.extends);
+        }
+        if (extends == null) {
+            return true;
+        }
+        if (extends.isAssignableFrom(type)) {
+            return true;
+        }
+        return extends.isAssignableFrom(type);
+    }
+
+    Boolean isAssignableFrom(PropType type) {
+        if (type == PropType.VOID) {
+            return this == PropType.VOID;
+        }
+        if (extends == null) {
+            return true;
+        }
+        if (isAssignableFromInternal(type)) {
+            return true;
+        }
+        return extends.isAssignableFrom(type);
+    }
+
+    List<MethodDecl> getAllMethods(ValidationContext ctx) {
+        if (extends != null) {
+            return extends.getAllMethods(ctx);
+        } else {
+            PropType objType = ctx.object();
+            if(this != objType) {
+                return objType.getAllMethods(ctx);
+            }
+        }
+        return List();
+    }
+
+    List<FieldDecl> getAllFields() {
+        if (extends != null) {
+            return extends.getAllFields();
+        }
+        return List();
+    }
+    Boolean isDependsOnReturn() {
+        if (positions == null || positions.isEmpty) {
+            return false;
+        }
+        return positions.first.type == TypeResolutionPositionType.RETURN;
+    }
 }

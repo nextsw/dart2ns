@@ -1,76 +1,597 @@
-// abstract server class ValidationContext {
 
-//     PropType bool();
-//     PropType object();
+server class ValidationContext {
 
-//     void addError(Range range, String str);
-
-//     void addAttribute(String str, Object obj);
-
-//     Boolean hasLocalVar(String name);
-//     void addLocalVar(PropType type, String name);
-
-//     PropType typeOrObjectData(DataType type);
-//     PropType getType(String str);
-
-//     Boolean isAssignableFrom(PropType from, PropType to);
-
-//     PropType getElemenetType(PropType type);
-//     PropType elementTypeWithIndex(PropType type, Integer index);
-
-//     PropType typeOrObject(Expression exp);
-
-//     PropType elementType(PropType type);
-
-//     ValidationContext subWithType(PropType type);
-
-//     PropType list(PropType element);
-//     PropType set(PropType element);
-
-//     PropType getExpectedType();
-
-//     PropType findSuperType(List<PropType> types);
-
-//     LocalVar findLocalVar(String name);
-
-//     Boolean canCompare(PropType lt, PropType rt);
-
-//     MethodDecl findOperatorMethod(PropType lt, String op, PropType rt);
-
-//     FieldDecl getField(PropType type, String name, [Boolean isStatic]);
-
-//     ValidationContext createSharedSub();
-
-//     void set statement(Statement s);
-
-//     Object getAttribute(String attr);
-
-//     Boolean isBool(PropType type);
-
-//     PropType getCommonType(PropType a, PropType b);
-
-//     Boolean isCollection(PropType t);
-
-//     void addUsedType(PropType type);
-//     void addTypeUsage(PropType type);
-//     void addLambdaUsed(LocalVar localVar, Boolean someThing);
-//     PropType getDataType();
-
-//     void addWarn(Range range, String msg);
-//     void addMethodUsege(PropType type, MethodDecl method);
-//     MethodDecl findMethodByName(PropType type, String name, Boolean setter, Boolean getter);
-
-//     PropType resolveType(PropType on, PropType type, Map<String, PropType> typeArgument);
-
-//     PropType asLambdaType(MethodDecl method);
-
-//     PropType computeReturnType(Expression exp);
-
-//     PropType getLocalVarType(String name);
-
-//     void addFieldUsege(PropType type, FieldDecl field);
-
-//     PropType get nullType;
-//     PropType get voidType;
+    TypeRegistry registry;
     
-// }
+    Map<String, LocalVar> _valirables = Map();
+    ValidationContext parent;
+    FieldDecl _property;
+    Object data;
+    PropType dataType;
+    PropType expectedType;
+    PropType typeHolder;
+    Map<String, PropType> genericTypes;
+    TypeParams generics;
+    Integer _stackSize = 0;
+    Range objRange;
+    String _usageContext;
+    String className;
+    String methodName;
+
+    //Do not copy to sub-context
+    Statement statement;
+    Boolean insideLambda = false;
+    
+    Map<String, Object> _attrs = Map();
+
+    // Used when extracting all local vars
+    Boolean _scopeBoundary = false;
+
+    PropType wrap(PropType baseType, PropType element) {
+        ParameterizedType type = ParameterizedType.from(baseType);
+        type.addArgument(element);
+        return type;
+    }
+
+    PropType list(PropType element) {
+        return wrap(getType(PropType.LIST_TYPE), element);
+    }
+
+    PropType set(PropType element) {
+        return wrap(getType(PropType.SET_TYPE), element);
+    }
+
+
+    PropType nullType() {
+        return registry.getType('null');
+    }
+
+    PropType voidType() {
+        return registry.getType('void');
+    }
+    
+    PropType bool() {
+        return registry.getType('bool');
+    }
+
+    PropType object() {
+        return registry.getType('Object');
+    }
+
+
+    PropType findSuperType(List<PropType> all) {
+        if(all.isEmpty) {
+            return null;
+        }
+        PropType reduce = all.reduce((a, b) => this.getCommonType(a, b));
+        return reduce != null ? reduce : object();
+    }
+
+    PropType getCommonType(PropType lt, PropType rt) {
+        if (rt == null || lt == null) {
+            return object();
+        }
+        if (lt == nullType()) {
+            return rt;
+        }
+        if (rt == nullType()) {
+            return lt;
+        }
+        if (lt.isAssignableFrom(rt)) {
+            return lt;
+        }
+        if (rt.isAssignableFrom(lt)) {
+            return rt;
+        }
+        if ((lt is ParameterizedType) || (rt is ParameterizedType)) {
+            PropType ltBase = lt;
+            PropType rtBase = rt;
+            if (lt is ParameterizedType) {
+                ltBase = (lt as ParameterizedType).baseType;
+            }
+            if (rt is ParameterizedType) {
+                rtBase = (rt as ParameterizedType).baseType;
+            }
+            PropType commonType = getCommonType(ltBase, rtBase);
+            if (commonType is ParameterizedType) {
+                return commonType;
+            }
+            if (commonType.typeVars.isEmpty) {
+                return commonType;
+            }
+            ParameterizedType pt = ParameterizedType.from(commonType);
+            commonType.typeVars.forEach((t) => pt.addArgumentWithName(t.name, this.object()));
+            return pt;
+        }
+        if (lt.name == 'Object') {
+            return lt;
+        }
+        if (lt.name == 'Object') {
+            return rt;
+        }
+        List<PropType> ltAll = List();
+        if (lt.extends != null) {
+            ltAll.add(lt.extends);
+        }
+        ltAll.addAll(lt.impls);
+        Set<PropType> commonTypes = Set();
+        for (PropType p in ltAll) {
+            commonTypes.add(getCommonType(p, rt));
+        }
+        List<PropType> arrayList = List.of(commonTypes);
+        if (arrayList.length == 1) {
+            return arrayList.get(0);
+        }
+        if (arrayList.length == 2) {
+            PropType nonObject = null;
+            if (arrayList.get(0).name == 'Object') {
+                nonObject = arrayList.get(1);
+            }
+            if (arrayList.get(1).name == 'Object') {
+                nonObject = arrayList.get(0);
+            }
+            if (nonObject != null) {
+                return nonObject;
+            }
+        }
+        ClassType classType = ClassType(
+            name: '#' + arrayList.toString(),
+        );
+        classType.impls = arrayList;
+        return classType;
+    }
+
+    PropType getTypeOrObject(String type) {
+        PropType propType = type == null ? null : this.getType(type);
+        return propType == null ? this.object() : propType;
+    }
+
+    PropType typeOrObject(Expression exp) {
+        return exp == null || exp.expType == null? this.object() : exp.expType;
+    }
+
+    PropType getType(String type) {
+        PropType propType = this.genericType(type);
+        if (propType != null) {
+            return propType;
+        }
+        return this.searchType(type);
+    }
+
+    PropType searchType(String type) {
+        return registry.getType(type);
+    }
+
+
+    PropType createLambdaFunctionType(PropType declType, PropType retType, String value, List<MethodParam> params, List<TypeVariable> typeVars, Boolean raw) {
+        MethodDecl method = MethodDecl(
+            name: value,
+        );
+        // method.params.positionalParams = MethodParamsUtil.createPositionalParams(params, this, declType, typeVars, raw);
+        // method.params.namedParams = MethodParamsUtil.createNamedParams(params, this, declType, typeVars, raw);
+        // method.params.optionalParams = MethodParamsUtil.createOptionalParams(params, this, declType, typeVars, raw);
+        method.returnType = retType.toDataType();
+        LambdaType lambdaType = LambdaType.withMethod(method);
+        declType.typeVars.forEach((i) => lambdaType.typeVars.add(i));
+        if (typeVars != null) {
+            // method.typeVars = typeVars;
+            typeVars.forEach((i) => lambdaType.typeVars.add(i));
+        }
+        if (declType is ParameterizedType) {
+            ParameterizedType dpt = (declType as ParameterizedType);
+            ParameterizedType pt = ParameterizedType.from(lambdaType);
+            pt.arguments.addAll(dpt.arguments);
+            return pt;
+        }
+        // It should have the type vars and arguments (If available)
+        return lambdaType;
+    }
+
+    LocalVar addLocalVar(PropType type, String name, Object value) {
+        LocalVar localVar = LocalVar();
+        localVar.name = name;
+        localVar.type = type;
+        localVar.value = value;
+        this._valirables.set(name, localVar);
+        return localVar;
+    }
+
+    LocalVar findLocalVar(String name) {
+        if (this._valirables.containsKey(name)) {
+            return this._valirables.get(name);
+        }
+        return this.parent == null ? null : this.parent.findLocalVar(name);
+    }
+
+    Map<String, LocalVar> getLocalVars() {
+        Map<String, LocalVar> vars = Map();
+        this._valirables.forEach((k, v) {
+            if (k == null || k.isEmpty || k.startsWith('#')) {
+                return;
+            }
+            vars.set(k, v);
+        });
+        if (this._scopeBoundary) {
+            return vars;
+        }
+        if (this.parent != null) {
+            vars.addAll(this.parent.getLocalVars());
+        }
+        return vars;
+    }
+
+    void markScopeBoundary() {
+        this._scopeBoundary = true;
+    }
+
+    void addLambdaUsed(LocalVar var, Boolean insideLambda) {
+        if (this._valirables.containsKey(var.name)) {
+            if(insideLambda) {
+                if(statement != null) {
+                    for(LocalVar v in statement.finalVars) {
+                        if(v.name == var.name) {
+                            return;
+                        }
+                    }
+                    statement.finalVars.add(var);
+                }
+            }
+        } else {
+            this.parent.addLambdaUsed(var, insideLambda || this.insideLambda);
+        }
+    }
+
+    PropType getLocalVarType(String name) {
+        return this.findLocalVar(name).type;
+    }
+
+    Boolean hasLocalVar(String name) {
+        return this.findLocalVar(name) != null;
+    }
+
+    Boolean updateLocalVarValue(String name) {
+        return this.findLocalVar(name) != null;
+    }
+    
+    void markInitialized(String name) {
+        LocalVar var = this.findLocalVar(name);
+        if(var != null) {
+            var.markInitialized();
+        }
+    }
+
+    void markNotInitialized(String name) {
+        LocalVar var = this.findLocalVar(name);
+        if(var != null) {
+            var.markNotInitialized();
+        }
+    }
+
+    List<String> getAllLocalVariables() {
+        List<String> all;
+        if (this.parent != null) {
+            all = this.parent.getAllLocalVariables();
+        } else {
+            all = List();
+        }
+        all.addAll(this._valirables.keys);
+        return all;
+    }
+
+    void addAttribute(String name, Object value) {
+        this._attrs.set(name, value);
+    }
+
+    Object getAttribute(String name) {
+        if (this._attrs.containsKey(name)) {
+            return this._attrs.get(name);
+        }
+        if (parent != null) {
+            return parent.getAttribute(name);
+        }
+        return null;
+    }
+
+    void setAttribute(String name, Object value) {
+        if (this._setInternal(name, value)) {
+            return;
+        }
+        this.parent.setAttribute(name, value);
+    }
+    
+    Boolean _setInternal(String name, Object value) {
+        if (!this._attrs.containsKey(name)) {
+            return false;
+        }
+        this._attrs.set(name, value);
+        return true;
+    }
+
+    ValidationContext subWithField(FieldDecl prop) {
+        ValidationContext sub = this.createSub();
+        sub._property = prop;
+        sub.expectedType = prop.type.resolvedType;
+        return sub;
+    }
+
+    ValidationContext createSharedSub() {
+        return createSub();
+    }
+
+    ValidationContext createSub() {
+        ValidationContext sub = newContext();
+        sub.parent = this;
+        sub.dataType = this.dataType;
+        sub._property = this._property;
+        sub.data = this.data;
+        sub.expectedType = this.expectedType;
+        sub.typeHolder = this.typeHolder;
+        sub.objRange = this.objRange;
+        sub.usageContext = this.usageContext;
+        sub.className = this.className;
+        sub.methodName = this.methodName;
+        return sub;
+    }
+
+    PropType typeOrObjectData(DataType exp) {
+        return exp == null ? this.object() : exp.type(this);
+    }
+
+    void addError(Range range, String message) {
+        D3ELogger.error(message);
+    }
+
+
+    void setExpectedType(PropType expectedType) {
+        this.expectedType = expectedType;
+    }
+
+    PropType getExpectedType() {
+        return this.expectedType;
+    }
+
+    PropType getTypeHolder() {
+        return this.typeHolder;
+    }
+
+    void setTypeHolder(PropType typeHolder) {
+        this.typeHolder = typeHolder;
+    }
+
+    void setProperty(FieldDecl property) {
+        this._property = property;
+        if (property != null) {
+            this.expectedType = property.type.resolvedType;
+        }
+    }
+
+    Object getData() {
+        return this.data;
+    }
+
+    FieldDecl getProperty() {
+        return this._property;
+    }
+
+    void addUsedType(PropType type) {
+        if (this.typeHolder == null) {
+            return;
+        }
+        if (type is TypeVariable) {
+            PropType ext = type.extends;
+            if (ext != null) {
+                addUsedType(ext);
+            }
+            return;
+        }
+        if (type is ParameterizedType) {
+            ParameterizedType pt = type as ParameterizedType;
+            addUsedType(pt.baseType);
+            pt.arguments.forEach((a) => addUsedType(a.type));
+            return;
+        }
+        this.typeHolder.usedTypes.add(type);
+    }
+
+    PropType getRawType(String type) {
+        PropType propType = type == null ? null : this.genericRawType(type);
+        if (propType != null) {
+            return propType;
+        }
+        propType = type.contains('.') ? getType(type) : this.searchType(type);
+        return propType == null ? this.object() : propType;
+    }
+
+    PropType findRawType(PropType type) {
+        if (type is ParameterizedType) {
+            return findRawType((type as ParameterizedType).baseType);
+        }
+        return type;
+    }
+
+    PropType genericType(String type) {
+        if (this.genericTypes != null) {
+            PropType propType = this.genericTypes.get(type);
+            if (propType != null) {
+                return propType;
+            }
+        }
+        if (this.parent != null) {
+            return this.parent.genericType(type);
+        }
+        return null;
+    }
+
+    PropType genericRawType(String type) {
+        if (this.generics != null) {
+            PropType propType = this.generics.resolveWithType(this, type);
+            if (propType != null) {
+                return propType;
+            }
+        }
+        if (this.parent != null) {
+            return this.parent.genericRawType(type);
+        }
+        return null;
+    }
+
+    void addWarn(Range range, String message) {
+        D3ELogger.info(message);
+    }
+
+    String get usageContext {
+        return _usageContext;
+    }
+
+    void set usageContext(String ctx) {
+        _usageContext = ctx;
+    }
+
+    PropType getDataType() {
+        return this.dataType;
+    }
+    
+    String toString() {
+        return this._valirables.toString();
+    }
+
+    ValidationContext(this.registry);
+
+    
+    Boolean hasErrors() {
+		return false;
+	}
+
+    ValidationContext newContext() {
+        return ValidationContext(this.registry);
+    }
+
+    String toCreatableVarName(String name) {
+        return name.toLowerCase().replaceAll(' ', '') + 's';
+    }
+
+    ValidationContext sub() {
+        return this.createSub();
+    }
+
+    MethodDecl getLibraryMethod(String name){
+        TopDecl top = registry.get(name);
+        if(top is MethodDecl) {
+            return top as MethodDecl;
+        }
+        return null;
+    }
+    FieldDecl getLibraryField(String name){
+        TopDecl top = registry.get(name);
+        if(top is FieldDecl) {
+            return top as FieldDecl;
+        }
+        return null;
+    }
+
+    ValidationContext subWithGenerics(TypeParams generics) {
+        ValidationContext sub = this.createSub();
+        sub.generics = generics;
+        sub.genericTypes = generics.resolve(this);
+        return sub;
+    }
+
+    ValidationContext subWithType(PropType expectedType) {
+        ValidationContext sub = this.createSub();
+        if (expectedType is TypeVariable) {
+            PropType gen = this.genericType(expectedType.name);
+            if (gen != null) {
+                expectedType = gen;
+            }
+        }
+        sub.expectedType = expectedType;
+        return sub;
+    }
+
+    ValidationContext subWithDataAndType(Object data, PropType type) {
+        ValidationContext sub = this.createSub();
+        sub.data = data;
+        sub.dataType = type;
+        return sub;
+    }
+
+    PropType futureOf(PropType type) {
+        PropType futureType = registry.getType('Future');
+        return futureType.wrap([
+            type,
+        ]);
+    }
+
+    PropType streamOf(PropType type) {
+        PropType futureType = registry.getType('Stream');
+        return futureType.wrap([
+            type,
+        ]);
+    }
+
+    List<String> getErrors() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+
+    ValidationContext subWithRange(Range objRange) {
+        ValidationContext s = sub();
+        s.objRange = objRange;
+        return s;
+    }
+
+    ValidationContext child(String field, String identity, Integer index) {
+        ValidationContext s = sub();
+        if (identity != null) {
+            if (this.methodName == null || this.methodName.isEmpty) {
+                s.methodName = field + '_' + identity;
+            } else {
+                s.methodName += '_' + field + '_' + identity;
+            }
+        }
+        return s;
+    }
+
+    void addToCurrent(PropType type) {
+        registry.addType(type);
+    }
+
+    void addFieldUsege(PropType type, FieldDecl field) {
+        // if (field.usageType != null && field.usageName != null) {
+        //     addAttributeUsegeInternal(field.usageType, field.usageName, null, field.name, usageContext);
+        // } else {
+        //     addAttributeUsege(type, field.name);
+        // }
+    }
+
+    void addMethodUsege(PropType type, MethodDecl method) {
+        // addTypeUsageInternal(method.returnType);
+        // if (method.usageType != null && method.usageName != null) {
+        //     addAttributeUsegeInternal(method.usageType, method.usageName, null, method.name, usageContext);
+        // } else {
+        // }
+    }
+
+
+    void addTypeUsage(PropType type) {
+        addTypeUsageInternal(type);
+    }
+
+    void addTypeUsageInternal(PropType type) {
+       
+    }
+
+    void validateType(DataType type) {
+        if(type == null){
+            return;
+        }
+        ExpressionValidationUtil.validateDataType(type, this);
+    }
+    void validateExpression(Expression exp) {
+        if(exp == null) {
+            return;
+        }
+        ExpressionValidationUtil.validate(exp, this);
+    }
+}

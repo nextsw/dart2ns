@@ -8,11 +8,12 @@ server class ForEachLoop extends Statement {
 
     void resolve(ResolveContext context) {
         collection.resolve(context);
-        if(body != null) {
-            body.resolve(context);
-        }
         if(dataType == null || dataType.name =='var') {
             dataType = context.subType(collection.resolvedType);
+        }
+        context.scope.add(name, dataType);
+        if(body != null) {
+            body.resolve(context);
         }
     }
     void collectUsedTypes(List<DataType> types) {

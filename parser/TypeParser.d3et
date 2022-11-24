@@ -455,7 +455,8 @@ server class TypeParser {
         ClassDecl cls = ClassDecl(isMixin, name);
         cls.isAbstract = isAbstract;
         if (tok.kind == TypeKind.Lt) {
-            cls.generics = readTypeParams();
+            TypeParams params = readTypeParams();
+            cls.generics = params;
         }
         Boolean isMixinApplication = false;
         if(!isMixin && tok.kind == TypeKind.Assign) {
@@ -1725,7 +1726,7 @@ server class TypeParser {
         ValueType type = ValueType(name);
         type.in = package;
         if (tok.kind == TypeKind.Lt) {
-            List<ValueType> typeArgs = readTypeArgs();
+            List<DataType> typeArgs = readTypeArgs();
             if(typeArgs == null) {
                 return null;
             }
@@ -1734,7 +1735,7 @@ server class TypeParser {
         DataType result = type;
         if(acceptFnWithNoRet && !isTypeName(name) && tok.kind == TypeKind.Lpar) {
             MethodParams params = readMethodParams(false);
-            ValueType returnType = ValueType('void');
+            DataType returnType = ValueType('void');
             FunctionType fnType = FunctionType(
                 params: params?.toFixedParams() ?? [], 
                 returnType: returnType,
@@ -1798,12 +1799,12 @@ server class TypeParser {
         return type;
     }
 
-    List<ValueType> readTypeArgs() {
+    List<DataType> readTypeArgs() {
         TypeToken start = tok;
         check(TypeKind.Lt);
-        List<ValueType> args = [];
+        List<DataType> args = [];
         while (true) {
-            ValueType sub = readValueType(false) as ValueType;
+            DataType sub = readType(false);
             if(sub == null) {
                 return null;
             }

@@ -27,6 +27,13 @@ server class CGen extends ResolveContext implements Gen {
 
     Integer tempCount = 0;
 
+    void error(String msg) {
+        D3ELogger.error(msg);
+        Integer a = 0;
+        a++;
+        //throw Exception(msg);
+    }
+
     TopDecl get(String name) {
         return context.get(name);
     }
@@ -74,6 +81,9 @@ server class CGen extends ResolveContext implements Gen {
         for(Library lib in context.libs){
             lib.simplify(Simplifier());
         }
+        // for(Library lib in context.libs){
+        //     lib.validate();
+        // }
         for(Library lib in context.libs){
             lib.resolveFields(this);
         }
@@ -545,7 +555,7 @@ server class CGen extends ResolveContext implements Gen {
             if(c != null) {
                 updateSuperAndParams(m, c);
             }
-            genMethodParams(m.params, c, needComma, x => hp(x),);
+            genMethodParams(m.allParams, c, needComma, x => hp(x),);
         }
         hp(')');
         hl(';');
@@ -691,7 +701,7 @@ server class CGen extends ResolveContext implements Gen {
             if(c != null) {
                 updateSuperAndParams(m, c);
             }
-            genMethodParams(m.params, c, needComma, x => hp(x));
+            genMethodParams(m.allParams, c, needComma, x => hp(x));
         }
         hp(')');
         hl(';');
@@ -742,7 +752,7 @@ server class CGen extends ResolveContext implements Gen {
             cp('* this ');
         }
         scope = Scope(thisType: c);
-        genMethodParams(m.params, c, needComma, x => cp(x));
+        genMethodParams(m.allParams, c, needComma, x => cp(x));
         cp(')');
         genBlock(m.body, 0, x => cp(x));
         cpp('');
@@ -759,15 +769,7 @@ server class CGen extends ResolveContext implements Gen {
         if(md.params == null) {
             return null;
         }
-        MethodParam param = md.params.firstWhere(m => m.name == name);
-        if(param != null) {
-            return param.dataType;
-        }
-        param = md.params.firstWhere(m => m.name == name);
-        if(param != null) {
-            return param.dataType;
-        }
-        param = md.params.firstWhere(m => m.name == name);
+        MethodParam param = md.allParams.firstWhere(m => m.name == name);
         if(param != null) {
             return param.dataType;
         }
@@ -788,12 +790,12 @@ server class CGen extends ResolveContext implements Gen {
             }
         }
         Integer x = 0;
-        for(MethodParam p in md.params){
+        for(MethodParam p in md.allParams){
             if(p.thisToken == 'this') {
                 p.dataType = getFieldType(c, p.name);
             } else if (p.thisToken == 'super' && superCon != null) {
                 superPosParams.add(p);
-                MethodParam superParam = superCon.params.length > x ? superCon.params.get(x) : null;
+                MethodParam superParam = superCon.allParams.length > x ? superCon.allParams.get(x) : null;
                 p.dataType = superParam?.dataType;
             }
             x++;
@@ -1670,14 +1672,10 @@ server class CGen extends ResolveContext implements Gen {
         if(r == null ) {
             return ofUnknownType();
         }
-        if(c.generics != null) {
-            TypeParam genType = c.generics.params.firstWhere(p => p.name == r.name);
-            if(genType != null) {
-                if(genType.resolvedType != null) {
-                    return genType.resolvedType;
-                } else if(genType.extendType != null){
-                    return genType.extendType;
-                } 
+        if(c.generics != null && from != null) {
+            DataType res = c.resolvedGenerics.get(from.name).get(r.name);
+            if(res !=null) {
+                return res;
             }
             D3ELogger.error('Unknown type in resolveType');
         }
@@ -2122,6 +2120,8 @@ server class CGen extends ResolveContext implements Gen {
         }
         return null;
     }
+
+
 
     
 

@@ -30,4 +30,9 @@ public class WhileLoop extends Statement {
     }
     this.body.simplify(s);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.test);
+    visitor.visit(this.body);
+  }
 }

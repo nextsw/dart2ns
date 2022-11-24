@@ -44,4 +44,6 @@ public class LiteralExpression extends Expression {
   public void collectUsedTypes(List<DataType> types) {}
 
   public void simplify(Simplifier s) {}
+
+  public void visit(ExpressionVisitor visitor) {}
 }

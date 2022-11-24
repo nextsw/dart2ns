@@ -26,4 +26,10 @@ public abstract class TopDecl {
   }
 
   public abstract void simplify(Simplifier s);
+
+  public abstract void validate(ValidationContext ctx, long phase);
+
+  public abstract void register(ValidationContext ctx);
+
+  public abstract void visit(ExpressionVisitor visitor);
 }

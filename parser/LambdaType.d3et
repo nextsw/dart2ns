@@ -1,9 +1,50 @@
 server class LambdaType extends PropType {
-    MethodDecl method;
+    PropType returnType;
+    List<PropType> params = [];
 
-    LambdaType({String name, this.method}) : super(name: name);
+    LambdaType({String name}) : super(name: name);
 
     String toString() {
         return FormateUtil.toStringLambdaType(this);
     }
+
+
+    static LambdaType withMethod(MethodDecl method){
+        LambdaType type = LambdaType(
+            name: '()->',
+        );
+        type.returnType = method.returnType.resolvedType;
+        type.params = method.allParams.map(p => p.dataType.resolvedType).toList();
+        return type;
+    }
+
+    Boolean isAssignableFrom(PropType type) {
+        if (type is LambdaType) {
+            LambdaType other = type as LambdaType;
+            if(!returnType.isAssignableFrom(other.returnType)){
+                return false;
+            }
+            if(params.length != other.params.length) {
+                return false;
+            }
+            for(Integer x=0; x< params.length; x++){
+                PropType ours = params.get(x);
+                PropType theirs = other.params.get(x);
+                if(!theirs.isAssignableFrom(ours)){
+                    return false;
+                }
+            }
+            return true;
+        }
+        return super.isAssignableFrom(type);
+    }
+
+    Boolean canAssignTo(PropType propType) {
+        LambdaType findLambdaFunction = propType.findLambdaFunction();
+        if (findLambdaFunction == null) {
+            return false;
+        }
+        return findLambdaFunction.isAssignableFrom(this);
+    }
+
 }

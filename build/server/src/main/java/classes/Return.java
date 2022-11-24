@@ -22,4 +22,8 @@ public class Return extends Statement {
   public void simplify(Simplifier s) {
     this.expression = s.makeSimple(this.expression);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.expression);
+  }
 }

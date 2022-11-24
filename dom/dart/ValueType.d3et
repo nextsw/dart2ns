@@ -1,6 +1,6 @@
 server class ValueType extends DataType {
     String in;
-    List<ValueType> args = [];
+    List<DataType> args = [];
     ValueType(this.name, [this.optional = false]);
 
     String toString(){
@@ -14,4 +14,45 @@ server class ValueType extends DataType {
     void collectUsedTypes(Set<String> types) {
         types.add(name);
     }
+
+
+    PropType type(ValidationContext ctx) {
+        PropType propType;
+        if (name.length == 1) {
+            propType = ctx.getType(name);
+        } else {
+            propType = ctx.getType(name);
+        }
+        if (propType == null) {
+            ctx.addError(null, 'Unknown type :' + name);
+            propType = ctx.object();
+        } else {
+            ctx.addUsedType(propType);
+        }
+        propType = applyArgsData(ctx, propType);
+        return propType;
+    }
+
+    PropType rawType(ValidationContext ctx) {
+        PropType realType = ctx.getRawType(name);
+        realType = applyRawArgsData(ctx, realType);
+        return realType;
+    }
+
+    PropType applyArgsData(ValidationContext ctx, PropType type) {
+        return type.applyArgs(args.map((a) => a.type(ctx)).toList());
+    }
+
+    PropType applyRawArgsData(ValidationContext ctx, PropType type) {
+        return type.applyArgs(args.map((a) => rawType(ctx)).toList());
+    }
+
+    List<PropType> createTypesArray(ValidationContext ctx) {
+        return args.map((a) => a.type(ctx)).toList();
+    }
+
+    List<DataType> get typeArguments {
+        return args;
+    }
+
 }

@@ -9,7 +9,9 @@ server class ClassDecl extends TopDecl {
     Boolean isMixin;
     DataType mixinApplicationType;
     String _packagePath;
-    Map<String, String> resolvedGenerics;
+    Map<String, Map<String, DataType>> resolvedGenerics;
+
+    ClassType type;
     ClassDecl(this.isMixin, String name) : super(name, TopDeclType.Class, '');
 
     void collectUsedTypes(){
@@ -28,7 +30,7 @@ server class ClassDecl extends TopDecl {
                 if(md.returnType != null) {
                     usedTypes.add(md.returnType);
                 }
-                for(MethodParam m in md.params) {
+                for(MethodParam m in md.allParams) {
                     if(m.dataType != null) {
                         usedTypes.add(m.dataType);
                     }
@@ -37,39 +39,70 @@ server class ClassDecl extends TopDecl {
         }
     }
 
-    void resolveGenerics() {
+    void resolveGenerics(ResolveContext context) {
         if(resolvedGenerics != null){
             return;
         }
         resolvedGenerics = Map();
-        if(generics == null) {
+        if(generics != null){
+            Map<String, DataType> ourGenercis = Map();
             for(TypeParam p in generics.params) {
                 if(p.extendType != null) {
-                    resolvedGenerics.set(p.name, p.extendType.name);
+                    ourGenercis.set(p.name, p.extendType);
                 } else {
-                    resolvedGenerics.set(p.name, p.name);
+                    ourGenercis.set(p.name, ValueType(p.name));
                 }
             }
+            resolvedGenerics.set(name, ourGenercis);
         }
         // Check extends
         if(extendType != null) {
-            ClassDecl ex = lib.get(extendType.name) as ClassDecl;
-            if(ex != null) {
-                ex.resolveGenerics();
-                ValueType extType = extendType as ValueType;
-                for(DataType arg in extType.args){
-                    
-                }
-            } 
+            resolveGenericsForType(context, extendType);
         }
+
+        impls.forEach((i){
+            resolveGenericsForType(context, i);
+        });
+        mixins.forEach((i){
+            resolveGenericsForType(context, i);
+        });
+        D3ELogger.info('Resolved Generics for '+ name);
+    }
+    void resolveGenericsForType(ResolveContext context, DataType type) {
+        if(type != null) {
+            ClassDecl ex = lib.get(type.name) as ClassDecl;
+            if(ex != null) {
+                ex.resolveGenerics(context);
+                ValueType extType = type as ValueType;
+                Map<String, DataType> replaced = Map();
+                for(Integer x=0; x< extType.args.length; x++){
+                    DataType arg = extType.args.get(x);
+                    TypeParam param = ex.generics.params.get(x);
+                    replaced.set(param.name, arg);
+                }
+                addResolvedGenerics(ex.resolvedGenerics, replaced);
+            } else {
+                context.error('Unable to find Type: '+ type.name);
+            }
+        }
+    }
+    void addResolvedGenerics(Map<String, Map<String, DataType>> from, Map<String, DataType> replaced) {
+        from.forEach((k, v){
+            Map<String, DataType> temp = Map();
+            v.forEach((k1, v1) {
+                DataType r = replaced.get(k1) ?? v1;
+                temp.set(k1, r);
+            });
+            resolvedGenerics.set(k, temp);
+        });
     }
 
     void resolveFields(ResolveContext context){
         for(ClassMember cm in members){
             cm.cls = this;
         }
-        resolveGenerics();
-        D3ELogger.info('Resolving Class: ' + name);
+        resolveGenerics(context);
+        // D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);
         for(ClassMember cm in members.where(m => m is FieldDecl)){
@@ -79,7 +112,7 @@ server class ClassDecl extends TopDecl {
         context.instanceClass = null;
     }
     void resolveMethods(ResolveContext context){
-        D3ELogger.info('Resolving Class: ' + name);
+        // D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);
         for(ClassMember cm in members.where(m => m is MethodDecl)){
@@ -122,5 +155,43 @@ server class ClassDecl extends TopDecl {
     }
     Iterable<MethodDecl> get methods {
         return members.where(m => m is MethodDecl).map(m => m as MethodDecl);
+    }
+
+    void validate(ValidationContext ctx, Integer phase) {
+        D3ELogger.info('Validating : ' + name);
+        ctx.dataType = type;
+        if(phase == 0) {
+            if(generics != null){
+                ExpressionValidationUtil.validateTypeParams(generics, ctx);
+                generics.resolveRawTypes(ctx, type, null, null).forEach((i) => type.typeVars.add(i));
+            }
+            if(extendType != null) {
+                ctx.validateType(extendType);
+                type.extends = extendType.resolvedType;
+            }
+            for(DataType i in impls){
+                ctx.validateType(i);
+                type.impls.add(i.resolvedType);
+            }
+            for(DataType i in ons){
+                ctx.validateType(i);
+                //type.impls.add(i.resolvedType);
+            }
+            for(DataType i in mixins){
+                ctx.validateType(i);
+            }
+        }
+
+        for(ClassMember m in members) {
+            m.validate(ctx, phase);
+        }
+    }
+    void register(ValidationContext ctx) {
+        for(ClassMember cm in members){
+            cm.cls = this;
+        }
+        type = ClassType(name: name);
+        type.cls = this;
+        ctx.addToCurrent(type);
     }
 } 

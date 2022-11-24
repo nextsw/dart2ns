@@ -1,0 +1,13 @@
+package classes;
+
+public enum EvalType {
+  ERROR,
+  LOCAL_VAR,
+  GETTER,
+  TYPE,
+  FIELD,
+  STATIC_FIELD,
+  GLOBAL_FIELD,
+  METHOD_REFERENCE,
+  GLOBAL_METHOD_REFERENCE;
+}

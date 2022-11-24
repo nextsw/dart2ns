@@ -8,6 +8,7 @@ server class ForLoop extends Statement {
 
 
     void resolve(ResolveContext context) {
+        context.scope = Scope(parent: context.scope);
         if(decl != null){
             decl.resolve(context);
         }
@@ -23,6 +24,7 @@ server class ForLoop extends Statement {
         if(body != null) {
             body.resolve(context);
         }
+        context.scope = context.scope.parent;
     }
     void collectUsedTypes(List<DataType> types) {
         inits.forEach((i){

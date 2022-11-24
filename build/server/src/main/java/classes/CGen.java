@@ -27,6 +27,15 @@ public class CGen extends ResolveContext implements Gen {
 
   public CGen() {}
 
+  public void error(String msg) {
+    D3ELogger.error(msg);
+    long a = 0l;
+    a++;
+    /*
+    throw Exception(msg);
+    */
+  }
+
   public TopDecl get(String name) {
     return this.context.get(name);
   }
@@ -74,6 +83,11 @@ public class CGen extends ResolveContext implements Gen {
     for (Library lib : this.context.libs) {
       lib.simplify(new Simplifier());
     }
+    /*
+     for(Library lib in context.libs){
+         lib.validate();
+     }
+    */
     for (Library lib : this.context.libs) {
       lib.resolveFields(this);
     }
@@ -297,7 +311,7 @@ public class CGen extends ResolveContext implements Gen {
       hp("typedef struct ");
       hp(fnType.signature);
       hl(" {");
-      hl("    void* data;");
+      hl("    void* __data;");
       hp("    ");
       functionTypeToString(
           fnType,
@@ -600,7 +614,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     if (!ParserUtil.isNameChar(m.name)) {
       hp("_");
-      if (m.params.isEmpty()) {
+      if (m.params.getIsEmpty()) {
         hp("uminus");
       } else {
         hp(operatorToName(m.name));
@@ -635,7 +649,7 @@ public class CGen extends ResolveContext implements Gen {
         updateSuperAndParams(m, c);
       }
       genMethodParams(
-          m.params,
+          m.allParams,
           c,
           needComma,
           (x) -> {
@@ -831,7 +845,7 @@ public class CGen extends ResolveContext implements Gen {
     hp(" ");
     if (!ParserUtil.isNameChar(m.name)) {
       hp("_");
-      if (m.params.isEmpty()) {
+      if (m.params.getIsEmpty()) {
         hp("uminus");
       } else {
         hp(operatorToName(m.name));
@@ -867,7 +881,7 @@ public class CGen extends ResolveContext implements Gen {
         updateSuperAndParams(m, c);
       }
       genMethodParams(
-          m.params,
+          m.allParams,
           c,
           needComma,
           (x) -> {
@@ -895,7 +909,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     if (!ParserUtil.isNameChar(m.name)) {
       cp("_");
-      if (m.params.isEmpty()) {
+      if (m.params.getIsEmpty()) {
         cp("uminus");
       } else {
         cp(operatorToName(m.name));
@@ -922,7 +936,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     this.scope = new Scope(null, c);
     genMethodParams(
-        m.params,
+        m.allParams,
         c,
         needComma,
         (x) -> {
@@ -954,27 +968,7 @@ public class CGen extends ResolveContext implements Gen {
     }
     MethodParam param =
         ListExt.firstWhere(
-            md.params,
-            (m) -> {
-              return Objects.equals(m.name, name);
-            },
-            null);
-    if (param != null) {
-      return param.dataType;
-    }
-    param =
-        ListExt.firstWhere(
-            md.params,
-            (m) -> {
-              return Objects.equals(m.name, name);
-            },
-            null);
-    if (param != null) {
-      return param.dataType;
-    }
-    param =
-        ListExt.firstWhere(
-            md.params,
+            md.allParams,
             (m) -> {
               return Objects.equals(m.name, name);
             },
@@ -999,13 +993,13 @@ public class CGen extends ResolveContext implements Gen {
       }
     }
     long x = 0l;
-    for (MethodParam p : md.params) {
+    for (MethodParam p : md.allParams) {
       if (Objects.equals(p.thisToken, "this")) {
         p.dataType = getFieldType(c, p.name);
       } else if (Objects.equals(p.thisToken, "super") && superCon != null) {
         superPosParams.add(p);
         MethodParam superParam =
-            ListExt.length(superCon.params) > x ? ListExt.get(superCon.params, x) : null;
+            ListExt.length(superCon.allParams) > x ? ListExt.get(superCon.allParams, x) : null;
         var value$ = superParam == null ? null : superParam.dataType;
         p.dataType = value$;
       }
@@ -1175,8 +1169,6 @@ public class CGen extends ResolveContext implements Gen {
       genDeclaration(((Declaration) exp), depth, xp);
     } else if (exp instanceof DoWhileLoop) {
       genDoWhileLoop(((DoWhileLoop) exp), depth, xp);
-    } else if (exp instanceof DynamicTypeExpression) {
-      genDynamicTypeExpression(((DynamicTypeExpression) exp), depth, xp);
     } else if (exp instanceof FnCallExpression) {
       genFnCallExpression(((FnCallExpression) exp), depth, xp);
     } else if (exp instanceof ForEachLoop) {
@@ -1917,10 +1909,6 @@ public class CGen extends ResolveContext implements Gen {
     xp.apply(")");
   }
 
-  public void genDynamicTypeExpression(DynamicTypeExpression exp, long depth, Xp xp) {
-    xp.apply("DynamicTypeExpression");
-  }
-
   public String getRecentCast(String name) {
     Scope s = this.scope;
     while (s != null) {
@@ -2161,24 +2149,14 @@ public class CGen extends ResolveContext implements Gen {
     return null;
   }
 
-  public DataType resolveType(ClassDecl c, DataType r) {
+  public DataType resolveType(ClassDecl c, ClassDecl from, DataType r) {
     if (r == null) {
       return ofUnknownType();
     }
-    if (c.generics != null) {
-      TypeParam genType =
-          ListExt.firstWhere(
-              c.generics.params,
-              (p) -> {
-                return Objects.equals(p.name, r.name);
-              },
-              null);
-      if (genType != null) {
-        if (genType.resolvedType != null) {
-          return genType.resolvedType;
-        } else if (genType.extendType != null) {
-          return genType.extendType;
-        }
+    if (c.generics != null && from != null) {
+      DataType res = c.resolvedGenerics.get(from.name).get(r.name);
+      if (res != null) {
+        return res;
       }
       D3ELogger.error("Unknown type in resolveType");
     }

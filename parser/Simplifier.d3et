@@ -14,7 +14,7 @@ server class Simplifier {
                 fe.on = makeSimple(fe.on);
                 String name = makeTempName();
                 Declaration d = Declaration(
-                    type: ValueType('auto'),
+                    type: ValueType('var'),
                 );
                 d.names.add(NameAndValue(name,fe));
                 stack.last.list.add(d);

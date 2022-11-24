@@ -1,6 +1,5 @@
 package classes;
 
-import d3e.core.D3ELogger;
 import d3e.core.ListExt;
 import java.util.List;
 import java.util.Objects;
@@ -15,6 +14,8 @@ public class MethodCall extends Statement {
   public Expression on;
   public String onTypeName;
   public MethodDecl resolvedMethod;
+  public MethodCallType callType;
+  public PropType staticClass;
 
   public MethodCall(
       String name,
@@ -38,7 +39,7 @@ public class MethodCall extends Statement {
         onLibrary = true;
       } else if (Objects.equals(this.on.resolvedType, context.typeType)) {
         if (!(this.on instanceof FieldOrEnumExpression)) {
-          D3ELogger.error("Mist be FE Exp");
+          context.error("Mist be FE Exp");
           this.resolvedType = context.ofUnknownType();
           return;
         }
@@ -73,6 +74,8 @@ public class MethodCall extends Statement {
     for (NamedArgument arg : this.namedArgs) {
       arg.value.resolve(context);
     }
+    var value$ = context.scope == null ? null : context.scope.get(this.name);
+    DataType scopeType = value$;
     if (onType != null) {
       ClassMember cm =
           ListExt.firstWhere(
@@ -91,7 +94,7 @@ public class MethodCall extends Statement {
           */
           this.resolvedType = new ValueType(onType.name, false);
         } else {
-          this.resolvedType = context.resolveType(onType, md.returnType);
+          this.resolvedType = context.resolveType(onType, md.cls, md.returnType);
         }
         this.resolvedMethod = md;
       } else {
@@ -102,7 +105,7 @@ public class MethodCall extends Statement {
       }
     } else if (onLibrary) {
       if (!(this.on instanceof FieldOrEnumExpression)) {
-        D3ELogger.error("Mist be FE Exp");
+        context.error("Mist be FE Exp");
         this.resolvedType = context.ofUnknownType();
         return;
       }
@@ -123,6 +126,27 @@ public class MethodCall extends Statement {
       } else {
         this.resolvedType = context.ofUnknownType();
       }
+    } else if (scopeType != null) {
+      if (scopeType instanceof FunctionType) {
+        this.resolvedType = (((FunctionType) scopeType)).returnType;
+      } else {
+        var value$1 = context.instanceClass == null ? null : context.instanceClass.name;
+        String cls = value$1;
+        var value$2 = context.method == null ? null : context.method.name;
+        String method = value$2;
+        var value$3 = onType == null ? null : onType.name;
+        String inType = value$3;
+        context.error(
+            "Referend method is not Function type: "
+                + this.name
+                + " in "
+                + inType
+                + " Cls: "
+                + cls
+                + " Method: "
+                + method);
+        this.resolvedType = context.ofUnknownType();
+      }
     } else {
       TopDecl td = context.currentLib.get(this.name);
       if (td instanceof MethodDecl) {
@@ -137,13 +161,13 @@ public class MethodCall extends Statement {
       } else if (Objects.equals(this.name, "assert")) {
         this.resolvedType = context.statementType;
       } else {
-        var value$ = context.instanceClass == null ? null : context.instanceClass.name;
-        String cls = value$;
-        var value$1 = context.method == null ? null : context.method.name;
-        String method = value$1;
-        var value$2 = onType == null ? null : onType.name;
-        String inType = value$2;
-        D3ELogger.error(
+        var value$1 = context.instanceClass == null ? null : context.instanceClass.name;
+        String cls = value$1;
+        var value$2 = context.method == null ? null : context.method.name;
+        String method = value$2;
+        var value$3 = onType == null ? null : onType.name;
+        String inType = value$3;
+        context.error(
             "No method found: "
                 + this.name
                 + " in "
@@ -157,9 +181,9 @@ public class MethodCall extends Statement {
     }
     if (this.resolvedMethod != null && ListExt.isNotEmpty(this.namedArgs)) {
       for (long x = ListExt.length(this.positionArgs);
-          x < ListExt.length(this.resolvedMethod.params);
+          x < ListExt.length(this.resolvedMethod.allParams);
           x++) {
-        MethodParam param = ListExt.get(this.resolvedMethod.params, x);
+        MethodParam param = ListExt.get(this.resolvedMethod.allParams, x);
         NamedArgument arg =
             ListExt.firstWhere(
                 this.namedArgs,
@@ -168,11 +192,11 @@ public class MethodCall extends Statement {
                 },
                 null);
         if (arg == null) {
-          Expression value$ = param.defaultValue;
-          if (value$ == null) {
-            value$ = makeDefaultValue(param.dataType);
+          Expression value$1 = param.defaultValue;
+          if (value$1 == null) {
+            value$1 = makeDefaultValue(param.dataType);
           }
-          this.positionArgs.add(new Argument(ListExt.List(), value$));
+          this.positionArgs.add(new Argument(ListExt.List(), value$1));
         } else {
           this.positionArgs.add(new Argument(ListExt.List(), arg.value));
         }
@@ -227,6 +251,16 @@ public class MethodCall extends Statement {
       return new LiteralExpression(false, LiteralType.TypeBoolean, "false");
     } else {
       return new NullExpression();
+    }
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
+    for (Argument arg : this.positionArgs) {
+      visitor.visit(arg.arg);
+    }
+    for (NamedArgument arg : this.namedArgs) {
+      visitor.visit(arg.value);
     }
   }
 }

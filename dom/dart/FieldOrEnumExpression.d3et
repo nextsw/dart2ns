@@ -39,7 +39,7 @@ server class FieldOrEnumExpression extends Statement {
                 }
             } else if(on.resolvedType == context.typeType) {
                 if(!(on is FieldOrEnumExpression)){
-                    D3ELogger.error('Mist be FE Exp');
+                    context.error('Mist be FE Exp');
                     resolvedType = context.ofUnknownType();
                     return;
                 }
@@ -53,7 +53,7 @@ server class FieldOrEnumExpression extends Statement {
                 // D3ELogger.error('Resolved Type is not Class in FEExp');
             } else if(on.resolvedType == context.libraryType) {
                 if(!(on is FieldOrEnumExpression)){
-                    D3ELogger.error('Mist be FE Exp');
+                    context.error('Mist be FE Exp');
                     resolvedType = context.ofUnknownType();
                     return;
                 }
@@ -116,7 +116,7 @@ server class FieldOrEnumExpression extends Statement {
             if(fieldType == null) {
                 String cls = context.instanceClass?.name;
                 String method = context.method?.name;
-                D3ELogger.error('No field found: ' + name + ' in Cls: ' + cls +' Method: ' + method);
+                context.error('No field found: ' + name + ' in Cls: ' + cls +' Method: ' + method);
                     
                 resolvedType = context.ofUnknownType();
             }
@@ -143,7 +143,7 @@ server class FieldOrEnumExpression extends Statement {
             } else {
                 resolvedType = FunctionType(
                     returnType: md.returnType,
-                    params: md.params,
+                    params: md.allParams,
                 );
                 resolvedMember = cm;
             }
@@ -163,14 +163,14 @@ server class FieldOrEnumExpression extends Statement {
                 String cls = context.instanceClass?.name;
                 String method = context.method?.name;
                 String inType = onType?.name;
-                D3ELogger.error('No field found: ' + name + ' in ' + inType + ' Cls: ' + cls +' Method: ' + method);
+                context.error('No field found: ' + name + ' in ' + inType + ' Cls: ' + cls +' Method: ' + method);
                 resolvedType = context.ofUnknownType();
             }
         }
     }
 
     String toString(){
-        return on == null? on.toString() : '' + name;
+        return (on?.toString() ?? '') + name;
     }
 
     void simplify(Simplifier s) {

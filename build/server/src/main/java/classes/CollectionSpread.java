@@ -25,4 +25,8 @@ public class CollectionSpread extends ArrayItem {
   public void simplify(Simplifier s) {
     this.values = s.makeSimple(this.values);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.values);
+  }
 }

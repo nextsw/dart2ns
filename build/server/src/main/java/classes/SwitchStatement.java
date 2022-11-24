@@ -49,4 +49,18 @@ public class SwitchStatement extends Statement {
           d.simplify(s);
         });
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.test);
+    this.cases.forEach(
+        (c) -> {
+          for (Statement ss : c.statements) {
+            visitor.visit(ss);
+          }
+        });
+    this.defaults.forEach(
+        (d) -> {
+          visitor.visit(d);
+        });
+  }
 }

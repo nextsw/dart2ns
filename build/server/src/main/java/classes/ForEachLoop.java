@@ -18,11 +18,12 @@ public class ForEachLoop extends Statement {
 
   public void resolve(ResolveContext context) {
     this.collection.resolve(context);
-    if (this.body != null) {
-      this.body.resolve(context);
-    }
     if (this.dataType == null || Objects.equals(this.dataType.name, "var")) {
       this.dataType = context.subType(this.collection.resolvedType, 0l);
+    }
+    context.scope.add(this.name, this.dataType);
+    if (this.body != null) {
+      this.body.resolve(context);
     }
   }
 
@@ -47,5 +48,10 @@ public class ForEachLoop extends Statement {
       this.body = b;
     }
     this.body.simplify(s);
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.collection);
+    visitor.visit(this.body);
   }
 }

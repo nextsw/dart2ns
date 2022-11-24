@@ -36,4 +36,10 @@ public class IfStatement extends Statement {
       this.elseStatement.simplify(s);
     }
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.test);
+    visitor.visit(this.thenStatement);
+    visitor.visit(this.elseStatement);
+  }
 }

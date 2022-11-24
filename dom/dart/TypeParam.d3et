@@ -2,5 +2,118 @@ server class TypeParam {
     String name;
     DataType extendType;
     DataType resolvedType;
+    TypeVariable typeVar;
+    PropType actualType;
     TypeParam({this.name, this.extendType});
+
+
+
+    TypeVariable createTypeVariable(ValidationContext ctx, PropType retType, List<PropType> positionalParams, Map<String, PropType> namedParams, List<PropType> optionalParams) {
+        if (typeVar == null) {
+            typeVar = TypeVariable(name: name);
+        }
+        if (extendType != null) {
+            PropType parent = ctx.typeOrObjectData(extendType);
+            typeVar.extends = parent;
+        }
+        List<TypeResolutionPosition> positions = createTypePositions(retType, positionalParams, namedParams, optionalParams, name);
+        if (!positions.isEmpty) {
+            typeVar.positions = positions;
+        }
+        return typeVar;
+    }
+
+    static List<TypeResolutionPosition> createTypePositions(PropType retType, List<PropType> positionalParams, Map<String, PropType> namedParams, List<PropType> optionalParams, String value) {
+        List<TypeResolutionPosition> positions = List();
+        if (positionalParams != null) {
+            for (Integer i = 0; i < positionalParams.length; i++) {
+                PropType param = positionalParams.get(i);
+                TypeResolutionPosition position = createTypePosition(param, value, TypeResolutionPositionType.POSITIONAL);
+                if (position != null) {
+                    position.index = i;
+                    positions.add(position);
+                }
+            }
+        }
+        if (optionalParams != null) {
+            for (Integer i = 0; i < optionalParams.length; i++) {
+                PropType param = optionalParams.get(i);
+                TypeResolutionPosition position = createTypePosition(param, value, TypeResolutionPositionType.OPTIONAL);
+                if (position != null) {
+                    position.index = i;
+                    positions.add(position);
+                }
+            }
+        }
+        if (namedParams != null) {
+            namedParams.forEach((n, type) {
+                TypeResolutionPosition position = createTypePosition(type, value, TypeResolutionPositionType.NAMED);
+                if (position != null) {
+                    position.name = n;
+                    positions.add(position);
+                }
+            });
+        }
+        if (retType != null && positions.isEmpty) {
+            TypeResolutionPosition position = createTypePosition(retType, value, TypeResolutionPositionType.RETURN);
+            if (position != null) {
+                positions.add(position);
+            }
+        }
+        return positions;
+    }
+
+    static TypeResolutionPosition createTypePosition(PropType type, String gen, TypeResolutionPositionType posType) {
+        if (type.name == gen) {
+            return TypeResolutionPosition(type: posType);
+        }
+        List<TypeResolutionPosition> gens = List();
+        if (type is ParameterizedType) {
+            List<TypeArgument> args = (type as ParameterizedType).arguments;
+            for (TypeArgument e in args) {
+                TypeResolutionPosition pos = createTypePosition(e.type, gen, TypeResolutionPositionType.GEN);
+                if (pos != null) {
+                    pos.genVar = e.name;
+                    gens.add(pos);
+                }
+            }
+        }
+        if (type is LambdaType) {
+            LambdaType lt = (type as LambdaType);
+            TypeResolutionPosition ret = createTypePosition(lt.returnType, gen, TypeResolutionPositionType.RETURN);
+            if (ret != null) {
+                gens.add(ret);
+            }
+            List<TypeResolutionPosition> positions = createTypePositions(lt.returnType, lt.params, Map(), [], gen);
+            gens.addAll(positions);
+        }
+        if (!gens.isEmpty) {
+            TypeResolutionPosition pos = TypeResolutionPosition(type: posType);
+            pos.gens = gens;
+            return pos;
+        }
+        return null;
+    }
+
+    // static void compute(TypeParam on, CompletionContext ctx, ValidationContext vctx) {
+    //     ctx.computeAtPositions(vctx, [
+    //         on.extendType,
+    //     ]);
+    // }
+
+    PropType resolve(ValidationContext ctx) {
+        if (actualType != null) {
+            return actualType;
+        }
+        if (typeVar != null) {
+            return typeVar;
+        }
+        ClassType type = ClassType(
+            name: name
+        );
+        PropType parent = ctx.typeOrObjectData(extendType);
+        type.extends = parent;
+        actualType = type;
+        return actualType;
+    }
 }

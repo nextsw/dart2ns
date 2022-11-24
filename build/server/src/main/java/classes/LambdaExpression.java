@@ -9,6 +9,9 @@ public class LambdaExpression extends Expression {
   public Expression expression;
   public Block body;
   public ASyncType asyncType = ASyncType.NONE;
+  public MethodDecl originalMethod;
+  public DataType returnType;
+  public PropType expectedType;
 
   public LambdaExpression(List<Param> params) {
     this.params = params;
@@ -65,5 +68,10 @@ public class LambdaExpression extends Expression {
     if (this.body != null) {
       this.body.simplify(s);
     }
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.expression);
+    visitor.visit(this.body);
   }
 }

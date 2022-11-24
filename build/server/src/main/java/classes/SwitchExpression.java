@@ -52,4 +52,13 @@ public class SwitchExpression extends Expression {
       this.onElse = s.makeSimple(this.onElse);
     }
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
+    this.cases.forEach(
+        (c) -> {
+          visitor.visit(c.result);
+        });
+    visitor.visit(this.onElse);
+  }
 }

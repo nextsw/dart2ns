@@ -23,4 +23,8 @@ public class CascadeExp extends Statement {
   public void simplify(Simplifier s) {
     this.on = s.makeSimple(this.on);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
+  }
 }

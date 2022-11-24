@@ -7,6 +7,7 @@ public class BinaryExpression extends Statement {
   public String op;
   public Expression left;
   public Expression right;
+  public MethodDecl method;
 
   public BinaryExpression(Expression left, String op, Expression right) {
     this.left = left;
@@ -60,5 +61,10 @@ public class BinaryExpression extends Statement {
       this.left = s.makeSimple(this.left);
       this.right = s.makeSimple(this.right);
     }
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.right);
+    visitor.visit(this.left);
   }
 }

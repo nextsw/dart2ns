@@ -10,4 +10,10 @@ abstract server class DataType {
         return name;
     }
 
+    PropType type(ValidationContext ctx);
+
+    PropType rawType(ValidationContext ctx);
+
+    List<DataType> get typeArguments;
+
 }

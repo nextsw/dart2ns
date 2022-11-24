@@ -17,5 +17,8 @@ abstract server class TopDecl {
     }
     void simplify(Simplifier s);
 
+    void validate(ValidationContext ctx, Integer phase);
+    void register(ValidationContext ctx);
+
     void visit(ExpressionVisitor visitor);
 }

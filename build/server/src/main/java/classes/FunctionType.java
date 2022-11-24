@@ -10,6 +10,7 @@ public class FunctionType extends DataType {
   public DataType returnType;
   public List<MethodParam> params = ListExt.asList();
   public List<DataType> typeArgs = ListExt.asList();
+  public MethodDecl method;
   public String signature;
 
   public FunctionType(
@@ -67,5 +68,23 @@ public class FunctionType extends DataType {
       StringBuilderExt.write(sb, "void");
     }
     return sb.toString();
+  }
+
+  public PropType type(ValidationContext ctx) {
+    /*
+     FIXME
+    */
+    return null;
+  }
+
+  public PropType rawType(ValidationContext ctx) {
+    /*
+     FIXME
+    */
+    return null;
+  }
+
+  public List<DataType> getTypeArguments() {
+    return ListExt.asList();
   }
 }

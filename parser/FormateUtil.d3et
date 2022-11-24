@@ -679,10 +679,10 @@ server class FormateUtil {
         sb.write(')');
     }
 
-    static void formateTypeParams(TypeParams on, StringBuffer sb, D3EFormattingOptions options) {
+    static void formateTypeParams(List<TypeParam> list, StringBuffer sb, D3EFormattingOptions options) {
         sb.write('<');
-        if (on.params != null) {
-            options.appendCollection(sb, on.params, (i) => formateTypeParam(i, sb, options));
+        if (list.isNotEmpty) {
+            options.appendCollection(sb, list, (i) => formateTypeParam(i, sb, options));
         }
         sb.write('>');
     }
@@ -730,7 +730,7 @@ server class FormateUtil {
             sb.write(on.name);
         }
         if (on.generics != null) {
-            formateTypeParams(on.generics, sb, options);
+            formateTypeParams(on.generics.params, sb, options);
         }
         // if (on.params != null) {
         //     formateMethodParams(on.params, sb, options);
@@ -768,7 +768,7 @@ server class FormateUtil {
             sb.write(on.name);
         }
         if (on.generics != null) {
-            formateTypeParams(on.generics, sb, options);
+            formateTypeParams(on.generics.params, sb, options);
         }
         // if (on.params != null) {
         //     formateMethodParams(on.params, sb, options);
@@ -806,16 +806,16 @@ server class FormateUtil {
     static String toStringLambdaType(LambdaType on) {
         StringBuffer sb = StringBuffer();
         sb.write('(');
-        if (!on.method.params.isEmpty) {
-            sb.write(on.method.params.get(0));
-            for (Integer i = 1; i < on.method.params.length; i++) {
+        if (!on.params.isEmpty) {
+            sb.write(on.params.get(0));
+            for (Integer i = 1; i < on.params.length; i++) {
                 sb.write(', ');
-                sb.write(on.method.params.get(i).dataType);
+                sb.write(on.params.get(i));
             }
         }
         sb.write(')');
         sb.write(' => ');
-        sb.write(on.method.returnType);
+        sb.write(on.returnType);
         sb.write(';');
         return sb.toString();
     }
@@ -834,7 +834,7 @@ server class FormateUtil {
 
     static String toStringTypeParams(TypeParams on) {
         StringBuffer sb = StringBuffer();
-        FormateUtil.formateTypeParams(on, sb, D3EFormattingOptions.withDefault());
+        FormateUtil.formateTypeParams(on.params, sb, D3EFormattingOptions.withDefault());
         return sb.toString();
     }
 

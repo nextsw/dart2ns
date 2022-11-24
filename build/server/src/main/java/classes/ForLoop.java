@@ -24,6 +24,7 @@ public class ForLoop extends Statement {
   }
 
   public void resolve(ResolveContext context) {
+    context.scope = new Scope(context.scope, null);
     if (this.decl != null) {
       this.decl.resolve(context);
     }
@@ -39,6 +40,7 @@ public class ForLoop extends Statement {
     if (this.body != null) {
       this.body.resolve(context);
     }
+    context.scope = context.scope.parent;
   }
 
   public void collectUsedTypes(List<DataType> types) {
@@ -74,5 +76,17 @@ public class ForLoop extends Statement {
       this.body = b;
     }
     this.body.simplify(s);
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.body);
+    visitor.visit(this.decl);
+    visitor.visit(this.test);
+    for (Statement s : this.inits) {
+      visitor.visit(s);
+    }
+    for (Statement s : this.resets) {
+      visitor.visit(s);
+    }
   }
 }

@@ -122,9 +122,9 @@ server class Dart2NSContext {
         }
         List<TopDecl> list = TypeParser.parse(this, content);
         if(current.partOf != null) {
-            current.parent.objects.addAll(list);
+            current.parent.addAll(list);
         } else {
-            current.objects.addAll(list);
+            current.addAll(list);
         }
     }
 

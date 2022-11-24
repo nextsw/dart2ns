@@ -49,6 +49,9 @@ public class SchemaConstants {
   public static final int LiteralType = 45;
   public static final int MemberFilter = 46;
   public static final int TopDeclType = 47;
-  public static final int TypeKind = 48;
-  public static final int _TOTAL_COUNT = 49;
+  public static final int EvalType = 48;
+  public static final int MethodCallType = 49;
+  public static final int TypeKind = 50;
+  public static final int TypeResolutionPositionType = 51;
+  public static final int _TOTAL_COUNT = 52;
 }

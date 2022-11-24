@@ -22,7 +22,7 @@ public class Simplifier {
         fe.on = makeSimple(fe.on);
         String name = makeTempName();
         Declaration d =
-            new Declaration(false, false, false, ListExt.List(), new ValueType("auto", false));
+            new Declaration(false, false, false, ListExt.List(), new ValueType("var", false));
         d.names.add(new NameAndValue(name, fe));
         ListExt.last(this.stack).list.add(d);
         return new FieldOrEnumExpression(false, name, false, null);

@@ -45,7 +45,7 @@ server class BinaryExpression extends Statement {
         if(op == '??=') {
             s.add(Assignment(
                 op: op,
-                left: left as FieldOrEnumExpression,
+                left: left,
                 right: right,
             ));
             s.markDelete();

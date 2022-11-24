@@ -35,4 +35,10 @@ public class StringInterExp extends Expression {
                 }),
             false);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    for (Expression exp : this.values) {
+      visitor.visit(exp);
+    }
+  }
 }

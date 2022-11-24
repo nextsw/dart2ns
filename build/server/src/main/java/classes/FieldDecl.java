@@ -59,4 +59,21 @@ public class FieldDecl extends ClassMember {
   }
 
   public void simplify(Simplifier s) {}
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.value);
+  }
+
+  public void validate(ValidationContext ctx, long phase) {
+    if (phase == 0l) {
+      ctx.validateType(this.type);
+    } else {
+      ctx.validateExpression(this.value);
+      if ((this.type == null || Objects.equals(this.type.name, "var")) && this.value != null) {
+        this.type = this.value.expType.toDataType();
+      }
+    }
+  }
+
+  public void register(ValidationContext ctx) {}
 }

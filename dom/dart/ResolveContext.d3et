@@ -31,4 +31,6 @@ abstract server class ResolveContext {
 
     DataType ofUnknownType();
 
+    void error(String msg);
+
 }

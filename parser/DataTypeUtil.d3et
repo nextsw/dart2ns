@@ -1,26 +1,4 @@
 server class DataTypeUtil {
 
-    static PropType type(ValueType on, ValidationContext ctx) {
-        PropType propType;
-        if (on.name.length == 1) {
-            propType = ctx.getType(on.name);
-        } else {
-            propType = ctx.getType(on.name);
-        }
-        if (propType == null) {
-            ClassType temp = ClassType();
-            temp.name = on.name;
-            propType = temp;
-        } else {
-            ctx.addUsedType(propType);
-        }
-        propType = TypeArgumentsUtil.applyArgs(on.args, ctx, propType);
-        return propType;
-    }
-
-    static PropType rawType(ValueType on, ValidationContext ctx) {
-        PropType realType = ctx.getRawType(on.name);
-        realType = TypeArgumentsUtil.applyRawArgs(on.args, ctx, realType);
-        return realType;
-    }
+    
 }

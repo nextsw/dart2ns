@@ -1,6 +1,5 @@
 package classes;
 
-import d3e.core.D3ELogger;
 import d3e.core.ListExt;
 import d3e.core.StringExt;
 import java.util.List;
@@ -11,6 +10,7 @@ public class ArrayAccess extends Expression {
   public Expression index;
   public boolean checkNull = false;
   public boolean notNull = false;
+  public MethodDecl method;
 
   public ArrayAccess(boolean checkNull, Expression index, boolean notNull, Expression on) {
     this.checkNull = checkNull;
@@ -38,7 +38,7 @@ public class ArrayAccess extends Expression {
         MethodDecl indexMethod = ((MethodDecl) context.getMember(cls, "[]", null, false));
         if (indexMethod == null) {
           this.resolvedType = context.ofUnknownType();
-          D3ELogger.error("Can not find [] operator in : " + cls.name);
+          context.error("Can not find [] operator in : " + cls.name);
         } else if (StringExt.length(indexMethod.returnType.name) == 1l) {
           DataType value$ = context.getListValueType(cls);
           if (value$ == null) {
@@ -50,7 +50,7 @@ public class ArrayAccess extends Expression {
         }
       } else {
         this.resolvedType = context.ofUnknownType();
-        D3ELogger.error("It must be Class");
+        context.error("It must be Class");
       }
     }
   }
@@ -63,5 +63,10 @@ public class ArrayAccess extends Expression {
   public void simplify(Simplifier s) {
     this.on = s.makeSimple(this.on);
     this.index = s.makeSimple(this.index);
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
+    visitor.visit(this.index);
   }
 }

@@ -4,50 +4,5 @@ server class MethodUtil {
 
     // MethodDecl(PropType declCls, String name, TypeAccess typeAccess): super(declCls, name, typeAccess);
 
-    static PropType getTypeAtPosition(MethodDecl on, ValidationContext ctx, TypeResolutionPosition pos) {
-        if (pos.type == TypeResolutionPositionType.RETURN) {
-            return ExecutableUtil.getTypeAtPostion(on, ctx, ctx.getExpectedType(), pos.gens);
-        }
-        return ExecutableUtil.getTypeAtPosition(on, ctx, pos);
-    }
-
-    static Boolean isSignatureMatched(MethodDecl on, ValidationContext ctx, PropType _this, String methodName, Boolean isStatic2, Boolean isGetter, Boolean isSetter, List<PropType> positionParamTypes, Map<String, PropType> namedParamTypes, List<PropType> typeArguments) {
-        if (on.static != isStatic2) {
-            return false;
-        }
-        if (on.setter != isSetter) {
-            return false;
-        }
-        if (on.getter != isGetter) {
-            return false;
-        }
-        return ExecutableUtil.isSignatureMatched(on, ctx, _this, methodName, isStatic2, isGetter, isSetter, positionParamTypes, namedParamTypes, typeArguments);
-    }
-
-
-    static LambdaType asLambdaType(MethodDecl on) {
-        if (on.lambdaType == null) {
-            on.lambdaType = LambdaTypeUtil.withMethod(on);
-        }
-        return on.lambdaType;
-    }
-
-    static MethodDecl replaceGenerics(MethodDecl on, ValidationContext ctx, ParameterizedType paraType) {
-        MethodDecl method = MethodDecl(name: on.name);
-        method.cls = on.cls;
-        method.returnType.resolvedType = PropTypeUtil.resolveType(paraType, ctx, on.returnType.resolvedType, null);
-        method.exp = on.exp;
-        method.body = on.body;
-        method.operator = on.operator;
-        method.static = on.static;
-        method.final = on.final;
-        // method.abstract = on.abstract;
-        method.setter = on.setter;
-        method.getter = on.getter;
-        // method.castRequired = on.castRequired;
-        method.asyncType = on.asyncType;
-        ExecutableUtil.replaceGenerics(on, ctx, paraType, method);
-        return method;
-    }
 
 }

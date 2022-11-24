@@ -6,4 +6,19 @@ server class DefType extends DataType {
     void collectUsedTypes(Set<String> types){
         
     }
+
+
+    PropType type(ValidationContext ctx){
+        // FIXME
+        return null;
+    }
+
+    PropType rawType(ValidationContext ctx){
+        // FIXME
+        return null;
+    }
+
+    List<DataType> get typeArguments {
+        return [];
+    }
 }

@@ -23,4 +23,8 @@ public class PrefixExpression extends Statement {
   public void simplify(Simplifier s) {
     this.on.simplify(s);
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.on);
+  }
 }

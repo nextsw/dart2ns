@@ -6,6 +6,8 @@ import java.util.List;
 public class CaseExpression {
   public List<Expression> tests = ListExt.asList();
   public Expression result;
+  public Range range;
+  public DataType expType;
 
   public CaseExpression() {}
 

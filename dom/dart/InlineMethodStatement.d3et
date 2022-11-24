@@ -4,6 +4,11 @@ server class InlineMethodStatement extends Statement {
 
     void resolve(ResolveContext context) {
         method.resolve(context);
+        FunctionType fnType = FunctionType(
+            returnType: method.returnType,
+            params: List.from(method.allParams),
+        );
+        context.scope.add(method.name, fnType);
     }
 
     void collectUsedTypes(List<DataType> types) {

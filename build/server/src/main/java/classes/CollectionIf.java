@@ -36,4 +36,10 @@ public class CollectionIf extends ArrayItem {
      elseItem = s.makeSimple(elseItem);
     */
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    visitor.visit(this.test);
+    visitor.visit(this.thenItem);
+    visitor.visit(this.elseItem);
+  }
 }

@@ -39,4 +39,10 @@ public class Block extends Statement {
       }
     }
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    for (Statement stmt : this.statements) {
+      visitor.visit(stmt);
+    }
+  }
 }

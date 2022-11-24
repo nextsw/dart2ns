@@ -61,4 +61,12 @@ public class Declaration extends Statement {
       }
     }
   }
+
+  public void visit(ExpressionVisitor visitor) {
+    for (NameAndValue n : this.names) {
+      if (n.value != null) {
+        visitor.visit(n.value);
+      }
+    }
+  }
 }

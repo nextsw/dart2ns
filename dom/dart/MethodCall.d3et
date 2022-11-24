@@ -10,6 +10,7 @@ server class MethodCall extends Statement {
     MethodDecl resolvedMethod;
 
     MethodCallType callType;
+    PropType staticClass;
     MethodCall({
         this.name,
         this.typeArgs,
@@ -28,7 +29,7 @@ server class MethodCall extends Statement {
                 onLibrary = true;
             } else if(on.resolvedType == context.typeType) {
                 if(!(on is FieldOrEnumExpression)){
-                    D3ELogger.error('Mist be FE Exp');
+                    context.error('Mist be FE Exp');
                     resolvedType = context.ofUnknownType();
                     return;
                 }
@@ -63,6 +64,7 @@ server class MethodCall extends Statement {
         for(NamedArgument arg in namedArgs) {
             arg.value.resolve(context);
         }
+        DataType scopeType = context.scope?.get(name);
 
         if(onType != null) {
             ClassMember cm = onType.members.firstWhere(m => m is MethodDecl && (m.name == name || (m as MethodDecl).factoryName == name));
@@ -81,7 +83,7 @@ server class MethodCall extends Statement {
             }
         } else if(onLibrary) {
             if(!(on is FieldOrEnumExpression)){
-                D3ELogger.error('Mist be FE Exp');
+                context.error('Mist be FE Exp');
                 resolvedType = context.ofUnknownType();
                 return;
             }
@@ -102,6 +104,16 @@ server class MethodCall extends Statement {
             } else {
                 resolvedType = context.ofUnknownType();
             }
+        } else if(scopeType != null) {
+            if(scopeType is FunctionType) {
+                resolvedType = (scopeType as FunctionType).returnType;
+            } else {
+                String cls = context.instanceClass?.name;
+                String method = context.method?.name;
+                String inType = onType?.name;
+                context.error('Referend method is not Function type: ' + name + ' in ' + inType + ' Cls: ' + cls +' Method: ' + method);
+                resolvedType = context.ofUnknownType();
+            }
         } else {
             TopDecl td = context.currentLib.get(name);
             if(td is MethodDecl) {
@@ -117,13 +129,13 @@ server class MethodCall extends Statement {
                 String cls = context.instanceClass?.name;
                 String method = context.method?.name;
                 String inType = onType?.name;
-                D3ELogger.error('No method found: ' + name + ' in ' + inType + ' Cls: ' + cls +' Method: ' + method);
+                context.error('No method found: ' + name + ' in ' + inType + ' Cls: ' + cls +' Method: ' + method);
                 resolvedType = context.ofUnknownType();
             }
         }
         if(resolvedMethod != null && this.namedArgs.isNotEmpty) {
-            for(Integer x = this.positionArgs.length; x < resolvedMethod.params.length; x++) {
-                MethodParam param  = resolvedMethod.params.get(x);
+            for(Integer x = this.positionArgs.length; x < resolvedMethod.allParams.length; x++) {
+                MethodParam param  = resolvedMethod.allParams.get(x);
                 NamedArgument arg = namedArgs.firstWhere(n => n.name == param.name);
                 if(arg == null) {
                     positionArgs.add(Argument(

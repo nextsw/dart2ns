@@ -1,4 +1,40 @@
 server class TypeParams{
     List<TypeParam> params = [];
 
+
+
+    List<TypeVariable> resolveRawTypes(ValidationContext ctx, PropType declarType, PropType retType, MethodParams methodParams) {
+        if (params.isEmpty) {
+            return List();
+        }
+        List<PropType> positionalParams = (methodParams == null) ? null : methodParams.positionalParams.map((m) => MethodParamUtil.type(m, ctx, declarType)).toList();
+        List<PropType> optionalParams = (methodParams == null) ? null : methodParams.optionalParams.map((m) => MethodParamUtil.type(m, ctx, declarType)).toList();
+        Map<String, PropType> namedParams = (methodParams == null) ? null : Map.fromIterable(methodParams.namedParams, 
+            key: (m) => m.name,
+            value: (m) => MethodParamUtil.type(m, ctx, declarType),
+        );
+        return params.map((m) => m.createTypeVariable(ctx, retType, positionalParams, namedParams, optionalParams)).toList();
+    }
+
+    Map<String, PropType> resolve(ValidationContext ctx) {
+        if (params.isEmpty) {
+            return Map();
+        }
+        return Map.fromIterable(params, 
+            key: (p) => p.name,
+            value: (m) => m.resolve(ctx),
+        );
+    }
+
+    PropType resolveWithType(ValidationContext ctx, String type) {
+        if (params.isEmpty) {
+            return null;
+        }
+        for (TypeParam param in params) {
+            if (type == param.name) {
+                return param.createTypeVariable(ctx, null, null, null, null);
+            }
+        }
+        return null;
+    }
 }

@@ -14,4 +14,6 @@ public class Continue extends Statement {
   public void resolve(ResolveContext context) {}
 
   public void simplify(Simplifier s) {}
+
+  public void visit(ExpressionVisitor visitor) {}
 }

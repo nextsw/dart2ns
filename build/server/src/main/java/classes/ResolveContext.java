@@ -22,7 +22,7 @@ public abstract class ResolveContext {
 
   public abstract DataType fieldTypeFromScope(String name);
 
-  public abstract DataType resolveType(ClassDecl onType, DataType type);
+  public abstract DataType resolveType(ClassDecl onType, ClassDecl from, DataType type);
 
   public abstract ClassMember getMember(
       ClassDecl onType, String name, MemberFilter filter, boolean noSuperCons);
@@ -36,4 +36,6 @@ public abstract class ResolveContext {
   public abstract DataType getListValueType(ClassDecl cls);
 
   public abstract DataType ofUnknownType();
+
+  public abstract void error(String msg);
 }

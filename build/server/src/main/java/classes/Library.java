@@ -2,13 +2,15 @@ package classes;
 
 import d3e.core.D3ELogger;
 import d3e.core.ListExt;
+import d3e.core.MapExt;
 import d3e.core.SetExt;
 import d3e.core.StringExt;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class Library {
+public class Library implements TypeRegistry {
   public String fullPath;
   public String packagePath;
   public String id;
@@ -18,6 +20,9 @@ public class Library {
   public List<TopDecl> objects = ListExt.asList();
   public List<Part> parts = ListExt.asList();
   public String partOf;
+  public Map<String, PropType> types = MapExt.Map();
+  public Map<String, TopDecl> cache = MapExt.Map();
+  public Set<String> notFound = SetExt.Set();
 
   public Library(String fullPath, String packagePath, Library parent) {
     this.fullPath = fullPath;
@@ -26,10 +31,23 @@ public class Library {
   }
 
   public TopDecl get(String name) {
-    if (StringExt.startsWith(name, "__", 0l)) {
+    if (name == null) {
       return null;
     }
-    return _getInternal(name, SetExt.Set(), true);
+    if (StringExt.startsWith(name, "__", 0l) || this.notFound.contains(name)) {
+      return null;
+    }
+    TopDecl obj = this.cache.get(name);
+    if (obj != null) {
+      return obj;
+    }
+    obj = _getInternal(name, SetExt.Set(), true);
+    if (obj != null) {
+      MapExt.set(this.cache, name, obj);
+    } else {
+      this.notFound.add(name);
+    }
+    return obj;
   }
 
   public TopDecl _getInternal(String name, Set<Library> checked, boolean checkImports) {
@@ -150,5 +168,40 @@ public class Library {
     for (TopDecl obj : this.objects) {
       obj.simplify(s);
     }
+  }
+
+  public void visit(ExpressionVisitor visitor) {
+    for (TopDecl obj : this.objects) {
+      obj.visit(visitor);
+    }
+  }
+
+  public PropType getType(String name) {
+    return this.types.get(name);
+  }
+
+  public void addType(PropType type) {
+    MapExt.set(this.types, type.name, type);
+  }
+
+  public void validate() {
+    ValidationContext ctx = new ValidationContext(this);
+    for (TopDecl top : this.objects) {
+      top.register(ctx);
+    }
+    D3ELogger.info("Validating : " + this.packagePath);
+    for (TopDecl top : this.objects) {
+      top.validate(ctx, 0l);
+    }
+    for (TopDecl top : this.objects) {
+      top.validate(ctx, 1l);
+    }
+  }
+
+  public void addAll(List<TopDecl> list) {
+    for (TopDecl i : list) {
+      i.lib = this;
+    }
+    ListExt.addAll(this.objects, list);
   }
 }

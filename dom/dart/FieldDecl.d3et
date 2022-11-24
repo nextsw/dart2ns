@@ -47,4 +47,19 @@ server class FieldDecl extends ClassMember {
     void visit(ExpressionVisitor visitor){
         visitor.visit(value);
     }
+
+    void validate(ValidationContext ctx, Integer phase) {
+        if(phase == 0) {
+            ctx.validateType(type);
+        } else {
+            ctx.validateExpression(value);
+            if((type == null || type.name == 'var') && value != null){
+                type = value.expType.toDataType();
+            }
+        }
+    }
+
+    void register(ValidationContext ctx) {
+
+    }
 }

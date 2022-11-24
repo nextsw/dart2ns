@@ -12,9 +12,10 @@ server class MethodParams {
     } 
 
     List<MethodParam> toFixedParams() {
-        positionalParams.addAll(optionalParams);
+        List<MethodParam> list = List.from(positionalParams);
+        list.addAll(optionalParams);
         namedParams.sort((a,b) => a.name.compareTo(b.name));
-        positionalParams.addAll(namedParams);
-        return positionalParams;
+        list.addAll(namedParams);
+        return list;
     }
 }

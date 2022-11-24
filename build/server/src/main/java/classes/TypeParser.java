@@ -462,7 +462,8 @@ public class TypeParser {
     ClassDecl cls = new ClassDecl(isMixin, name);
     cls.isAbstract = isAbstract;
     if (this.tok.kind == TypeKind.Lt) {
-      cls.generics = readTypeParams();
+      TypeParams params = readTypeParams();
+      cls.generics = params;
     }
     boolean isMixinApplication = false;
     if (!isMixin && this.tok.kind == TypeKind.Assign) {
@@ -634,9 +635,11 @@ public class TypeParser {
         name = checkName();
       }
     }
+    boolean operator = false;
     if (name.equals("operator")) {
       name = this.tok.lit;
       next();
+      operator = true;
       while (this.tok.kind != TypeKind.Lpar) {
         name += this.tok.lit;
         next();
@@ -701,6 +704,7 @@ public class TypeParser {
             isGet,
             init,
             name,
+            operator,
             params,
             type,
             isSet,
@@ -946,6 +950,7 @@ public class TypeParser {
               false,
               null,
               name,
+              false,
               params,
               type,
               false,
@@ -1700,7 +1705,7 @@ public class TypeParser {
     DataType result = type;
     if (acceptFnWithNoRet && !isTypeName(name) && this.tok.kind == TypeKind.Lpar) {
       MethodParams params = readMethodParams(false);
-      ValueType returnType = new ValueType("void", false);
+      DataType returnType = new ValueType("void", false);
       var value$1 = params == null ? null : params.toFixedParams();
       List<MethodParam> value$ = value$1;
       if (value$ == null) {
