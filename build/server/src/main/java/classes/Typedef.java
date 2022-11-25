@@ -7,6 +7,7 @@ public class Typedef extends TopDecl {
   public DefType type;
   public FunctionType fnType;
   public List<Annotation> annotations = ListExt.asList();
+  public List<DataType> extensions = ListExt.asList();
 
   public Typedef(String name, DefType type, FunctionType fnType) {
     super(name, TopDeclType.Typedef, "");

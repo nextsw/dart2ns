@@ -330,4 +330,18 @@ server class MethodDecl extends ClassMember{
         }
     }
 
+    MethodParam getParamAt(Integer i) {
+        if(i < params.positionalParams.length){
+            return params.positionalParams.get(i);
+        }
+        i = i - params.positionalParams.length;
+        if(i < params.optionalParams.length){
+            return params.optionalParams.get(i);
+        }
+        return null;
+    }
+    MethodParam getParam(String name) {
+        return params.namedParams.firstWhere(p => p.name == name);
+    }
+
 }

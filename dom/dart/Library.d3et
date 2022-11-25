@@ -5,7 +5,7 @@ server class Library implements TypeRegistry {
     Library parent;
     List<Import> imports = [];
     List<Export> exports = [];
-    List<TopDecl> objects = [];
+    Map<String, TopDecl> objects = Map();
     List<Part> parts = [];
     String partOf;
 
@@ -21,28 +21,26 @@ server class Library implements TypeRegistry {
         if(name == null){
             return null;
         }
-        if(name.startsWith('__') || notFound.contains(name)){
+        if(name.startsWith('__')){
             return null;
         }
+        return _getInternal(name, Set(), true);
+    }
+    TopDecl _getInternal(String name, Set<Library> checked, Boolean checkImports) {
+        // if(notFound.contains(name)){
+        //     return null;
+        // }
         TopDecl obj = cache.get(name);
         if(obj != null) {
             return obj;
         }
-        obj = _getInternal(name, Set(), true);
-        if(obj != null) {
-            cache.set(name, obj);
-        } else {
-            notFound.add(name);
-        }
-        return obj;
-    }
-    TopDecl _getInternal(String name, Set<Library> checked, Boolean checkImports) {
+        
         if(checked.contains(this)) {
             return null;
         }
         D3ELogger.info('Checking for "'+ name +'" in ' + packagePath);
         // checked.add(this);
-        TopDecl top = objects.firstWhere(o => o.name == name);
+        TopDecl top = objects.get(name);
         if(top == null) {
             // Check in Exports
             for(Export e in exports){
@@ -75,44 +73,18 @@ server class Library implements TypeRegistry {
                 }
             }
         }
+        if(top != null) {
+            cache.set(name, top);
+        } else {
+            notFound.add(name);
+        }
         return top;
-    }
-
-    void subs(List<TopDecl> libs, Set<Library> collected) {
-        if(collected.contains(this)) {
-            return;
-        }
-        collected.add(this);
-        for(Part p in parts){
-            p.lib.subs(libs, collected);
-        }
-        for(Export p in exports){
-            List<TopDecl> exported = List();
-            p.lib.subs(exported, collected);
-            if(p.hide.isNotEmpty) {
-                for(TopDecl top in exported){
-                    if(p.hide.contains(top.name)){
-                        continue;
-                    }
-                    libs.add(top);
-                }
-            } else if(p.show.isNotEmpty) {
-                for(TopDecl top in exported){
-                    if(p.show.contains(top.name)){
-                        libs.add(top);
-                    }
-                }
-            } else {
-                libs.addAll(exported);
-            }
-        }
-        libs.addAll(objects);
     }
 
     void resolveFields(ResolveContext context) {
         D3ELogger.info('Resolving fields in Library: ' + packagePath);
         context.currentLib = this;
-        for(TopDecl obj in objects) {
+        for(TopDecl obj in objects.values) {
             if(obj is FieldDecl) {
                 (obj as FieldDecl).resolve(context);
             } else if (obj is ClassDecl) {
@@ -123,7 +95,7 @@ server class Library implements TypeRegistry {
     void resolveMethods(ResolveContext context) {
         D3ELogger.info('Resolving methods in Library: ' + packagePath);
         context.currentLib = this;
-        for(TopDecl obj in objects) {
+        for(TopDecl obj in objects.values) {
             if(obj is MethodDecl) {
                 (obj as MethodDecl).resolve(context);
             } else if (obj is ClassDecl) {
@@ -133,19 +105,26 @@ server class Library implements TypeRegistry {
     }
 
     void collectUsedTypes(List<DataType> list) {
-        for(TopDecl obj in objects) {
+        for(TopDecl obj in objects.values) {
             obj.collectUsedTypes();
             list.addAll(obj.usedTypes);
         }
     }
 
+    void addExtensions(){
+        for(TopDecl obj in objects.values){
+            if(obj is ClassDecl) {
+                (obj as ClassDecl).addExtensions();
+            }
+        }
+    }
     void simplify(Simplifier s){
-        for(TopDecl obj in objects){
+        for(TopDecl obj in objects.values){
             obj.simplify(s);
         }
     }
     void visit(ExpressionVisitor visitor){
-        for(TopDecl obj in objects){
+        for(TopDecl obj in objects.values){
             obj.visit(visitor);
         }
     }
@@ -160,14 +139,14 @@ server class Library implements TypeRegistry {
 
     void validate(){
         ValidationContext ctx = ValidationContext(this);
-        for(TopDecl top in objects) {
+        for(TopDecl top in objects.values) {
             top.register(ctx);
         }
         D3ELogger.info('Validating : ' + packagePath);
-        for(TopDecl top in objects) {
+        for(TopDecl top in objects.values) {
             top.validate(ctx, 0);
         }
-        for(TopDecl top in objects) {
+        for(TopDecl top in objects.values) {
             top.validate(ctx, 1);
         }
     }
@@ -176,7 +155,7 @@ server class Library implements TypeRegistry {
         for(TopDecl i in list){
             i.lib = this;
         }
-        objects.addAll(list);
+        objects.addAll(Map.fromIterable(list, key: i => i.name, value: j => j));
     }
 
 }

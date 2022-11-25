@@ -1,6 +1,7 @@
 server class Argument {
     Expression arg;
     Range range;
+    DataType resolvedType;
     List<Comment> afterComments = [];
     Argument({this.arg, this.afterComments});
 }

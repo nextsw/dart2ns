@@ -17,4 +17,8 @@ server class ParExpression extends Expression {
     void visit(ExpressionVisitor visitor) {
         visitor.visit(exp);
     }
+
+    void getTypeChecks(Map<String, String> checks){
+        exp.getTypeChecks(checks);
+    }
 }

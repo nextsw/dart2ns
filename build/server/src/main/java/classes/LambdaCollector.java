@@ -19,7 +19,7 @@ public class LambdaCollector implements ExpressionVisitor {
               return exp instanceof LambdaExpression;
             });
     lib.objects.forEach(
-        (obj) -> {
+        (k, obj) -> {
           if (obj instanceof ClassDecl) {
           } else {
             obj.visit(collector);

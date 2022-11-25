@@ -8,6 +8,7 @@ public class NamedArgument {
   public List<Comment> beforeComments = ListExt.asList();
   public List<Comment> afterComments = ListExt.asList();
   public Expression value;
+  public DataType resolvedType;
 
   public NamedArgument(List<Comment> afterComments, String name, Expression value) {
     this.afterComments = afterComments;

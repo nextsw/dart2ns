@@ -1,6 +1,5 @@
 server class Part {
     String path;
     Library parent;
-    Library lib;
-    Part(this.parent, this.path, this.lib);
+    Part(this.parent, this.path);
 }

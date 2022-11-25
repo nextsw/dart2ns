@@ -8,4 +8,5 @@ server class NamedArgument {
         this.value,
         this.afterComments,
     });
+    DataType resolvedType;
 }

@@ -26,4 +26,15 @@ server class TypeCastOrCheckExpression extends Statement {
     void visit(ExpressionVisitor visitor) {
         visitor.visit(exp);
     }
+
+    void getTypeChecks(Map<String, String> checks){
+        if(check){
+            if(exp is FieldOrEnumExpression){
+                FieldOrEnumExpression fe = exp as FieldOrEnumExpression;
+                if(fe.on == null) {
+                    checks.set(fe.name, dataType.name);
+                }
+            }
+        }
+    }
 }

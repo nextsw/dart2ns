@@ -17,6 +17,7 @@ public abstract class ResolveContext {
   public Library currentLib;
   public MethodDecl method;
   public Scope scope;
+  public DataType expectedType;
 
   public abstract TopDecl get(String name);
 
@@ -25,7 +26,7 @@ public abstract class ResolveContext {
   public abstract DataType resolveType(ClassDecl onType, ClassDecl from, DataType type);
 
   public abstract ClassMember getMember(
-      ClassDecl onType, String name, MemberFilter filter, boolean noSuperCons);
+      ClassDecl onType, String name, MemberFilter filter, boolean noSuperCons, DataType thisType);
 
   public abstract DataType commonType(DataType first, DataType second);
 

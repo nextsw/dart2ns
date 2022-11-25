@@ -19,8 +19,18 @@ public class LambdaExpression extends Expression {
 
   public void resolve(ResolveContext context) {
     context.scope = new Scope(context.scope, null);
-    for (Param p : this.params) {
-      if (p.type != null) {
+    DataType type = context.expectedType;
+    if (type instanceof FunctionType) {
+      FunctionType fnType = ((FunctionType) type);
+      long x = 0l;
+      for (Param p : this.params) {
+        if (p.type == null) {
+          if (x < ListExt.length(fnType.params)) {
+            p.type = ListExt.get(fnType.params, x).dataType;
+          } else {
+            p.type = new ValueType("dynamic", false);
+          }
+        }
         context.scope.add(p.name, p.type);
       }
     }

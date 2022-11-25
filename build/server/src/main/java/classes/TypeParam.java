@@ -18,6 +18,13 @@ public class TypeParam {
     this.name = name;
   }
 
+  public DataType toType() {
+    if (this.extendType != null) {
+      return this.extendType;
+    }
+    return new ValueType(this.name, false);
+  }
+
   public TypeVariable createTypeVariable(
       ValidationContext ctx,
       PropType retType,

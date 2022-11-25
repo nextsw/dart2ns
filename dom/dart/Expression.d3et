@@ -15,5 +15,13 @@ abstract server class Expression {
     void simplify(Simplifier s);
 
     void visit(ExpressionVisitor visitor);
+
+    String toString() {
+        return FormateUtil.toStringExpression(this);
+    }
+
+    void getTypeChecks(Map<String, String> checks){
+        
+    }
     
 }

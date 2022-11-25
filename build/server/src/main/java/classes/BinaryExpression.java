@@ -1,6 +1,8 @@
 package classes;
 
+import d3e.core.MapExt;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class BinaryExpression extends Statement {
@@ -16,27 +18,20 @@ public class BinaryExpression extends Statement {
   }
 
   public void resolve(ResolveContext context) {
+    Map<String, String> typeChecks = MapExt.Map();
+    this.left.getTypeChecks(typeChecks);
     this.left.resolve(context);
-    /*
-     Create new scope if needed
-    */
     boolean newScope = false;
-    if (Objects.equals(this.op, "&&")) {
-      Expression check = this.left;
-      if (check instanceof ParExpression) {
-        check = (((ParExpression) check)).exp;
-      }
-      if (this.left instanceof TypeCastOrCheckExpression) {
-        TypeCastOrCheckExpression typeCheck = ((TypeCastOrCheckExpression) check);
-        if (typeCheck.check && typeCheck.exp instanceof FieldOrEnumExpression) {
-          FieldOrEnumExpression fe = ((FieldOrEnumExpression) typeCheck.exp);
-          if (fe.on == null) {
-            context.scope = new Scope(context.scope, null);
-            context.scope.add(fe.name, typeCheck.dataType);
-            newScope = true;
-          }
-        }
-      }
+    if (MapExt.isNotEmpty(typeChecks) && Objects.equals(this.op, "&&")) {
+      /*
+       Create new scope if needed
+      */
+      context.scope = new Scope(context.scope, null);
+      typeChecks.forEach(
+          (k, v) -> {
+            context.scope.add(k, new ValueType(v, false));
+          });
+      newScope = true;
     }
     this.right.resolve(context);
     if (newScope) {
@@ -66,5 +61,12 @@ public class BinaryExpression extends Statement {
   public void visit(ExpressionVisitor visitor) {
     visitor.visit(this.right);
     visitor.visit(this.left);
+  }
+
+  public void getTypeChecks(Map<String, String> checks) {
+    if (Objects.equals(this.op, "&&")) {
+      this.left.getTypeChecks(checks);
+      this.right.getTypeChecks(checks);
+    }
   }
 }

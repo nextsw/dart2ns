@@ -80,7 +80,7 @@ server class CppGen implements Gen{
             }
         });
         hpp('');
-        lib.objects.forEach((obj) {
+        lib.objects.forEach((k, obj) {
             if(obj is ClassDecl) {
                 genClassDecl(obj as ClassDecl);
             } else if(obj is Enum) {
@@ -259,10 +259,6 @@ server class CppGen implements Gen{
         declareFields(c, false);
         hpp('');
         declareMethods(c, false);
-        c.members.where(o => o is MethodDecl).forEach((o) {
-            MethodDecl m = o as MethodDecl;
-            
-        });
         hpp('};');
         hp(generics(c.generics));
         hp('using ');
@@ -278,13 +274,12 @@ server class CppGen implements Gen{
         hl('>;');
     }
     void declareFields(ClassDecl c, Boolean public) {
-        c.members.where(m => public != m.name.startsWith('_') && (m is FieldDecl)).forEach((m) {
-            genFieldDecl(m as FieldDecl, 1);
+        c.fields.where(m => public != m.name.startsWith('_')).forEach((m) {
+            genFieldDecl(m, 1);
         });
     }
     void declareMethods(ClassDecl c, Boolean public) {
-        c.members.where(x => public != x.name.startsWith('_') && (x is MethodDecl)).forEach((i) {
-            MethodDecl m = i as MethodDecl;
+        c.methods.where(x => public != x.name.startsWith('_')).forEach((m) {
             genMethodDecl(c, m, 1);
         });
     }
@@ -608,7 +603,7 @@ server class CppGen implements Gen{
 
 
         ClassDecl parent = obj as ClassDecl;
-        obj = parent.members.firstWhere(m => m.name == name);
+        obj = parent.get(name);
         if(obj == null || !(obj is MethodDecl)){
             return false;
         }
@@ -1244,7 +1239,7 @@ server class CppGen implements Gen{
         if(c == null) {
             return null;
         }
-        ClassMember cm = c.members.firstWhere(m => m.name == name);
+        ClassMember cm = c.get(name);
         if(cm != null){
             return cm;
         }
@@ -1363,8 +1358,8 @@ server class CppGen implements Gen{
             s= s.parent;
         }
         if(instanceClass != null){
-            ClassMember cm = instanceClass.members.firstWhere(m => m is FieldDecl && m.name == name);
-            if(cm != null) {
+            ClassMember cm = instanceClass.get(name);
+            if(cm != null && cm is FieldDecl) {
                 return (cm as FieldDecl).type;
             }
         }
@@ -1390,7 +1385,8 @@ server class CppGen implements Gen{
     }
 
     Boolean isGetter(ClassDecl type, String name) {
-        return type.members.any(m => m.name == name && m is MethodDecl && (m as MethodDecl).getter);
+        ClassMember cm = type.get(name);
+        return cm is MethodDecl && (cm as MethodDecl).getter;
     }
     void genFnCallExpression(FnCallExpression exp, Integer depth, Xp xp) {
         genExp(exp.on, depth, xp);
@@ -1603,7 +1599,7 @@ server class CppGen implements Gen{
         }
         xp(')');
         if(onType != null) {
-            ClassMember cm = onType.members.firstWhere(m => m.name == exp.name);
+            ClassMember cm = onType.get(exp.name);
             if(cm != null && cm is MethodDecl) {
                 MethodDecl md = cm as MethodDecl;
                 exp.resolvedType = resolveType(onType, md.returnType);

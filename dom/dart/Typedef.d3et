@@ -2,6 +2,7 @@ server class Typedef extends TopDecl {
     DefType type;
     FunctionType fnType;
     List<Annotation> annotations = [];
+    List<DataType> extensions = [];
     Typedef(this.name, this.type, this.fnType) : super(name, TopDeclType.Typedef, '');
 
 

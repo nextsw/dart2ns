@@ -1,6 +1,8 @@
 package classes;
 
+import d3e.core.MapExt;
 import java.util.List;
+import java.util.Map;
 
 public class IfStatement extends Statement {
   public Expression test;
@@ -14,8 +16,20 @@ public class IfStatement extends Statement {
   }
 
   public void resolve(ResolveContext context) {
+    Map<String, String> typeChecks = MapExt.Map();
+    this.test.getTypeChecks(typeChecks);
     this.test.resolve(context);
+    if (MapExt.isNotEmpty(typeChecks)) {
+      context.scope = new Scope(context.scope, null);
+      typeChecks.forEach(
+          (k, v) -> {
+            context.scope.add(k, new ValueType(v, false));
+          });
+    }
     this.thenStatement.resolve(context);
+    if (MapExt.isNotEmpty(typeChecks)) {
+      context.scope = context.scope.parent;
+    }
     if (this.elseStatement != null) {
       this.elseStatement.resolve(context);
     }

@@ -89,7 +89,7 @@ public class CppGen implements Gen {
         });
     hpp("");
     lib.objects.forEach(
-        (obj) -> {
+        (k, obj) -> {
           if (obj instanceof ClassDecl) {
             genClassDecl(((ClassDecl) obj));
           } else if (obj instanceof Enum) {
@@ -302,15 +302,6 @@ public class CppGen implements Gen {
     declareFields(c, false);
     hpp("");
     declareMethods(c, false);
-    ListExt.where(
-            c.members,
-            (o) -> {
-              return o instanceof MethodDecl;
-            })
-        .forEach(
-            (o) -> {
-              MethodDecl m = ((MethodDecl) o);
-            });
     hpp("};");
     hp(generics(c.generics));
     hp("using ");
@@ -334,28 +325,25 @@ public class CppGen implements Gen {
   }
 
   public void declareFields(ClassDecl c, boolean publicValue) {
-    ListExt.where(
-            c.members,
+    IterableExt.where(
+            c.getFields(),
             (m) -> {
-              return publicValue != StringExt.startsWith(m.name, "_", 0l)
-                  && (m instanceof FieldDecl);
+              return publicValue != StringExt.startsWith(m.name, "_", 0l);
             })
         .forEach(
             (m) -> {
-              genFieldDecl(((FieldDecl) m), 1l);
+              genFieldDecl(m, 1l);
             });
   }
 
   public void declareMethods(ClassDecl c, boolean publicValue) {
-    ListExt.where(
-            c.members,
+    IterableExt.where(
+            c.getMethods(),
             (x) -> {
-              return publicValue != StringExt.startsWith(x.name, "_", 0l)
-                  && (x instanceof MethodDecl);
+              return publicValue != StringExt.startsWith(x.name, "_", 0l);
             })
         .forEach(
-            (i) -> {
-              MethodDecl m = ((MethodDecl) i);
+            (m) -> {
               genMethodDecl(c, m, 1l);
             });
   }
@@ -766,13 +754,7 @@ public class CppGen implements Gen {
       return false;
     }
     ClassDecl parent = ((ClassDecl) obj);
-    obj =
-        ListExt.firstWhere(
-            parent.members,
-            (m) -> {
-              return Objects.equals(m.name, name);
-            },
-            null);
+    obj = parent.get(name);
     if (obj == null || !(obj instanceof MethodDecl)) {
       return false;
     }
@@ -1635,13 +1617,7 @@ public class CppGen implements Gen {
     if (c == null) {
       return null;
     }
-    ClassMember cm =
-        ListExt.firstWhere(
-            c.members,
-            (m) -> {
-              return Objects.equals(m.name, name);
-            },
-            null);
+    ClassMember cm = c.get(name);
     if (cm != null) {
       return cm;
     }
@@ -1764,14 +1740,8 @@ public class CppGen implements Gen {
       s = s.parent;
     }
     if (this.instanceClass != null) {
-      ClassMember cm =
-          ListExt.firstWhere(
-              this.instanceClass.members,
-              (m) -> {
-                return m instanceof FieldDecl && Objects.equals(m.name, name);
-              },
-              null);
-      if (cm != null) {
+      ClassMember cm = this.instanceClass.get(name);
+      if (cm != null && cm instanceof FieldDecl) {
         return (((FieldDecl) cm)).type;
       }
     }
@@ -1803,13 +1773,8 @@ public class CppGen implements Gen {
   }
 
   public boolean isGetter(ClassDecl type, String name) {
-    return ListExt.any(
-        type.members,
-        (m) -> {
-          return Objects.equals(m.name, name)
-              && m instanceof MethodDecl
-              && (((MethodDecl) m)).getter;
-        });
+    ClassMember cm = type.get(name);
+    return cm instanceof MethodDecl && (((MethodDecl) cm)).getter;
   }
 
   public void genFnCallExpression(FnCallExpression exp, long depth, Xp xp) {
@@ -2049,13 +2014,7 @@ public class CppGen implements Gen {
     }
     xp.apply(")");
     if (onType != null) {
-      ClassMember cm =
-          ListExt.firstWhere(
-              onType.members,
-              (m) -> {
-                return Objects.equals(m.name, exp.name);
-              },
-              null);
+      ClassMember cm = onType.get(exp.name);
       if (cm != null && cm instanceof MethodDecl) {
         MethodDecl md = ((MethodDecl) cm);
         exp.resolvedType = resolveType(onType, md.returnType);

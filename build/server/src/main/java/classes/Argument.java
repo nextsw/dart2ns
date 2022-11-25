@@ -6,6 +6,7 @@ import java.util.List;
 public class Argument {
   public Expression arg;
   public Range range;
+  public DataType resolvedType;
   public List<Comment> afterComments = ListExt.asList();
 
   public Argument(List<Comment> afterComments, Expression arg) {

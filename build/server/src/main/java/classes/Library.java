@@ -7,7 +7,6 @@ import d3e.core.SetExt;
 import d3e.core.StringExt;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 public class Library implements TypeRegistry {
@@ -17,7 +16,7 @@ public class Library implements TypeRegistry {
   public Library parent;
   public List<Import> imports = ListExt.asList();
   public List<Export> exports = ListExt.asList();
-  public List<TopDecl> objects = ListExt.asList();
+  public Map<String, TopDecl> objects = MapExt.Map();
   public List<Part> parts = ListExt.asList();
   public String partOf;
   public Map<String, PropType> types = MapExt.Map();
@@ -34,23 +33,22 @@ public class Library implements TypeRegistry {
     if (name == null) {
       return null;
     }
-    if (StringExt.startsWith(name, "__", 0l) || this.notFound.contains(name)) {
+    if (StringExt.startsWith(name, "__", 0l)) {
       return null;
     }
+    return _getInternal(name, SetExt.Set(), true);
+  }
+
+  public TopDecl _getInternal(String name, Set<Library> checked, boolean checkImports) {
+    /*
+     if(notFound.contains(name)){
+         return null;
+     }
+    */
     TopDecl obj = this.cache.get(name);
     if (obj != null) {
       return obj;
     }
-    obj = _getInternal(name, SetExt.Set(), true);
-    if (obj != null) {
-      MapExt.set(this.cache, name, obj);
-    } else {
-      this.notFound.add(name);
-    }
-    return obj;
-  }
-
-  public TopDecl _getInternal(String name, Set<Library> checked, boolean checkImports) {
     if (checked.contains(this)) {
       return null;
     }
@@ -58,13 +56,7 @@ public class Library implements TypeRegistry {
     /*
      checked.add(this);
     */
-    TopDecl top =
-        ListExt.firstWhere(
-            this.objects,
-            (o) -> {
-              return Objects.equals(o.name, name);
-            },
-            null);
+    TopDecl top = this.objects.get(name);
     if (top == null) {
       /*
        Check in Exports
@@ -99,44 +91,18 @@ public class Library implements TypeRegistry {
         }
       }
     }
+    if (top != null) {
+      MapExt.set(this.cache, name, top);
+    } else {
+      this.notFound.add(name);
+    }
     return top;
-  }
-
-  public void subs(List<TopDecl> libs, Set<Library> collected) {
-    if (collected.contains(this)) {
-      return;
-    }
-    collected.add(this);
-    for (Part p : this.parts) {
-      p.lib.subs(libs, collected);
-    }
-    for (Export p : this.exports) {
-      List<TopDecl> exported = ListExt.List(0l);
-      p.lib.subs(exported, collected);
-      if (ListExt.isNotEmpty(p.hide)) {
-        for (TopDecl top : exported) {
-          if (p.hide.contains(top.name)) {
-            continue;
-          }
-          libs.add(top);
-        }
-      } else if (ListExt.isNotEmpty(p.show)) {
-        for (TopDecl top : exported) {
-          if (p.show.contains(top.name)) {
-            libs.add(top);
-          }
-        }
-      } else {
-        ListExt.addAll(libs, exported);
-      }
-    }
-    ListExt.addAll(libs, this.objects);
   }
 
   public void resolveFields(ResolveContext context) {
     D3ELogger.info("Resolving fields in Library: " + this.packagePath);
     context.currentLib = this;
-    for (TopDecl obj : this.objects) {
+    for (TopDecl obj : this.objects.values()) {
       if (obj instanceof FieldDecl) {
         (((FieldDecl) obj)).resolve(context);
       } else if (obj instanceof ClassDecl) {
@@ -148,7 +114,7 @@ public class Library implements TypeRegistry {
   public void resolveMethods(ResolveContext context) {
     D3ELogger.info("Resolving methods in Library: " + this.packagePath);
     context.currentLib = this;
-    for (TopDecl obj : this.objects) {
+    for (TopDecl obj : this.objects.values()) {
       if (obj instanceof MethodDecl) {
         (((MethodDecl) obj)).resolve(context);
       } else if (obj instanceof ClassDecl) {
@@ -158,20 +124,28 @@ public class Library implements TypeRegistry {
   }
 
   public void collectUsedTypes(List<DataType> list) {
-    for (TopDecl obj : this.objects) {
+    for (TopDecl obj : this.objects.values()) {
       obj.collectUsedTypes();
       ListExt.addAll(list, obj.usedTypes);
     }
   }
 
+  public void addExtensions() {
+    for (TopDecl obj : this.objects.values()) {
+      if (obj instanceof ClassDecl) {
+        (((ClassDecl) obj)).addExtensions();
+      }
+    }
+  }
+
   public void simplify(Simplifier s) {
-    for (TopDecl obj : this.objects) {
+    for (TopDecl obj : this.objects.values()) {
       obj.simplify(s);
     }
   }
 
   public void visit(ExpressionVisitor visitor) {
-    for (TopDecl obj : this.objects) {
+    for (TopDecl obj : this.objects.values()) {
       obj.visit(visitor);
     }
   }
@@ -186,14 +160,14 @@ public class Library implements TypeRegistry {
 
   public void validate() {
     ValidationContext ctx = new ValidationContext(this);
-    for (TopDecl top : this.objects) {
+    for (TopDecl top : this.objects.values()) {
       top.register(ctx);
     }
     D3ELogger.info("Validating : " + this.packagePath);
-    for (TopDecl top : this.objects) {
+    for (TopDecl top : this.objects.values()) {
       top.validate(ctx, 0l);
     }
-    for (TopDecl top : this.objects) {
+    for (TopDecl top : this.objects.values()) {
       top.validate(ctx, 1l);
     }
   }
@@ -202,6 +176,15 @@ public class Library implements TypeRegistry {
     for (TopDecl i : list) {
       i.lib = this;
     }
-    ListExt.addAll(this.objects, list);
+    MapExt.addAll(
+        this.objects,
+        MapExt.fromIterable(
+            list,
+            (i) -> {
+              return i.name;
+            },
+            (j) -> {
+              return j;
+            }));
   }
 }

@@ -6,8 +6,21 @@ server class IfStatement extends Statement {
 
 
     void resolve(ResolveContext context) {
+        Map<String, String> typeChecks = Map();
+        test.getTypeChecks(typeChecks);
         test.resolve(context);
+        
+        if(typeChecks.isNotEmpty) {
+            context.scope = Scope(parent: context.scope);
+            typeChecks.forEach((k,v){
+                context.scope.add(k, ValueType(v));
+            });
+        }
+
         thenStatement.resolve(context);
+        if(typeChecks.isNotEmpty){
+            context.scope = context.scope.parent;
+        }
         if(elseStatement != null) {
             elseStatement.resolve(context);
         }

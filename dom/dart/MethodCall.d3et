@@ -8,6 +8,7 @@ server class MethodCall extends Statement {
     Expression on;
     String onTypeName;
     MethodDecl resolvedMethod;
+    FunctionType resolvedFunctionType;
 
     MethodCallType callType;
     PropType staticClass;
@@ -21,6 +22,28 @@ server class MethodCall extends Statement {
 
 
     void resolve(ResolveContext context) {
+        callType = ERROR;
+        if(name == 'assert') {
+            resolvedType = context.statementType;
+            callType = Assert;
+            if(positionArgs.isNotEmpty){
+                Expression exp = positionArgs.first.arg;
+                if(exp is LambdaExpression) {
+                    context.expectedType = FunctionType(
+                        returnType: ValueType('bool'),
+                    );
+                } 
+                exp.resolve(context);
+            }
+            return;
+        }
+        if(name == 'this' && context.instanceClass.isExtension) {
+            DataType on = context.instanceClass.ons.first;
+            Typedef def = context.currentLib.get(on.name) as Typedef;
+            resolvedType = def.fnType.returnType;
+            callType = FunctionMethod;
+            return;
+        }
         ClassDecl onType = null;
         Boolean onLibrary = false;
         if(on != null) {
@@ -58,23 +81,44 @@ server class MethodCall extends Statement {
                 }
             }
         }
-        for(Argument arg in positionArgs) {
-            arg.arg.resolve(context);
-        }
-        for(NamedArgument arg in namedArgs) {
-            arg.value.resolve(context);
-        }
         DataType scopeType = context.scope?.get(name);
-
         if(onType != null) {
-            ClassMember cm = onType.members.firstWhere(m => m is MethodDecl && (m.name == name || (m as MethodDecl).factoryName == name));
-            if(cm != null && cm is MethodDecl) {
-                MethodDecl md = cm as MethodDecl;
-                if(md.returnType == null) {
+            MethodDecl md = context.getMember(onType, name, filter: AllMethods) as MethodDecl;
+            if(md == null){
+                md = onType.method(onType.name + '.' + name);
+            }
+            if(md != null) {
+                if(md.getter) {
+                    // we are calling a getters return type
+                    if(md.returnType is FunctionType) {
+                        resolvedFunctionType = md.returnType as FunctionType;
+                        callType = FunctionMethod;
+                    } else {
+                        TopDecl top = context.currentLib.get(md.returnType.name);
+                        if(top is Typedef ){
+                            Typedef def = top as Typedef;
+                            resolvedFunctionType = def.fnType;
+                            callType = FunctionMethod;
+                        } else {
+                            context.error('We can not call non function type getters');
+                            resolvedType = context.ofUnknownType();
+                        }
+                    }
+                } else if(md.returnType == null) {
                     //Assuming it is constuctor
                     resolvedType = ValueType(onType.name);
+                    if(md.factoryName == name){
+                        callType = FactoryConstructor;
+                    } else {
+                        callType = Constructor;
+                    }
                 } else {
                     resolvedType = context.resolveType(onType, md.cls, md.returnType);
+                    if(md.static) {
+                        callType = StaticMethod;
+                    } else {
+                        callType = InstanceMethod;
+                    }
                 }
                 resolvedMethod = md;
             } else {
@@ -85,28 +129,31 @@ server class MethodCall extends Statement {
             if(!(on is FieldOrEnumExpression)){
                 context.error('Mist be FE Exp');
                 resolvedType = context.ofUnknownType();
-                return;
-            }
-            String importName = (on as FieldOrEnumExpression).name;
-            Library libToCheck = context.currentLib;
-            TopDecl topCm = libToCheck.get(name);
-            if(topCm is MethodDecl) {
-                MethodDecl md = topCm as MethodDecl;
-                resolvedType = md.returnType;
-                resolvedMethod = md;
-            } else if(topCm is ClassDecl){
-                ClassDecl cls = topCm as ClassDecl;
-                ClassMember cm = context.getMember(cls, name);
-                if(cm is MethodDecl) {
-                    resolvedMethod = cm as MethodDecl;
-                }
-                resolvedType = ValueType(cls.name);
             } else {
-                resolvedType = context.ofUnknownType();
+                String importName = (on as FieldOrEnumExpression).name;
+                Library libToCheck = context.currentLib;
+                TopDecl topCm = libToCheck.get(name);
+                if(topCm is MethodDecl) {
+                    MethodDecl md = topCm as MethodDecl;
+                    resolvedType = md.returnType;
+                    resolvedMethod = md;
+                    callType = LibraryMethod;
+                } else if(topCm is ClassDecl){
+                    ClassDecl cls = topCm as ClassDecl;
+                    ClassMember cm = context.getMember(cls, name);
+                    if(cm is MethodDecl) {
+                        resolvedMethod = cm as MethodDecl;
+                    }
+                    resolvedType = ValueType(cls.name);
+                    callType = InstanceMethod;
+                } else {
+                    resolvedType = context.ofUnknownType();
+                }
             }
         } else if(scopeType != null) {
             if(scopeType is FunctionType) {
                 resolvedType = (scopeType as FunctionType).returnType;
+                callType = FunctionMethod;
             } else {
                 String cls = context.instanceClass?.name;
                 String method = context.method?.name;
@@ -120,11 +167,12 @@ server class MethodCall extends Statement {
                 MethodDecl md = td as MethodDecl;
                 resolvedType = md.returnType;
                 resolvedMethod = md;
+                callType = LibraryMethod;
                 //TODO need to resolve on method type generics
             } else if(td is ClassDecl){
                 resolvedType = ValueType(name);
-            } else if(name == 'assert'){
-                resolvedType = context.statementType;
+                resolvedMethod = (td as ClassDecl).method(name);
+                callType = Constructor;
             } else {
                 String cls = context.instanceClass?.name;
                 String method = context.method?.name;
@@ -133,21 +181,57 @@ server class MethodCall extends Statement {
                 resolvedType = context.ofUnknownType();
             }
         }
+        
+        Integer x = 0;
+        for(Argument arg in positionArgs) {
+            if(resolvedFunctionType != null) {
+                MethodParam p = resolvedFunctionType.params.get(x);
+                if(p!= null) {
+                    arg.resolvedType = p.dataType;
+                    context.expectedType = arg.resolvedType;
+                }else {
+                    context.expectedType = context.ofUnknownType();
+                }
+            } else if(resolvedMethod != null) {
+                MethodParam p = resolvedMethod.getParamAt(x);
+                if(p!= null){
+                    arg.resolvedType = p.dataType;
+                    context.expectedType = arg.resolvedType;
+                }else {
+                    context.expectedType = context.ofUnknownType();
+                }
+            } else {
+                context.expectedType = context.ofUnknownType();
+            }
+            arg.arg.resolve(context);
+        }
+        for(NamedArgument arg in namedArgs) {
+            if(resolvedMethod != null) {
+                MethodParam p = resolvedMethod.getParam(arg.name);
+                if(p != null) {
+                    arg.resolvedType = resolvedMethod.getParam(arg.name).dataType;
+                    context.expectedType = arg.resolvedType;
+                } else{
+                    context.expectedType = context.ofUnknownType();
+                }
+            } else {
+                context.expectedType = context.ofUnknownType();
+            }
+            arg.value.resolve(context);
+        }
         if(resolvedMethod != null && this.namedArgs.isNotEmpty) {
-            for(Integer x = this.positionArgs.length; x < resolvedMethod.allParams.length; x++) {
-                MethodParam param  = resolvedMethod.allParams.get(x);
+            for(Integer y = this.positionArgs.length; y < resolvedMethod.allParams.length; y++) {
+                MethodParam param  = resolvedMethod.allParams.get(y);
                 NamedArgument arg = namedArgs.firstWhere(n => n.name == param.name);
                 if(arg == null) {
-                    positionArgs.add(Argument(
-                        arg: param.defaultValue ?? makeDefaultValue(param.dataType),
+                    namedArgs.add(NamedArgument(
+                        name: param.name,
+                        value: param.defaultValue ?? makeDefaultValue(param.dataType),
                     ));
                 } else {
-                    positionArgs.add(Argument(
-                        arg: arg.value,
-                    ));
+                    namedArgs.add(arg);
                 }
             }
-            namedArgs.clear();
         }
     }
     void collectUsedTypes(List<DataType> types) {

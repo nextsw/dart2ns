@@ -1,6 +1,7 @@
 package classes;
 
 import java.util.List;
+import java.util.Map;
 
 public class ParExpression extends Expression {
   public Expression exp;
@@ -24,5 +25,9 @@ public class ParExpression extends Expression {
 
   public void visit(ExpressionVisitor visitor) {
     visitor.visit(this.exp);
+  }
+
+  public void getTypeChecks(Map<String, String> checks) {
+    this.exp.getTypeChecks(checks);
   }
 }

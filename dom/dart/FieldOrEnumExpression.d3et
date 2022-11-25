@@ -75,6 +75,14 @@ server class FieldOrEnumExpression extends Statement {
             resolvedType = ValueType(context.instanceClass.name);
             return;
         } 
+        if(name == 'super') {
+            if(context.instanceClass.isMixin) {
+                resolvedType = ValueType(context.instanceClass.name);
+            } else {
+                resolvedType = context.instanceClass.extendType;
+            }
+            return;
+        } 
         DataType fieldType = context.fieldTypeFromScope(name);
         if(onDynamic) {
             resolvedType = context.objectType;

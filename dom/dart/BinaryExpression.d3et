@@ -7,25 +7,18 @@ server class BinaryExpression extends Statement {
 
 
     void resolve(ResolveContext context) {
+        Map<String, String> typeChecks = Map();
+        left.getTypeChecks(typeChecks);
         left.resolve(context);
-        // Create new scope if needed
+        
         Boolean newScope = false;
-        if(op == '&&'){
-            Expression check = left;
-            if(check is ParExpression) {
-                check= (check as ParExpression).exp;
-            }
-            if(left is TypeCastOrCheckExpression){
-                TypeCastOrCheckExpression typeCheck = check as TypeCastOrCheckExpression;
-                if(typeCheck.check && typeCheck.exp is FieldOrEnumExpression){
-                    FieldOrEnumExpression fe = typeCheck.exp as FieldOrEnumExpression;
-                    if(fe.on == null) {
-                        context.scope = Scope(parent: context.scope);
-                        context.scope.add(fe.name, typeCheck.dataType);
-                        newScope = true;
-                    }
-                }
-            }
+        if(typeChecks.isNotEmpty && op == '&&') {
+            // Create new scope if needed
+            context.scope = Scope(parent: context.scope);
+            typeChecks.forEach((k,v){
+                context.scope.add(k, ValueType(v));
+            });
+            newScope = true;
         }
         right.resolve(context);
         if(newScope){
@@ -57,5 +50,12 @@ server class BinaryExpression extends Statement {
     void visit(ExpressionVisitor visitor) {
         visitor.visit(right);
         visitor.visit(left);
+    }
+
+    void getTypeChecks(Map<String, String> checks){
+        if(op == '&&'){
+            left.getTypeChecks(checks);
+            right.getTypeChecks(checks);
+        }
     }
 }

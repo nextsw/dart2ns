@@ -1,6 +1,7 @@
 package classes;
 
 import d3e.core.D3ELogger;
+import d3e.core.IterableExt;
 import d3e.core.ListExt;
 import d3e.core.MapExt;
 import d3e.core.StringExt;
@@ -12,12 +13,14 @@ public class ClassDecl extends TopDecl {
   public TypeParams generics;
   public DataType extendType;
   public List<DataType> impls = ListExt.asList();
-  public List<ClassMember> members = ListExt.asList();
+  private Map<String, ClassMember> _members = MapExt.Map();
   public List<DataType> mixins = ListExt.asList();
   public List<DataType> ons = ListExt.asList();
+  public List<DataType> extensions = ListExt.asList();
   public boolean isMixin = false;
   public DataType mixinApplicationType;
   private String _packagePath;
+  public boolean isExtension = false;
   public Map<String, Map<String, DataType>> resolvedGenerics;
   public ClassType type;
 
@@ -31,7 +34,7 @@ public class ClassDecl extends TopDecl {
     if (this.extendType != null) {
       this.usedTypes.add(this.extendType);
     }
-    for (ClassMember cm : this.members) {
+    for (ClassMember cm : this.getMembers()) {
       if (cm instanceof FieldDecl) {
         FieldDecl fd = ((FieldDecl) cm);
         if (fd.type != null) {
@@ -56,8 +59,8 @@ public class ClassDecl extends TopDecl {
       return;
     }
     this.resolvedGenerics = MapExt.Map();
+    Map<String, DataType> ourGenercis = MapExt.Map();
     if (this.generics != null) {
-      Map<String, DataType> ourGenercis = MapExt.Map();
       for (TypeParam p : this.generics.params) {
         if (p.extendType != null) {
           MapExt.set(ourGenercis, p.name, p.extendType);
@@ -65,8 +68,8 @@ public class ClassDecl extends TopDecl {
           MapExt.set(ourGenercis, p.name, new ValueType(p.name, false));
         }
       }
-      MapExt.set(this.resolvedGenerics, this.name, ourGenercis);
     }
+    MapExt.set(this.resolvedGenerics, this.name, ourGenercis);
     /*
      Check extends
     */
@@ -86,17 +89,22 @@ public class ClassDecl extends TopDecl {
 
   public void resolveGenericsForType(ResolveContext context, DataType type) {
     if (type != null) {
-      ClassDecl ex = ((ClassDecl) this.lib.get(type.name));
-      if (ex != null) {
-        ex.resolveGenerics(context);
+      TopDecl ex = this.lib.get(type.name);
+      if (ex != null && ex instanceof ClassDecl) {
+        ClassDecl cls = ((ClassDecl) ex);
+        cls.resolveGenerics(context);
+        Map<String, DataType> ourGenercis = this.resolvedGenerics.get(this.name);
         ValueType extType = ((ValueType) type);
         Map<String, DataType> replaced = MapExt.Map();
         for (long x = 0l; x < ListExt.length(extType.args); x++) {
           DataType arg = ListExt.get(extType.args, x);
-          TypeParam param = ListExt.get(ex.generics.params, x);
+          TypeParam param = ListExt.get(cls.generics.params, x);
+          if (ourGenercis.containsKey(arg.name)) {
+            arg = ourGenercis.get(arg.name);
+          }
           MapExt.set(replaced, param.name, arg);
         }
-        addResolvedGenerics(ex.resolvedGenerics, replaced);
+        addResolvedGenerics(cls.resolvedGenerics, replaced);
       } else {
         context.error("Unable to find Type: " + type.name);
       }
@@ -122,9 +130,10 @@ public class ClassDecl extends TopDecl {
   }
 
   public void resolveFields(ResolveContext context) {
-    for (ClassMember cm : this.members) {
-      cm.cls = this;
-    }
+    this._members.forEach(
+        (k, cm) -> {
+          cm.cls = this;
+        });
     resolveGenerics(context);
     /*
      D3ELogger.info('Resolving Class: ' + name);
@@ -132,8 +141,8 @@ public class ClassDecl extends TopDecl {
     context.instanceClass = this;
     context.scope = new Scope(context.scope, null);
     for (ClassMember cm :
-        ListExt.where(
-            this.members,
+        IterableExt.where(
+            this.getFields(),
             (m) -> {
               return m instanceof FieldDecl;
             })) {
@@ -150,8 +159,8 @@ public class ClassDecl extends TopDecl {
     context.instanceClass = this;
     context.scope = new Scope(context.scope, null);
     for (ClassMember cm :
-        ListExt.where(
-            this.members,
+        IterableExt.where(
+            this.getMethods(),
             (m) -> {
               return m instanceof MethodDecl;
             })) {
@@ -161,8 +170,35 @@ public class ClassDecl extends TopDecl {
     context.instanceClass = null;
   }
 
+  public void addExtensions() {
+    if (this.isExtension) {
+      for (DataType t : this.ons) {
+        TopDecl top = this.lib.get(t.name);
+        if (top instanceof ClassDecl) {
+          ClassDecl cls = ((ClassDecl) top);
+          ValueType type = new ValueType(this.name, false);
+          if (this.generics != null) {
+            for (TypeParam p : this.generics.params) {
+              type.args.add(p.toType());
+            }
+          }
+          cls.extensions.add(type);
+        } else if (top instanceof Typedef) {
+          Typedef def = ((Typedef) top);
+          ValueType type = new ValueType(this.name, false);
+          if (this.generics != null) {
+            for (TypeParam p : this.generics.params) {
+              type.args.add(p.toType());
+            }
+          }
+          def.extensions.add(type);
+        }
+      }
+    }
+  }
+
   public void simplify(Simplifier s) {
-    for (ClassMember cm : this.members) {
+    for (ClassMember cm : this.getMembers()) {
       cm.simplify(s);
     }
   }
@@ -184,15 +220,15 @@ public class ClassDecl extends TopDecl {
   }
 
   public void visit(ExpressionVisitor visitor) {
-    for (ClassMember cm : this.members) {
+    for (ClassMember cm : this.getMembers()) {
       cm.visit(visitor);
     }
   }
 
   public Iterable<FieldDecl> getFields() {
-    return ListExt.map(
-        ListExt.where(
-            this.members,
+    return IterableExt.map(
+        IterableExt.where(
+            this.getMembers(),
             (m) -> {
               return m instanceof FieldDecl;
             }),
@@ -202,9 +238,9 @@ public class ClassDecl extends TopDecl {
   }
 
   public Iterable<MethodDecl> getMethods() {
-    return ListExt.map(
-        ListExt.where(
-            this.members,
+    return IterableExt.map(
+        IterableExt.where(
+            this.getMembers(),
             (m) -> {
               return m instanceof MethodDecl;
             }),
@@ -244,17 +280,111 @@ public class ClassDecl extends TopDecl {
         ctx.validateType(i);
       }
     }
-    for (ClassMember m : this.members) {
+    for (ClassMember m : this.getMembers()) {
       m.validate(ctx, phase);
     }
   }
 
   public void register(ValidationContext ctx) {
-    for (ClassMember cm : this.members) {
+    for (ClassMember cm : this.getMembers()) {
       cm.cls = this;
     }
     this.type = new ClassType(this.name);
     this.type.cls = this;
     ctx.addToCurrent(this.type);
+  }
+
+  public ClassMember get(String name) {
+    return this._members.get(name);
+  }
+
+  public FieldDecl field(String name) {
+    ClassMember cm = this._members.get(name);
+    if (cm instanceof FieldDecl) {
+      return ((FieldDecl) cm);
+    }
+    /*
+     if(extendType != null) {
+         ClassDecl ext = getClass(extendType);
+         cm = ext.method(name);
+         if(cm is FieldDecl){
+             return cm as FieldDecl;
+         }
+     }
+     for(DataType i in impls){
+         ClassDecl iCls = getClass(i);
+         cm = iCls.method(name);
+         if(cm is FieldDecl){
+             return cm as FieldDecl;
+         }
+     }
+     for(DataType i in ons){
+         // ctx.validateType(i);
+         //type.impls.add(i.resolvedType);
+     }
+     for(DataType i in mixins){
+         ClassDecl iCls = getClass(i);
+         cm = iCls.method(name);
+         if(cm is FieldDecl){
+             return cm as FieldDecl;
+         }
+     }
+    */
+    return null;
+  }
+
+  public MethodDecl method(String name) {
+    ClassMember cm = this._members.get(name);
+    if (cm instanceof MethodDecl) {
+      return ((MethodDecl) cm);
+    }
+    /*
+     if(extendType != null) {
+         ClassDecl ext = getClass(extendType);
+         cm = ext.method(name);
+         if(cm is MethodDecl){
+             return cm as MethodDecl;
+         }
+     }
+     for(DataType i in impls){
+         ClassDecl iCls = getClass(i);
+         cm = iCls.method(name);
+         if(cm is MethodDecl){
+             return cm as MethodDecl;
+         }
+     }
+     for(DataType i in ons){
+         // ctx.validateType(i);
+         //type.impls.add(i.resolvedType);
+     }
+     for(DataType i in mixins){
+         ClassDecl iCls = getClass(i);
+         cm = iCls.method(name);
+         if(cm is MethodDecl){
+             return cm as MethodDecl;
+         }
+     }
+    */
+    return null;
+  }
+
+  public ClassDecl getClass(DataType t) {
+    TopDecl top = this.lib.get(t.name);
+    return ((ClassDecl) top);
+  }
+
+  public Iterable<ClassMember> getMembers() {
+    return this._members.values();
+  }
+
+  public void add(ClassMember cm) {
+    String name = cm.name;
+    if (cm instanceof MethodDecl) {
+      MethodDecl m = ((MethodDecl) cm);
+      if (m.factoryName != null) {
+        name = name + "." + m.factoryName;
+      }
+    }
+    MapExt.set(this._members, name, cm);
   }
 }

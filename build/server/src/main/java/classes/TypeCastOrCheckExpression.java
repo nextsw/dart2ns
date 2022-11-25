@@ -1,6 +1,8 @@
 package classes;
 
+import d3e.core.MapExt;
 import java.util.List;
+import java.util.Map;
 
 public class TypeCastOrCheckExpression extends Statement {
   public boolean check = false;
@@ -36,5 +38,16 @@ public class TypeCastOrCheckExpression extends Statement {
 
   public void visit(ExpressionVisitor visitor) {
     visitor.visit(this.exp);
+  }
+
+  public void getTypeChecks(Map<String, String> checks) {
+    if (this.check) {
+      if (this.exp instanceof FieldOrEnumExpression) {
+        FieldOrEnumExpression fe = ((FieldOrEnumExpression) this.exp);
+        if (fe.on == null) {
+          MapExt.set(checks, fe.name, this.dataType.name);
+        }
+      }
+    }
   }
 }

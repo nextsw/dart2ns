@@ -21,7 +21,7 @@ server class Enum extends TopDecl {
                 static: true,
                 type: ValueType(name),
             );
-            cls.members.add(field);
+            cls.add(field);
         }
         ValueType valuesType = ValueType('List');
         valuesType.args.add(ValueType(name));
@@ -30,7 +30,7 @@ server class Enum extends TopDecl {
             static: true,
             type: valuesType,
         );
-        cls.members.add(valuesField);
+        cls.add(valuesField);
         return cls;
     }
 

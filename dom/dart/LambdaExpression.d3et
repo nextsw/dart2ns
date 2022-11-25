@@ -11,8 +11,18 @@ server class LambdaExpression extends Expression {
 
     void resolve(ResolveContext context) {
         context.scope = Scope(parent: context.scope);
-        for(Param p in params){
-            if(p.type != null) {
+        DataType type = context.expectedType;
+        if(type is FunctionType) {
+            FunctionType fnType = type as FunctionType;
+            Integer x = 0;
+            for(Param p in params){
+                if(p.type == null){
+                    if(x < fnType.params.length){
+                        p.type = fnType.params.get(x).dataType;
+                    } else {
+                        p.type = ValueType('dynamic');
+                    }
+                }
                 context.scope.add(p.name, p.type);
             }
         }

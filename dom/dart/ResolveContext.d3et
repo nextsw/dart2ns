@@ -17,13 +17,14 @@ abstract server class ResolveContext {
     MethodDecl method;
 
     Scope scope;
+    DataType expectedType;
 
 
     TopDecl get(String name);
 
     DataType fieldTypeFromScope(String name);
     DataType resolveType(ClassDecl onType, ClassDecl from, DataType type);
-    ClassMember getMember(ClassDecl onType, String name,{MemberFilter filter, Boolean noSuperCons});
+    ClassMember getMember(ClassDecl onType, String name,{MemberFilter filter, Boolean noSuperCons, DataType thisType});
     DataType commonType(DataType first, DataType second);
     DataType subType(DataType type, [Integer index]);
     List<MethodParam> sortMethodParams(MethodParams params);

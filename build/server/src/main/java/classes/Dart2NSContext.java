@@ -103,9 +103,15 @@ public class Dart2NSContext {
   }
 
   public boolean loadPart(String path) {
-    Library lib = loadLibrary(path);
+    String fullPath = this.current.fullPath;
+    List<String> parts = StringExt.split(fullPath, "/");
+    ListExt.removeLast(parts);
+    List<String> subs = StringExt.split(path, "/");
+    ListExt.addAll(parts, subs);
+    String fp = ListExt.join(parts, "/");
+    _parse(fp);
     path = StringExt.replaceAll(path, ".dart", "");
-    Part p = new Part(this.current, path, lib);
+    Part p = new Part(this.current, path);
     this.current.parts.add(p);
     return false;
   }
@@ -134,11 +140,7 @@ public class Dart2NSContext {
       return;
     }
     List<TopDecl> list = TypeParser.parse(this, content);
-    if (this.current.partOf != null) {
-      this.current.parent.addAll(list);
-    } else {
-      this.current.addAll(list);
-    }
+    this.current.addAll(list);
   }
 
   public static String join(String base, String sub) {

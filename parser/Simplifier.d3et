@@ -6,6 +6,9 @@ server class Simplifier {
         if(exp == null){
             return exp;
         }
+        if(exp is ParExpression) {
+            exp = (exp as ParExpression).exp;
+        }
         if(exp is FieldOrEnumExpression) {
             FieldOrEnumExpression fe = exp as FieldOrEnumExpression;
             if(fe.on == null) {

@@ -139,7 +139,7 @@ server class TypeParser {
         if(isKey(tok, 'hide')) {
             next();
             while(tok.kind != TypeKind.Semicolon) {
-                ex.show.add(tok.lit);
+                ex.hide.add(tok.lit);
                 next();
             }
         }
@@ -453,6 +453,7 @@ server class TypeParser {
         }
         String name = checkName();
         ClassDecl cls = ClassDecl(isMixin, name);
+        cls.isExtension = isExtension;
         cls.isAbstract = isAbstract;
         if (tok.kind == TypeKind.Lt) {
             TypeParams params = readTypeParams();
@@ -489,7 +490,6 @@ server class TypeParser {
                 next();
             }
         }
-        cls.impls.clear();
         if (!isExtension && isKey(tok, 'implements')) {
             next();
             while (true) {
@@ -502,16 +502,17 @@ server class TypeParser {
         }
         if(!isMixinApplication && this.tok.kind == TypeKind.Lcbr) {
             check(TypeKind.Lcbr);
-            cls.members.clear();
+            List<ClassMember> members = [];
             while (true) {
                 List<Comment> comments = eatComments();
                 if (tok.kind == TypeKind.Rcbr || tok.kind == TypeKind.Eof) {
                     break;
                 }
-                ClassMember member = readClassMember(cls.name, cls.members);
+                ClassMember member = readClassMember(cls.name, members);
                 member.comments = comments;
-                cls.members.add(member);
+                members.add(member);
             }
+            members.forEach(i => cls.add(i));
             check(TypeKind.Rcbr);
         } else {
             check(TypeKind.Semicolon);

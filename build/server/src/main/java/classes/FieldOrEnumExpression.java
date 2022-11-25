@@ -80,13 +80,21 @@ public class FieldOrEnumExpression extends Statement {
       this.resolvedType = new ValueType(context.instanceClass.name, false);
       return;
     }
+    if (Objects.equals(this.name, "super")) {
+      if (context.instanceClass.isMixin) {
+        this.resolvedType = new ValueType(context.instanceClass.name, false);
+      } else {
+        this.resolvedType = context.instanceClass.extendType;
+      }
+      return;
+    }
     DataType fieldType = context.fieldTypeFromScope(this.name);
     if (onDynamic) {
       this.resolvedType = context.objectType;
       return;
     }
     if (fieldType == null && onType != null) {
-      ClassMember cm = context.getMember(onType, this.name, null, false);
+      ClassMember cm = context.getMember(onType, this.name, null, false, null);
       resolveUsingClassMember(context, cm, onType);
     } else if (fieldType != null) {
       /*
@@ -99,7 +107,7 @@ public class FieldOrEnumExpression extends Statement {
         this.resolvedType = context.typeType;
         return;
       } else if (context.instanceClass != null) {
-        ClassMember mem = context.getMember(context.instanceClass, this.name, null, false);
+        ClassMember mem = context.getMember(context.instanceClass, this.name, null, false, null);
         if (mem != null) {
           resolveUsingClassMember(context, mem, context.instanceClass);
           fieldType = this.resolvedType;

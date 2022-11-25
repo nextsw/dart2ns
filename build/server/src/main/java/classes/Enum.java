@@ -33,14 +33,14 @@ public class Enum extends TopDecl {
               true,
               new ValueType(this.name, false),
               null);
-      this.cls.members.add(field);
+      this.cls.add(field);
     }
     ValueType valuesType = new ValueType("List", false);
     valuesType.args.add(new ValueType(this.name, false));
     FieldDecl valuesField =
         new FieldDecl(
             ListExt.List(), ListExt.List(), false, false, false, "values", true, valuesType, null);
-    this.cls.members.add(valuesField);
+    this.cls.add(valuesField);
     return this.cls;
   }
 

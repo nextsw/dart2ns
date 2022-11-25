@@ -66,7 +66,7 @@ server class CGen extends ResolveContext implements Gen {
 
 
     DataType ofUnknownType(){
-        D3ELogger.error('Unknown type');
+        error('Unknown type');
         return objectType;
     }
 
@@ -78,6 +78,9 @@ server class CGen extends ResolveContext implements Gen {
 
     void generate() {
         List<DataType> types = [];
+        for(Library lib in context.libs){
+            lib.addExtensions();
+        }
         for(Library lib in context.libs){
             lib.simplify(Simplifier());
         }
@@ -133,7 +136,7 @@ server class CGen extends ResolveContext implements Gen {
         //     }
         // });
         hpp('');
-        List<TopDecl> objects = List.from(lib.objects);
+        List<TopDecl> objects = List.from(lib.objects.values);
         // objects.sort((a, b) => a == b? 0 : a.usedTypes.contains(b.name)? 1 : -1);
 
         Set<String> usedTypes = Set();
@@ -446,7 +449,7 @@ server class CGen extends ResolveContext implements Gen {
         hp(c.name);
         hl('Type;');
         hpp('');
-        c.members.where(o => o is MethodDecl).forEach((obj){
+        c.methods.forEach((obj){
             genMethodDecl(c, obj as MethodDecl, 0);
         });
     }
@@ -464,7 +467,7 @@ server class CGen extends ResolveContext implements Gen {
         declareFields(c, static);
     }
     void declareFields(ClassDecl c, Boolean static) {
-        c.members.where(m => (m is FieldDecl)).forEach((m) {
+        c.fields.forEach((m) {
             FieldDecl fd = m as FieldDecl;
             if(static == fd.static) {
                 genFieldDecl(fd, null, false, 1, x => hp(x));
@@ -485,7 +488,7 @@ server class CGen extends ResolveContext implements Gen {
         hp('    // ');
         hp(c.name);
         hl(' methods');
-        c.members.where(x => x is MethodDecl).forEach((i) {
+        c.methods.forEach((i) {
             MethodDecl m = i as MethodDecl;
             genClassMethodDecl(c, m, added, topLevel);
         });
@@ -880,7 +883,7 @@ server class CGen extends ResolveContext implements Gen {
 
 
         ClassDecl parent = obj as ClassDecl;
-        obj = parent.members.firstWhere(m => m.name == name);
+        obj = parent.get(name);
         if(obj == null || !(obj is MethodDecl)){
             return false;
         }
@@ -1483,87 +1486,107 @@ server class CGen extends ResolveContext implements Gen {
         }
         return null;
     }
-    ClassMember getMember(ClassDecl c, String name, {MemberFilter filter, Boolean noSuperCons}) {
+    ClassMember getMember(ClassDecl c, String name, {MemberFilter filter, Boolean noSuperCons, DataType thisType}) {
         if(c == null) {
             return null;
         }
-        ClassMember cm = c.members.firstWhere((m){
-            if(m.name != name){
-                return false;
-            }
+        ClassMember m = c.get(name);
+        if(m != null){
             if(noSuperCons && m.name == c.name){
-                return false;
+                return null;
             }
             if(filter == null) {
-                return true;
+                return m;
             }
             switch(filter){
                 case AllFields:
                     if(m is MethodDecl){
-                        return false;
+                        return null;
                     }
                 case AllMethods:
                     if(m is FieldDecl){
-                        return false;
+                        return null;
                     }
                 case FieldsAndGetters:
                     if(m is MethodDecl) {
                         MethodDecl md = m as MethodDecl;
                         if(!md.getter){
-                            return false;
+                            return null;
                         }
                     }
                 case FieldsAndSetters:
                     if(m is MethodDecl) {
                     MethodDecl md = m as MethodDecl;
                         if(!md.setter) {
-                            return false;
+                            return null;
                         }
                     }
                 case MethodsWithoutGettersAndSetters:
                     if(m is FieldDecl){
-                        return false;
+                        return null;
                     }
                     if(m is MethodDecl) {
                         MethodDecl md = m as MethodDecl;
                         if(md.setter || md.getter) {
-                            return false;
+                            return null;
                         }
                     }
             }
-            return true;
-        });
-        if(cm != null){
-            return cm;
+        }
+        if(m != null){
+            return m;
         }
         if(c.extendType != null) {
             ClassDecl parent = context.get(c.extendType.name) as ClassDecl;
             if(parent != c) {
-                cm = getMember(parent, name, filter: filter, noSuperCons: true);
+                m = getMember(parent, name, filter: filter, noSuperCons: true);
             }
-            if(cm != null){
-                return cm;
+            if(m != null){
+                return m;
             }
         }
         for(DataType impl in c.impls) {
             ClassDecl parent = context.get(impl.name) as ClassDecl;
             if(parent != c) {
-                cm = getMember(parent, name, filter: filter, noSuperCons: true);
+                m = getMember(parent, name, filter: filter, noSuperCons: true);
             }
-            if(cm != null){
-                return cm;
+            if(m != null){
+                return m;
+            }
+        }
+        if(c.isMixin || (c.isExtension && !noSuperCons)) {
+            for(DataType impl in c.ons) {
+                TopDecl top = context.get(impl.name);
+                if(top is ClassDecl) {
+                    ClassDecl parent = top as ClassDecl;
+                    if(parent != c) {
+                        m = getMember(parent, name, filter: filter, noSuperCons: true);
+                    }
+                }
+                if(m != null){
+                    return m;
+                }
             }
         }
         for(DataType impl in c.mixins) {
             ClassDecl parent = context.get(impl.name) as ClassDecl;
             if(parent != c) {
-                cm = getMember(parent, name, filter: filter, noSuperCons: true);
+                m = getMember(parent, name, filter: filter, noSuperCons: true);
             }
-            if(cm != null){
-                return cm;
+            if(m != null){
+                return m;
             }
         }
-        return cm;
+        for(DataType impl in c.extensions) {
+            ClassDecl parent = context.get(impl.name) as ClassDecl;
+            if(parent != c) {
+                m = getMember(parent, name, filter: filter, noSuperCons: true);
+            }
+            if(m != null){
+                return m;
+            }
+        }
+        return m;
     }
     void genFieldOrEnumExpression(FieldOrEnumExpression exp, Integer depth, Xp xp) {
         if(exp.resolvedType is FunctionType && exp.on != null) {
@@ -1660,8 +1683,8 @@ server class CGen extends ResolveContext implements Gen {
             s= s.parent;
         }
         if(instanceClass != null){
-            ClassMember cm = instanceClass.members.firstWhere(m => m is FieldDecl && m.name == name);
-            if(cm != null) {
+            ClassMember cm = instanceClass.get(name);
+            if(cm != null && cm is FieldDecl) {
                 return (cm as FieldDecl).type;
             }
         }
@@ -1673,7 +1696,11 @@ server class CGen extends ResolveContext implements Gen {
             return ofUnknownType();
         }
         if(c.generics != null && from != null) {
-            DataType res = c.resolvedGenerics.get(from.name).get(r.name);
+            Map<String, DataType> forFrom = c.resolvedGenerics.get(from.name);
+            if(forFrom == null){
+                return r;
+            }
+            DataType res = forFrom.get(r.name);
             if(res !=null) {
                 return res;
             }
@@ -1683,7 +1710,8 @@ server class CGen extends ResolveContext implements Gen {
     }
 
     Boolean isGetter(ClassDecl type, String name) {
-        return type.members.any(m => m.name == name && m is MethodDecl && (m as MethodDecl).getter);
+        ClassMember cm = type.get(name);
+        return cm is MethodDecl && (cm as MethodDecl).getter;
     }
     void genFnCallExpression(FnCallExpression exp, Integer depth, Xp xp) {
         genExp(exp.on, depth, xp);
@@ -2109,20 +2137,12 @@ server class CGen extends ResolveContext implements Gen {
     }
 
     DataType getListValueType(ClassDecl cls) {
-        ValueType listImpl = cls.impls.firstWhere(i => i.name =='List') as ValueType;
-        if(listImpl != null) {
-            DataType valueType = listImpl.args.isNotEmpty? listImpl.args.get(0): null;
-            if(valueType == null || valueType.name.length == 1){
-                D3ELogger.error('We need to resolve the List ValueType Further');
-            } else {
-                return valueType;
-            }
+        MethodDecl method = getMember(cls, '[]', filter: AllMethods) as MethodDecl;
+        if(method != null) {
+            return method.returnType;
+        } else {
+            error('No index operator found');
+            return ofUnknownType();
         }
-        return null;
     }
-
-
-
-    
-
 }

@@ -6,6 +6,13 @@ server class TypeParam {
     PropType actualType;
     TypeParam({this.name, this.extendType});
 
+    DataType toType(){
+        if(extendType != null){
+            return extendType;
+        } 
+        return ValueType(name);
+    }
+
 
 
     TypeVariable createTypeVariable(ValidationContext ctx, PropType retType, List<PropType> positionalParams, Map<String, PropType> namedParams, List<PropType> optionalParams) {

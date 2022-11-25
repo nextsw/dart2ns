@@ -419,4 +419,24 @@ public class MethodDecl extends ClassMember {
       }
     }
   }
+
+  public MethodParam getParamAt(long i) {
+    if (i < ListExt.length(this.params.positionalParams)) {
+      return ListExt.get(this.params.positionalParams, i);
+    }
+    i = i - ListExt.length(this.params.positionalParams);
+    if (i < ListExt.length(this.params.optionalParams)) {
+      return ListExt.get(this.params.optionalParams, i);
+    }
+    return null;
+  }
+
+  public MethodParam getParam(String name) {
+    return ListExt.firstWhere(
+        this.params.namedParams,
+        (p) -> {
+          return Objects.equals(p.name, name);
+        },
+        null);
+  }
 }

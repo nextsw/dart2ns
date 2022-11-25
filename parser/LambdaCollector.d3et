@@ -5,7 +5,7 @@ server class LambdaCollector  implements ExpressionVisitor{
 
     static List<Expression> forLibrary(Library lib) {
         LambdaCollector collector = LambdaCollector((exp) => exp is LambdaExpression);
-        lib.objects.forEach((obj) {
+        lib.objects.forEach((k, obj) {
             if(obj is ClassDecl) {
              } else {
                 obj.visit(collector);

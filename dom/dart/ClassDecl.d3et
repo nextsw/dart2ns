@@ -3,12 +3,14 @@ server class ClassDecl extends TopDecl {
     TypeParams generics;
     DataType extendType;
     List<DataType> impls = [];
-    List<ClassMember> members = [];
+    Map<String, ClassMember> _members = Map();
     List<DataType> mixins = [];
     List<DataType> ons = [];
+    List<DataType> extensions = [];
     Boolean isMixin;
     DataType mixinApplicationType;
     String _packagePath;
+    Boolean isExtension;
     Map<String, Map<String, DataType>> resolvedGenerics;
 
     ClassType type;
@@ -44,8 +46,8 @@ server class ClassDecl extends TopDecl {
             return;
         }
         resolvedGenerics = Map();
+        Map<String, DataType> ourGenercis = Map();
         if(generics != null){
-            Map<String, DataType> ourGenercis = Map();
             for(TypeParam p in generics.params) {
                 if(p.extendType != null) {
                     ourGenercis.set(p.name, p.extendType);
@@ -53,8 +55,8 @@ server class ClassDecl extends TopDecl {
                     ourGenercis.set(p.name, ValueType(p.name));
                 }
             }
-            resolvedGenerics.set(name, ourGenercis);
         }
+        resolvedGenerics.set(name, ourGenercis);
         // Check extends
         if(extendType != null) {
             resolveGenericsForType(context, extendType);
@@ -70,17 +72,22 @@ server class ClassDecl extends TopDecl {
     }
     void resolveGenericsForType(ResolveContext context, DataType type) {
         if(type != null) {
-            ClassDecl ex = lib.get(type.name) as ClassDecl;
-            if(ex != null) {
-                ex.resolveGenerics(context);
+            TopDecl ex = lib.get(type.name);
+            if(ex != null && ex is ClassDecl) {
+                ClassDecl cls = ex as ClassDecl;
+                cls.resolveGenerics(context);
+                Map<String, DataType> ourGenercis = resolvedGenerics.get(name);
                 ValueType extType = type as ValueType;
                 Map<String, DataType> replaced = Map();
                 for(Integer x=0; x< extType.args.length; x++){
                     DataType arg = extType.args.get(x);
-                    TypeParam param = ex.generics.params.get(x);
+                    TypeParam param = cls.generics.params.get(x);
+                    if(ourGenercis.containsKey(arg.name)){
+                        arg = ourGenercis.get(arg.name);
+                    }
                     replaced.set(param.name, arg);
                 }
-                addResolvedGenerics(ex.resolvedGenerics, replaced);
+                addResolvedGenerics(cls.resolvedGenerics, replaced);
             } else {
                 context.error('Unable to find Type: '+ type.name);
             }
@@ -98,14 +105,14 @@ server class ClassDecl extends TopDecl {
     }
 
     void resolveFields(ResolveContext context){
-        for(ClassMember cm in members){
+        _members.forEach((k, cm){
             cm.cls = this;
-        }
+        });
         resolveGenerics(context);
         // D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);
-        for(ClassMember cm in members.where(m => m is FieldDecl)){
+        for(ClassMember cm in fields.where(m => m is FieldDecl)){
             (cm as FieldDecl).resolve(context);
         }
         context.scope = context.scope.parent;
@@ -115,11 +122,38 @@ server class ClassDecl extends TopDecl {
         // D3ELogger.info('Resolving Class: ' + name);
         context.instanceClass = this;
         context.scope = Scope(parent: context.scope);
-        for(ClassMember cm in members.where(m => m is MethodDecl)){
+        for(ClassMember cm in methods.where(m => m is MethodDecl)){
             (cm as MethodDecl).resolve(context);
         }
         context.scope = context.scope.parent;
         context.instanceClass = null;
+    }
+
+    void addExtensions(){
+        if(isExtension) {
+            for(DataType t in ons) {
+                TopDecl top = lib.get(t.name);
+                if(top is ClassDecl) {
+                    ClassDecl cls = top as ClassDecl;
+                    ValueType type = ValueType(name);
+                    if(generics != null) {
+                        for(TypeParam p in generics.params){
+                            type.args.add(p.toType());
+                        }
+                    }
+                    cls.extensions.add(type);
+                } else if(top is Typedef) {
+                    Typedef def = top as Typedef;
+                    ValueType type = ValueType(name);
+                    if(generics != null) {
+                        for(TypeParam p in generics.params){
+                            type.args.add(p.toType());
+                        }
+                    }
+                    def.extensions.add(type);
+                }
+            }
+        }
     }
 
     void simplify(Simplifier s){
@@ -193,5 +227,95 @@ server class ClassDecl extends TopDecl {
         type = ClassType(name: name);
         type.cls = this;
         ctx.addToCurrent(type);
+    }
+
+    ClassMember get(String name){
+        return _members.get(name);
+    }
+
+    FieldDecl field(String name){
+        ClassMember cm = _members.get(name);
+        if(cm is FieldDecl){
+            return cm as FieldDecl;
+        }
+        // if(extendType != null) {
+        //     ClassDecl ext = getClass(extendType);
+        //     cm = ext.method(name);
+        //     if(cm is FieldDecl){
+        //         return cm as FieldDecl;
+        //     }
+        // }
+        // for(DataType i in impls){
+        //     ClassDecl iCls = getClass(i);
+        //     cm = iCls.method(name);
+        //     if(cm is FieldDecl){
+        //         return cm as FieldDecl;
+        //     }
+        // }
+        // for(DataType i in ons){
+        //     // ctx.validateType(i);
+        //     //type.impls.add(i.resolvedType);
+        // }
+        // for(DataType i in mixins){
+        //     ClassDecl iCls = getClass(i);
+        //     cm = iCls.method(name);
+        //     if(cm is FieldDecl){
+        //         return cm as FieldDecl;
+        //     }
+        // }
+        return null;
+    }
+
+    MethodDecl method(String name){
+        ClassMember cm = _members.get(name);
+        if(cm is MethodDecl){
+            return cm as MethodDecl;
+        }
+        // if(extendType != null) {
+        //     ClassDecl ext = getClass(extendType);
+        //     cm = ext.method(name);
+        //     if(cm is MethodDecl){
+        //         return cm as MethodDecl;
+        //     }
+        // }
+        // for(DataType i in impls){
+        //     ClassDecl iCls = getClass(i);
+        //     cm = iCls.method(name);
+        //     if(cm is MethodDecl){
+        //         return cm as MethodDecl;
+        //     }
+        // }
+        // for(DataType i in ons){
+        //     // ctx.validateType(i);
+        //     //type.impls.add(i.resolvedType);
+        // }
+        // for(DataType i in mixins){
+        //     ClassDecl iCls = getClass(i);
+        //     cm = iCls.method(name);
+        //     if(cm is MethodDecl){
+        //         return cm as MethodDecl;
+        //     }
+        // }
+        return null;
+    }
+
+    ClassDecl getClass(DataType t) {
+        TopDecl top = lib.get(t.name);
+        return top as ClassDecl;
+    }
+
+    Iterable<ClassMember> get members {
+        return _members.values;
+    }
+
+    void add(ClassMember cm) {
+        String name = cm.name;
+        if(cm is MethodDecl) {
+            MethodDecl m = cm as MethodDecl;
+            if(m.factoryName != null) {
+                name = name + '.' + m.factoryName;
+            }
+        }
+        _members.set(name, cm);
     }
 } 
